@@ -228,3 +228,15 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
   cursor: pointer;
 }
 .tab[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 700; }
+
+.stepper { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.stepper-btn {
+  width: 26px; height: 26px; border-radius: 13px;
+  border: 1px solid var(--primary);
+  background: transparent;
+  color: var(--primary);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.stepper-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.stepper-qty { min-width: 20px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }

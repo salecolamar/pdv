@@ -278,3 +278,85 @@ create policy "audit_logs_isolamento" on audit_logs for all to authenticated
 create index vendas_empresa_criado_em_idx on vendas (empresa_id, criado_em desc);
 create index produtos_empresa_ativo_idx on produtos (empresa_id, ativo);
 create index clientes_empresa_nome_idx on clientes (empresa_id, nome);
+
+-- ---------------------------------------------------------------------
+-- finalizar_venda: fecha uma venda inteira numa transação só — valida
+-- estoque, cria a venda, os itens e os pagamentos, e baixa o estoque dos
+-- produtos controlados. Se qualquer parte falhar (estoque insuficiente,
+-- pagamentos que não batem com o total), a função inteira desfaz sozinha.
+-- ---------------------------------------------------------------------
+create or replace function finalizar_venda(
+  p_itens jsonb,
+  p_pagamentos jsonb,
+  p_desconto numeric default 0,
+  p_cliente_id uuid default null
+)
+returns uuid
+language plpgsql
+security invoker
+as $$
+declare
+  v_venda_id uuid := gen_random_uuid();
+  v_subtotal numeric := 0;
+  v_total numeric := 0;
+  v_soma_pagamentos numeric := 0;
+  v_item jsonb;
+  v_pagamento jsonb;
+  v_produto produtos%rowtype;
+  v_qtd numeric;
+begin
+  if jsonb_array_length(p_itens) = 0 then
+    raise exception 'A venda precisa ter ao menos um item.';
+  end if;
+
+  for v_item in select * from jsonb_array_elements(p_itens)
+  loop
+    v_qtd := (v_item->>'quantidade')::numeric;
+    select * into v_produto from produtos where id = (v_item->>'produto_id')::uuid;
+    if v_produto is null then
+      raise exception 'Produto não encontrado.';
+    end if;
+    if v_produto.estoque is not null and v_produto.estoque < v_qtd then
+      raise exception 'Estoque insuficiente de "%". Disponível: %.', v_produto.nome, v_produto.estoque;
+    end if;
+    v_subtotal := v_subtotal + (v_qtd * (v_item->>'preco_unitario')::numeric);
+  end loop;
+
+  v_total := v_subtotal - coalesce(p_desconto, 0);
+  if v_total < 0 then
+    raise exception 'O desconto não pode ser maior que o total da venda.';
+  end if;
+
+  select coalesce(sum((p->>'valor')::numeric), 0) into v_soma_pagamentos
+  from jsonb_array_elements(p_pagamentos) p;
+  if abs(v_soma_pagamentos - v_total) > 0.01 then
+    raise exception 'O total dos pagamentos (%) não bate com o valor da venda (%).', v_soma_pagamentos, v_total;
+  end if;
+
+  insert into vendas (id, cliente_id, operador_id, subtotal, desconto, total)
+  values (v_venda_id, p_cliente_id, auth.uid(), v_subtotal, coalesce(p_desconto, 0), v_total);
+
+  for v_item in select * from jsonb_array_elements(p_itens)
+  loop
+    insert into venda_itens (venda_id, produto_id, nome_produto, quantidade, preco_unitario)
+    values (
+      v_venda_id,
+      (v_item->>'produto_id')::uuid,
+      v_item->>'nome_produto',
+      (v_item->>'quantidade')::numeric,
+      (v_item->>'preco_unitario')::numeric
+    );
+
+    update produtos set estoque = estoque - (v_item->>'quantidade')::numeric
+    where id = (v_item->>'produto_id')::uuid and estoque is not null;
+  end loop;
+
+  for v_pagamento in select * from jsonb_array_elements(p_pagamentos)
+  loop
+    insert into pagamentos (venda_id, forma, valor)
+    values (v_venda_id, v_pagamento->>'forma', (v_pagamento->>'valor')::numeric);
+  end loop;
+
+  return v_venda_id;
+end;
+$$;

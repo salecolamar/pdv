@@ -14,6 +14,7 @@ import { supabase } from './supabase';
 import { Centro } from './App';
 import Dashboard from './pages/Dashboard';
 import Produtos from './pages/Produtos';
+import Pdv from './pages/Pdv';
 
 // Cada módulo diz quais papéis podem vê-lo (seção 10 do documento):
 // admin enxerga tudo; gerente não mexe em usuários; operador só vende e
@@ -106,7 +107,7 @@ export default function Shell({ session }) {
 
       <main style={{ flex: 1, padding: 16 }}>
         {abaAtiva === 'dashboard' && <Dashboard />}
-        {abaAtiva === 'pdv' && <EmConstrucao nome="PDV" />}
+        {abaAtiva === 'pdv' && <Pdv />}
         {abaAtiva === 'produtos' && <Produtos />}
         {abaAtiva === 'clientes' && <EmConstrucao nome="Clientes" />}
         {abaAtiva === 'estoque' && <EmConstrucao nome="Estoque" />}
