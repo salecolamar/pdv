@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Minus, Plus, Trash2, X } from 'lucide-react';
+import { Minus, Plus, ShoppingCart, Trash2, X } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import { precoEfetivo } from '../utils/promocoes';
+import Pdv from './Pdv';
 
 const STATUS_LABEL = { livre: 'Livre', ocupada: 'Ocupada' };
 
 export default function Mesas() {
   const [aba, setAba] = useState('mapa');
   const [mesaSelecionada, setMesaSelecionada] = useState(null);
+  const [vendaAvulsa, setVendaAvulsa] = useState(false);
   const [mesas, setMesas] = useState(null);
 
   useEffect(() => {
@@ -39,6 +41,17 @@ export default function Mesas() {
     );
   }
 
+  if (vendaAvulsa) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setVendaAvulsa(false)}>
+          <X size={14} /> Voltar ao mapa
+        </button>
+        <Pdv />
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="tab-row">
@@ -51,7 +64,12 @@ export default function Mesas() {
       </div>
 
       {aba === 'mapa' ? (
-        <MapaMesas mesas={mesas} onAbrirMesa={setMesaSelecionada} />
+        <>
+          <MapaMesas mesas={mesas} onAbrirMesa={setMesaSelecionada} />
+          <button type="button" className="btn btn-secondary btn-block" onClick={() => setVendaAvulsa(true)}>
+            <ShoppingCart size={15} /> Venda avulsa (sem mesa)
+          </button>
+        </>
       ) : (
         <ConfigurarMesas mesas={mesas} onAtualizado={carregar} />
       )}
