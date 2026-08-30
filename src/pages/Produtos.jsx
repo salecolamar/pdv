@@ -223,11 +223,22 @@ function ProdutosLista({ categorias }) {
     const dados = validar(campos, setErro);
     if (!dados) return;
     setSalvando(true);
+    const original = produtos.find((p) => p.id === id);
     const { error } = await supabase.from('produtos').update(dados).eq('id', id);
     setSalvando(false);
     if (error) {
       setErro(error.message);
       return;
+    }
+    if (original && Number(original.preco) !== dados.preco) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      await supabase.from('audit_logs').insert({
+        usuario_id: user.id,
+        acao: 'alterar_preco',
+        detalhes: { produto: dados.nome, preco_antigo: Number(original.preco), preco_novo: dados.preco },
+      });
     }
     setEditandoId(null);
     carregar();

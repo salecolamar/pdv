@@ -3,6 +3,7 @@ import {
   BarChart3,
   Boxes,
   ChefHat,
+  History,
   LayoutDashboard,
   LayoutGrid,
   LogOut,
@@ -27,6 +28,7 @@ import Caixa from './pages/Caixa';
 import Usuarios from './pages/Usuarios';
 import Relatorios from './pages/Relatorios';
 import Notificacoes from './pages/Notificacoes';
+import Auditoria from './pages/Auditoria';
 
 // Cada módulo diz quais papéis podem vê-lo (seção 10 do documento):
 // admin enxerga tudo; gerente não mexe em usuários; operador só vende e
@@ -43,6 +45,7 @@ const MODULOS = [
   { id: 'caixa', label: 'Caixa', icon: Wallet, papeis: ['admin', 'gerente'] },
   { id: 'relatorios', label: 'Relatórios', icon: BarChart3, papeis: ['admin', 'gerente'] },
   { id: 'usuarios', label: 'Usuários', icon: UserCog, papeis: ['admin'] },
+  { id: 'auditoria', label: 'Auditoria', icon: History, papeis: ['admin'] },
 ];
 
 export default function Shell({ session }) {
@@ -134,6 +137,7 @@ export default function Shell({ session }) {
         {abaAtiva === 'caixa' && <Caixa />}
         {abaAtiva === 'relatorios' && <Relatorios />}
         {abaAtiva === 'usuarios' && <Usuarios />}
+        {abaAtiva === 'auditoria' && <Auditoria />}
       </main>
     </div>
   );

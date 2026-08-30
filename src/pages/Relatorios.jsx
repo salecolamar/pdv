@@ -40,6 +40,8 @@ export default function Relatorios() {
   const [ate, setAte] = useState('');
   const [resumo, setResumo] = useState(undefined);
   const [erro, setErro] = useState('');
+  const [cancelandoId, setCancelandoId] = useState(null);
+  const [motivoCancelamento, setMotivoCancelamento] = useState('');
 
   useEffect(() => {
     carregar();
@@ -111,6 +113,17 @@ export default function Relatorios() {
       porFormaPagamento: [...porFormaPagamento.entries()].sort((a, b) => b[1] - a[1]),
       maisVendidos,
     });
+  }
+
+  async function confirmarCancelamento(id) {
+    const { error } = await supabase.rpc('cancelar_venda', { p_venda_id: id, p_motivo: motivoCancelamento.trim() || null });
+    if (error) {
+      setErro(error.message.replace('P0001: ', ''));
+      return;
+    }
+    setCancelandoId(null);
+    setMotivoCancelamento('');
+    carregar();
   }
 
   function exportarCsv() {
@@ -205,6 +218,46 @@ export default function Relatorios() {
                     <span className="tabular">{money(v.total)}</span>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          <div className="card no-print">
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>Vendas do período</div>
+            {resumo.vendas.length === 0 ? (
+              <p className="muted" style={{ fontSize: 13, margin: 0 }}>Nenhuma venda no período.</p>
+            ) : (
+              <div className="list">
+                {resumo.vendas.map((v) =>
+                  cancelandoId === v.id ? (
+                    <div key={v.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 13 }}>Cancelar venda de {money(v.total)}?</span>
+                      <span className="label">Motivo (opcional)</span>
+                      <input value={motivoCancelamento} onChange={(e) => setMotivoCancelamento(e.target.value)} />
+                      {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
+                      <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                        <button type="button" className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={() => setCancelandoId(null)}>
+                          Voltar
+                        </button>
+                        <button type="button" className="btn btn-danger btn-sm" style={{ flex: 1 }} onClick={() => confirmarCancelamento(v.id)}>
+                          Confirmar cancelamento
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="item" key={v.id}>
+                      <span>
+                        {new Date(v.criado_em).toLocaleString('pt-BR')} <span className="muted" style={{ fontSize: 11 }}>· {v.usuarios?.nome || 'Sem operador'}</span>
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className="tabular">{money(v.total)}</span>
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setCancelandoId(v.id); setMotivoCancelamento(''); setErro(''); }}>
+                          Cancelar
+                        </button>
+                      </span>
+                    </div>
+                  )
+                )}
               </div>
             )}
           </div>

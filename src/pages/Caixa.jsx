@@ -55,6 +55,7 @@ function AbrirCaixa({ onAberto }) {
       setErro(error.message);
       return;
     }
+    await supabase.from('audit_logs').insert({ usuario_id: user.id, acao: 'abrir_caixa', detalhes: { valor_inicial: valor } });
     onAberto();
   }
 

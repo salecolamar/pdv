@@ -202,6 +202,11 @@ begin
   update pedidos set status = 'pago', venda_id = v_venda_id where id = p_pedido_id;
   update mesas set status = 'livre' where id = v_pedido.mesa_id;
 
+  if coalesce(p_desconto, 0) > 0 then
+    insert into audit_logs (usuario_id, acao, detalhes)
+    values (auth.uid(), 'desconto', jsonb_build_object('venda_id', v_venda_id, 'valor', p_desconto, 'origem', 'comanda'));
+  end if;
+
   return v_venda_id;
 end;
 $$;
@@ -230,3 +235,181 @@ create table promocoes (
 alter table promocoes enable row level security;
 create policy "promocoes_isolamento" on promocoes for all to authenticated
   using (empresa_id = empresa_id_atual()) with check (empresa_id = empresa_id_atual());
+
+-- ---------------------------------------------------------------------
+-- Auditoria: finalizar_venda e fechar_caixa passam a gravar em audit_logs
+-- (redeclaradas aqui, mesmo corpo de schema.sql + o log). cancelar_venda é
+-- nova: desfaz a venda e devolve o estoque baixado por ela.
+-- ---------------------------------------------------------------------
+create or replace function finalizar_venda(
+  p_itens jsonb,
+  p_pagamentos jsonb,
+  p_desconto numeric default 0,
+  p_cliente_id uuid default null
+)
+returns uuid
+language plpgsql
+security invoker
+as $$
+declare
+  v_venda_id uuid := gen_random_uuid();
+  v_subtotal numeric := 0;
+  v_total numeric := 0;
+  v_soma_pagamentos numeric := 0;
+  v_item jsonb;
+  v_pagamento jsonb;
+  v_produto produtos%rowtype;
+  v_qtd numeric;
+  v_caixa_id uuid;
+begin
+  if jsonb_array_length(p_itens) = 0 then
+    raise exception 'A venda precisa ter ao menos um item.';
+  end if;
+
+  for v_item in select * from jsonb_array_elements(p_itens)
+  loop
+    v_qtd := (v_item->>'quantidade')::numeric;
+    select * into v_produto from produtos where id = (v_item->>'produto_id')::uuid;
+    if v_produto is null then
+      raise exception 'Produto não encontrado.';
+    end if;
+    if v_produto.estoque is not null and v_produto.estoque < v_qtd then
+      raise exception 'Estoque insuficiente de "%". Disponível: %.', v_produto.nome, v_produto.estoque;
+    end if;
+    v_subtotal := v_subtotal + (v_qtd * (v_item->>'preco_unitario')::numeric);
+  end loop;
+
+  v_total := v_subtotal - coalesce(p_desconto, 0);
+  if v_total < 0 then
+    raise exception 'O desconto não pode ser maior que o total da venda.';
+  end if;
+
+  select coalesce(sum((p->>'valor')::numeric), 0) into v_soma_pagamentos
+  from jsonb_array_elements(p_pagamentos) p;
+  if abs(v_soma_pagamentos - v_total) > 0.01 then
+    raise exception 'O total dos pagamentos (%) não bate com o valor da venda (%).', v_soma_pagamentos, v_total;
+  end if;
+
+  select id into v_caixa_id from caixas
+  where empresa_id = empresa_id_atual() and fechado_em is null
+  order by aberto_em desc limit 1;
+
+  insert into vendas (id, cliente_id, caixa_id, operador_id, subtotal, desconto, total)
+  values (v_venda_id, p_cliente_id, v_caixa_id, auth.uid(), v_subtotal, coalesce(p_desconto, 0), v_total);
+
+  for v_item in select * from jsonb_array_elements(p_itens)
+  loop
+    insert into venda_itens (venda_id, produto_id, nome_produto, quantidade, preco_unitario)
+    values (
+      v_venda_id,
+      (v_item->>'produto_id')::uuid,
+      v_item->>'nome_produto',
+      (v_item->>'quantidade')::numeric,
+      (v_item->>'preco_unitario')::numeric
+    );
+
+    select * into v_produto from produtos where id = (v_item->>'produto_id')::uuid;
+    if v_produto.estoque is not null then
+      update produtos set estoque = estoque - (v_item->>'quantidade')::numeric
+      where id = (v_item->>'produto_id')::uuid;
+
+      insert into estoque_movimentos (produto_id, tipo, quantidade, usuario_id, motivo)
+      values ((v_item->>'produto_id')::uuid, 'saida', -(v_item->>'quantidade')::numeric, auth.uid(), 'Venda');
+    end if;
+  end loop;
+
+  for v_pagamento in select * from jsonb_array_elements(p_pagamentos)
+  loop
+    insert into pagamentos (venda_id, forma, valor)
+    values (v_venda_id, v_pagamento->>'forma', (v_pagamento->>'valor')::numeric);
+  end loop;
+
+  if coalesce(p_desconto, 0) > 0 then
+    insert into audit_logs (usuario_id, acao, detalhes)
+    values (auth.uid(), 'desconto', jsonb_build_object('venda_id', v_venda_id, 'valor', p_desconto, 'origem', 'pdv'));
+  end if;
+
+  return v_venda_id;
+end;
+$$;
+
+create or replace function fechar_caixa(p_caixa_id uuid, p_valor_informado numeric)
+returns jsonb
+language plpgsql
+security invoker
+as $$
+declare
+  v_caixa caixas%rowtype;
+  v_vendas_dinheiro numeric := 0;
+  v_movimentos numeric := 0;
+  v_esperado numeric;
+  v_diferenca numeric;
+begin
+  select * into v_caixa from caixas where id = p_caixa_id;
+  if v_caixa is null then
+    raise exception 'Caixa não encontrado.';
+  end if;
+  if v_caixa.fechado_em is not null then
+    raise exception 'Esse caixa já está fechado.';
+  end if;
+
+  select coalesce(sum(pg.valor), 0) into v_vendas_dinheiro
+  from pagamentos pg
+  join vendas v on v.id = pg.venda_id
+  where v.caixa_id = p_caixa_id and pg.forma = 'dinheiro' and v.cancelada = false;
+
+  select coalesce(sum(case when tipo = 'entrada' then valor else -valor end), 0) into v_movimentos
+  from caixa_movimentos where caixa_id = p_caixa_id;
+
+  v_esperado := v_caixa.valor_inicial + v_vendas_dinheiro + v_movimentos;
+  v_diferenca := p_valor_informado - v_esperado;
+
+  update caixas
+  set fechado_em = now(), fechado_por = auth.uid(), valor_informado = p_valor_informado, diferenca = v_diferenca
+  where id = p_caixa_id;
+
+  insert into audit_logs (usuario_id, acao, detalhes)
+  values (auth.uid(), 'fechar_caixa', jsonb_build_object('caixa_id', p_caixa_id, 'esperado', v_esperado, 'informado', p_valor_informado, 'diferenca', v_diferenca));
+
+  return jsonb_build_object('esperado', v_esperado, 'diferenca', v_diferenca);
+end;
+$$;
+
+-- cancelar_venda: marca a venda como cancelada, devolve o estoque que ela
+-- havia baixado (se houver) e grava a auditoria com o motivo.
+create or replace function cancelar_venda(p_venda_id uuid, p_motivo text default null)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_venda vendas%rowtype;
+  v_item record;
+begin
+  select * into v_venda from vendas where id = p_venda_id;
+  if v_venda is null then
+    raise exception 'Venda não encontrada.';
+  end if;
+  if v_venda.cancelada then
+    raise exception 'Essa venda já está cancelada.';
+  end if;
+
+  update vendas set cancelada = true where id = p_venda_id;
+
+  for v_item in select produto_id, quantidade from venda_itens where venda_id = p_venda_id
+  loop
+    if v_item.produto_id is not null then
+      update produtos set estoque = estoque + v_item.quantidade
+      where id = v_item.produto_id and estoque is not null;
+
+      if found then
+        insert into estoque_movimentos (produto_id, tipo, quantidade, usuario_id, motivo)
+        values (v_item.produto_id, 'entrada', v_item.quantidade, auth.uid(), 'Cancelamento de venda');
+      end if;
+    end if;
+  end loop;
+
+  insert into audit_logs (usuario_id, acao, detalhes)
+  values (auth.uid(), 'cancelar_venda', jsonb_build_object('venda_id', p_venda_id, 'motivo', p_motivo, 'total', v_venda.total));
+end;
+$$;
