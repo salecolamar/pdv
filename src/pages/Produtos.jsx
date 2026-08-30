@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import * as XLSX from 'xlsx';
+import { Upload } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 
@@ -31,7 +33,7 @@ export default function Produtos() {
       {aba === 'categorias' ? (
         <Categorias categorias={categorias} onMudou={carregarCategorias} />
       ) : (
-        <ProdutosLista categorias={categorias || []} />
+        <ProdutosLista categorias={categorias || []} onCategoriasAtualizadas={carregarCategorias} />
       )}
     </div>
   );
@@ -178,9 +180,10 @@ function CamposProduto({ campos, setCampos, categorias }) {
   );
 }
 
-function ProdutosLista({ categorias }) {
+function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
   const [produtos, setProdutos] = useState(null);
   const [mostrarForm, setMostrarForm] = useState(false);
+  const [importando, setImportando] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [campos, setCampos] = useState(campoVazio(null));
   const [salvando, setSalvando] = useState(false);
@@ -249,12 +252,31 @@ function ProdutosLista({ categorias }) {
     carregar();
   }
 
+  if (importando) {
+    return (
+      <ImportarProdutos
+        categorias={categorias}
+        onVoltar={() => setImportando(false)}
+        onImportado={() => {
+          setImportando(false);
+          onCategoriasAtualizadas();
+          carregar();
+        }}
+      />
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {!mostrarForm ? (
-        <button type="button" className="btn btn-primary btn-block" onClick={() => { setCampos(campoVazio(null)); setMostrarForm(true); }}>
-          Novo produto
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={() => { setCampos(campoVazio(null)); setMostrarForm(true); }}>
+            Novo produto
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={() => setImportando(true)}>
+            <Upload size={15} /> Importar
+          </button>
+        </div>
       ) : (
         <form onSubmit={adicionar} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>Novo produto</div>
@@ -331,6 +353,168 @@ function ProdutosLista({ categorias }) {
             );
           })}
         </div>
+      )}
+    </div>
+  );
+}
+
+function normalizarCabecalho(texto) {
+  // Remove acentos sem depender de escrever a faixa Unicode de marcas
+  // diacríticas combinantes no código-fonte (0x300-0x36f).
+  return Array.from(String(texto).normalize('NFD'))
+    .filter((ch) => {
+      const codigo = ch.codePointAt(0);
+      return codigo < 0x300 || codigo > 0x36f;
+    })
+    .join('')
+    .trim()
+    .toUpperCase();
+}
+
+function acharCampo(linha, alvos) {
+  for (const chave of Object.keys(linha)) {
+    if (alvos.includes(normalizarCabecalho(chave))) return linha[chave];
+  }
+  return undefined;
+}
+
+function parsePreco(valor) {
+  if (typeof valor === 'number') return valor;
+  if (valor == null) return NaN;
+  const limpo = String(valor).trim().replace(/[^\d,.-]/g, '').replace(',', '.');
+  return limpo ? Number(limpo) : NaN;
+}
+
+function analisarLinha(linhaBruta) {
+  const nome = String(acharCampo(linhaBruta, ['NOME', 'PRODUTO']) ?? '').trim();
+  const precoValor = acharCampo(linhaBruta, ['PRECO', 'VALOR']);
+  const preco = parsePreco(precoValor);
+  const categoria = String(acharCampo(linhaBruta, ['CATEGORIA']) ?? '').trim();
+
+  if (!nome) return { nome, preco, categoria, valido: false, motivo: 'Sem nome' };
+  if (!(preco > 0)) return { nome, preco, categoria, valido: false, motivo: 'Preço inválido' };
+  return { nome, preco, categoria, valido: true, motivo: '' };
+}
+
+function ImportarProdutos({ categorias, onVoltar, onImportado }) {
+  const [nomeArquivo, setNomeArquivo] = useState('');
+  const [linhas, setLinhas] = useState(null);
+  const [lendo, setLendo] = useState(false);
+  const [importando, setImportando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  async function selecionarArquivo(e) {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    setErro('');
+    setLinhas(null);
+    setNomeArquivo(arquivo.name);
+    setLendo(true);
+    try {
+      // CSV precisa ser lido como texto (senão o SheetJS não garante UTF-8 e
+      // acentos viram lixo); .xlsx/.xls são binários de verdade, lidos como
+      // array de bytes.
+      const ehCsv = /\.csv$/i.test(arquivo.name) || arquivo.type === 'text/csv';
+      const planilha = ehCsv
+        ? XLSX.read(await arquivo.text(), { type: 'string' })
+        : XLSX.read(await arquivo.arrayBuffer(), { type: 'array' });
+      const primeiraAba = planilha.Sheets[planilha.SheetNames[0]];
+      // raw:false devolve o texto formatado da célula (ex: "12,00"), não o
+      // número que o SheetJS às vezes adivinha errado pra formato brasileiro
+      // (vírgula como separador de milhar em vez de decimal).
+      const linhasBrutas = XLSX.utils.sheet_to_json(primeiraAba, { defval: '', raw: false });
+      setLinhas(linhasBrutas.map(analisarLinha));
+    } catch {
+      setErro('Não foi possível ler esse arquivo. Confira se é um .xlsx, .xls ou .csv válido.');
+    } finally {
+      setLendo(false);
+    }
+  }
+
+  async function confirmarImportacao() {
+    const validas = linhas.filter((l) => l.valido);
+    if (validas.length === 0) return;
+    setImportando(true);
+    setErro('');
+
+    const nomesCategorias = [...new Set(validas.map((l) => l.categoria).filter(Boolean))];
+    const mapaCategorias = new Map(categorias.map((c) => [normalizarCabecalho(c.nome), c.id]));
+    const categoriasFaltando = nomesCategorias.filter((nome) => !mapaCategorias.has(normalizarCabecalho(nome)));
+
+    if (categoriasFaltando.length > 0) {
+      const { data: novasCategorias, error: erroCategorias } = await supabase
+        .from('categorias')
+        .insert(categoriasFaltando.map((nome) => ({ nome })))
+        .select();
+      if (erroCategorias) {
+        setErro('Falha ao criar categorias: ' + erroCategorias.message);
+        setImportando(false);
+        return;
+      }
+      for (const c of novasCategorias) mapaCategorias.set(normalizarCabecalho(c.nome), c.id);
+    }
+
+    const payload = validas.map((l) => ({
+      nome: l.nome,
+      preco: l.preco,
+      categoria_id: l.categoria ? mapaCategorias.get(normalizarCabecalho(l.categoria)) || null : null,
+    }));
+
+    const { error: erroProdutos } = await supabase.from('produtos').insert(payload);
+    setImportando(false);
+    if (erroProdutos) {
+      setErro('Falha ao importar produtos: ' + erroProdutos.message);
+      return;
+    }
+    onImportado();
+  }
+
+  const validas = linhas?.filter((l) => l.valido).length ?? 0;
+  const invalidas = (linhas?.length ?? 0) - validas;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onVoltar}>
+        Voltar
+      </button>
+
+      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ fontWeight: 700 }}>Importar produtos</div>
+        <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+          Envie uma planilha (.xlsx, .xls ou .csv) com as colunas <strong>NOME</strong>, <strong>PREÇO</strong> e <strong>CATEGORIA</strong>. Categorias novas são criadas automaticamente.
+        </p>
+        <input type="file" accept=".xlsx,.xls,.csv" onChange={selecionarArquivo} />
+        {nomeArquivo && <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>Arquivo: {nomeArquivo}</p>}
+      </div>
+
+      {lendo && <p className="muted">Lendo planilha…</p>}
+      {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
+
+      {linhas && !lendo && (
+        <>
+          <div className="card row">
+            <span className="success-text" style={{ fontSize: 13 }}>{validas} válido{validas === 1 ? '' : 's'}</span>
+            {invalidas > 0 && <span className="danger-text" style={{ fontSize: 13 }}>{invalidas} com erro</span>}
+          </div>
+
+          <div className="list" style={{ maxHeight: 320, overflowY: 'auto' }}>
+            {linhas.map((l, idx) => (
+              <div key={idx} className="item" style={{ opacity: l.valido ? 1 : 0.6 }}>
+                <span>
+                  {l.nome || <span className="muted">(sem nome)</span>}
+                  {l.categoria && <span className="muted" style={{ fontSize: 11 }}> · {l.categoria}</span>}
+                </span>
+                <span className={l.valido ? 'tabular' : 'danger-text'} style={{ fontSize: 12.5 }}>
+                  {l.valido ? money(l.preco) : l.motivo}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <button type="button" className="btn btn-primary btn-block" disabled={validas === 0 || importando} onClick={confirmarImportacao}>
+            {importando ? 'Importando…' : `Importar ${validas} produto${validas === 1 ? '' : 's'}`}
+          </button>
+        </>
       )}
     </div>
   );
