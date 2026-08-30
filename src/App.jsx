@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Lock, LogOut } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import { supabase } from './supabase';
+import Shell from './Shell';
 
 export default function App() {
   const [session, setSession] = useState(undefined); // undefined = carregando, null = deslogado
@@ -21,10 +22,10 @@ export default function App() {
     return <Auth />;
   }
 
-  return <AreaLogada session={session} />;
+  return <Shell session={session} />;
 }
 
-function Centro({ children }) {
+export function Centro({ children }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100dvh', color: 'var(--text-dim)' }}>
       {children}
@@ -169,66 +170,3 @@ function FormularioCriarEmpresa() {
   );
 }
 
-function AreaLogada({ session }) {
-  const [perfil, setPerfil] = useState(undefined); // undefined = carregando, null = sem linha em usuarios
-
-  useEffect(() => {
-    let cancelado = false;
-    supabase
-      .from('usuarios')
-      .select('*, empresas(*)')
-      .eq('id', session.user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (cancelado) return;
-        if (error) {
-          console.error('Falha ao carregar perfil:', error);
-          setPerfil(null);
-          return;
-        }
-        setPerfil(data);
-      });
-    return () => {
-      cancelado = true;
-    };
-  }, [session.user.id]);
-
-  if (perfil === undefined) return <Centro>Carregando…</Centro>;
-  if (perfil === null) {
-    return (
-      <Centro>
-        <div className="card" style={{ width: 320, textAlign: 'center' }}>
-          <p style={{ marginBottom: 12 }}>Não achamos seu cadastro de usuário. Tente sair e criar a empresa de novo.</p>
-          <button type="button" className="btn btn-secondary btn-block" onClick={() => supabase.auth.signOut()}>
-            Sair
-          </button>
-        </div>
-      </Centro>
-    );
-  }
-
-  return (
-    <div className="container" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div className="row">
-        <div>
-          <h1 style={{ fontSize: 20 }}>{perfil.empresas.nome}</h1>
-          <p className="muted" style={{ fontSize: 13 }}>{perfil.empresas.categoria}</p>
-        </div>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={() => supabase.auth.signOut()}>
-          <LogOut size={14} /> Sair
-        </button>
-      </div>
-      <div className="card">
-        <p className="muted" style={{ fontSize: 12 }}>Logado como</p>
-        <p style={{ fontWeight: 700 }}>{perfil.nome}</p>
-        <span className="chip chip-primary" style={{ marginTop: 6 }}>{perfil.role}</span>
-      </div>
-      <div className="card">
-        <p className="muted" style={{ fontSize: 13 }}>
-          Base do sistema funcionando: login, cadastro de empresa e isolamento multiempresa prontos. Próximos módulos
-          (Dashboard, Produtos, PDV…) entram a partir daqui.
-        </p>
-      </div>
-    </div>
-  );
-}
