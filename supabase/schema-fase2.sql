@@ -205,3 +205,28 @@ begin
   return v_venda_id;
 end;
 $$;
+
+-- promocoes: desconto automático por produto ou categoria inteira, com
+-- vigência opcional por dia da semana, horário (happy hour) e/ou período.
+-- Campo em branco = sem restrição naquele critério (ex: sem hora = dia
+-- inteiro, sem dias_semana = todo dia da semana).
+create table promocoes (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null default empresa_id_atual() references empresas(id) on delete cascade,
+  nome text not null,
+  tipo text not null check (tipo in ('percentual', 'fixo')),
+  valor numeric(10, 2) not null,
+  produto_id uuid references produtos(id) on delete cascade,
+  categoria_id uuid references categorias(id) on delete cascade,
+  dias_semana int[],
+  hora_inicio time,
+  hora_fim time,
+  data_inicio date,
+  data_fim date,
+  ativo boolean not null default true,
+  criado_em timestamptz not null default now(),
+  constraint promocoes_tem_alvo check (produto_id is not null or categoria_id is not null)
+);
+alter table promocoes enable row level security;
+create policy "promocoes_isolamento" on promocoes for all to authenticated
+  using (empresa_id = empresa_id_atual()) with check (empresa_id = empresa_id_atual());

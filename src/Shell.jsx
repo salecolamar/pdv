@@ -7,6 +7,7 @@ import {
   LayoutGrid,
   LogOut,
   Package,
+  Percent,
   ShoppingCart,
   UserCog,
   Users,
@@ -16,6 +17,7 @@ import { supabase } from './supabase';
 import { Centro } from './App';
 import Dashboard from './pages/Dashboard';
 import Produtos from './pages/Produtos';
+import Promocoes from './pages/Promocoes';
 import Pdv from './pages/Pdv';
 import Mesas from './pages/Mesas';
 import Cozinha from './pages/Cozinha';
@@ -34,6 +36,7 @@ const MODULOS = [
   { id: 'mesas', label: 'Mesas', icon: LayoutGrid, papeis: ['admin', 'gerente', 'operador'] },
   { id: 'cozinha', label: 'Cozinha', icon: ChefHat, papeis: ['admin', 'gerente', 'operador'] },
   { id: 'produtos', label: 'Produtos', icon: Package, papeis: ['admin', 'gerente'] },
+  { id: 'promocoes', label: 'Promoções', icon: Percent, papeis: ['admin', 'gerente'] },
   { id: 'clientes', label: 'Clientes', icon: Users, papeis: ['admin', 'gerente', 'operador'] },
   { id: 'estoque', label: 'Estoque', icon: Boxes, papeis: ['admin', 'gerente'] },
   { id: 'caixa', label: 'Caixa', icon: Wallet, papeis: ['admin', 'gerente'] },
@@ -121,6 +124,7 @@ export default function Shell({ session }) {
         {abaAtiva === 'mesas' && <Mesas />}
         {abaAtiva === 'cozinha' && <Cozinha />}
         {abaAtiva === 'produtos' && <Produtos />}
+        {abaAtiva === 'promocoes' && <Promocoes />}
         {abaAtiva === 'clientes' && <Clientes />}
         {abaAtiva === 'estoque' && <Estoque />}
         {abaAtiva === 'caixa' && <Caixa />}

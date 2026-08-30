@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Minus, Plus, ShoppingCart, Trash2, X } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
+import { precoEfetivo } from '../utils/promocoes';
 
 const PLACEHOLDER_SVG = "<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44'><rect width='44' height='44' rx='10' fill='#10131a'/></svg>";
 const PLACEHOLDER_FOTO = 'data:image/svg+xml;utf8,' + encodeURIComponent(PLACEHOLDER_SVG);
@@ -17,6 +18,7 @@ export default function Pdv() {
   const [toast, setToast] = useState(null);
   const [clientes, setClientes] = useState([]);
   const [clienteId, setClienteId] = useState('');
+  const [promocoes, setPromocoes] = useState([]);
 
   useEffect(() => {
     carregar();
@@ -29,14 +31,16 @@ export default function Pdv() {
   }, [toast]);
 
   async function carregar() {
-    const [prodResp, catResp, cliResp] = await Promise.all([
+    const [prodResp, catResp, cliResp, promoResp] = await Promise.all([
       supabase.from('produtos').select('*').eq('ativo', true).order('nome'),
       supabase.from('categorias').select('*').order('ordem').order('nome'),
       supabase.from('clientes').select('id, nome').order('nome'),
+      supabase.from('promocoes').select('*').eq('ativo', true),
     ]);
     setProdutos(prodResp.data || []);
     setCategorias(catResp.data || []);
     setClientes(cliResp.data || []);
+    setPromocoes(promoResp.data || []);
   }
 
   function avisar(msg, kind) {
@@ -54,8 +58,7 @@ export default function Pdv() {
       if (existente) {
         return atual.map((i) => (i.produto_id === p.id ? { ...i, quantidade: i.quantidade + 1 } : i));
       }
-      const preco = p.preco_promocional ?? p.preco;
-      return [...atual, { produto_id: p.id, nome: p.nome, preco: Number(preco), quantidade: 1, estoque: p.estoque }];
+      return [...atual, { produto_id: p.id, nome: p.nome, preco: precoEfetivo(p, promocoes), quantidade: 1, estoque: p.estoque }];
     });
   }
 
@@ -127,6 +130,8 @@ export default function Pdv() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
           {produtosFiltrados.map((p) => {
             const esgotado = p.estoque !== null && p.estoque <= 0;
+            const preco = precoEfetivo(p, promocoes);
+            const emPromocao = preco < Number(p.preco);
             return (
               <button
                 key={p.id}
@@ -138,8 +143,9 @@ export default function Pdv() {
               >
                 <img src={p.foto_url || PLACEHOLDER_FOTO} alt="" style={{ width: '100%', aspectRatio: '1', borderRadius: 8, objectFit: 'cover', background: 'var(--panel-2)', marginBottom: 6 }} />
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{p.nome}</div>
-                <div className="tabular" style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 700, marginTop: 2 }}>
-                  {money(p.preco_promocional ?? p.preco)}
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
+                  <span className="tabular" style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 700 }}>{money(preco)}</span>
+                  {emPromocao && <span className="tabular muted" style={{ fontSize: 11, textDecoration: 'line-through' }}>{money(p.preco)}</span>}
                 </div>
                 {esgotado && <div className="danger-text" style={{ fontSize: 11 }}>Esgotado</div>}
               </button>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Minus, Plus, Trash2, X } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
+import { precoEfetivo } from '../utils/promocoes';
 
 const STATUS_LABEL = { livre: 'Livre', ocupada: 'Ocupada' };
 
@@ -331,6 +332,7 @@ const CATEGORIA_TODAS = 'Todos';
 function LancarItens({ pedido, onVoltar, onLancado }) {
   const [produtos, setProdutos] = useState(null);
   const [categorias, setCategorias] = useState([]);
+  const [promocoes, setPromocoes] = useState([]);
   const [categoriaAtiva, setCategoriaAtiva] = useState(CATEGORIA_TODAS);
   const [carrinho, setCarrinho] = useState([]);
   const [enviando, setEnviando] = useState(false);
@@ -340,9 +342,11 @@ function LancarItens({ pedido, onVoltar, onLancado }) {
     Promise.all([
       supabase.from('produtos').select('*').eq('ativo', true).order('nome'),
       supabase.from('categorias').select('*').order('ordem').order('nome'),
-    ]).then(([prodResp, catResp]) => {
+      supabase.from('promocoes').select('*').eq('ativo', true),
+    ]).then(([prodResp, catResp, promoResp]) => {
       setProdutos(prodResp.data || []);
       setCategorias(catResp.data || []);
+      setPromocoes(promoResp.data || []);
     });
   }, []);
 
@@ -352,7 +356,7 @@ function LancarItens({ pedido, onVoltar, onLancado }) {
       if (existente) {
         return atual.map((i) => (i.produto_id === p.id ? { ...i, quantidade: i.quantidade + 1 } : i));
       }
-      return [...atual, { produto_id: p.id, nome: p.nome, preco: Number(p.preco_promocional ?? p.preco), quantidade: 1 }];
+      return [...atual, { produto_id: p.id, nome: p.nome, preco: precoEfetivo(p, promocoes), quantidade: 1 }];
     });
   }
 
@@ -407,21 +411,26 @@ function LancarItens({ pedido, onVoltar, onLancado }) {
         <p className="muted" style={{ fontSize: 13 }}>Nenhum produto ativo nessa categoria.</p>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
-          {produtosFiltrados.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className="card"
-              onClick={() => adicionar(p)}
-              style={{ textAlign: 'left', cursor: 'pointer' }}
-            >
-              <img src={p.foto_url || PLACEHOLDER_FOTO} alt="" style={{ width: '100%', aspectRatio: '1', borderRadius: 8, objectFit: 'cover', background: 'var(--panel-2)', marginBottom: 6 }} />
-              <div style={{ fontSize: 13, fontWeight: 600 }}>{p.nome}</div>
-              <div className="tabular" style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 700, marginTop: 2 }}>
-                {money(p.preco_promocional ?? p.preco)}
-              </div>
-            </button>
-          ))}
+          {produtosFiltrados.map((p) => {
+            const preco = precoEfetivo(p, promocoes);
+            const emPromocao = preco < Number(p.preco);
+            return (
+              <button
+                key={p.id}
+                type="button"
+                className="card"
+                onClick={() => adicionar(p)}
+                style={{ textAlign: 'left', cursor: 'pointer' }}
+              >
+                <img src={p.foto_url || PLACEHOLDER_FOTO} alt="" style={{ width: '100%', aspectRatio: '1', borderRadius: 8, objectFit: 'cover', background: 'var(--panel-2)', marginBottom: 6 }} />
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{p.nome}</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
+                  <span className="tabular" style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 700 }}>{money(preco)}</span>
+                  {emPromocao && <span className="tabular muted" style={{ fontSize: 11, textDecoration: 'line-through' }}>{money(p.preco)}</span>}
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
 
