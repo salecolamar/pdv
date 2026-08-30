@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Minus, Plus, ShoppingCart, Trash2, X } from 'lucide-react';
+import { ArrowRightLeft, Minus, Plus, Printer, Receipt, ShoppingCart, Trash2, Wallet, X } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import { precoEfetivo } from '../utils/promocoes';
@@ -33,6 +33,7 @@ export default function Mesas() {
     return (
       <Comanda
         mesa={mesaSelecionada}
+        mesas={mesas || []}
         onVoltar={() => {
           setMesaSelecionada(null);
           carregar();
@@ -200,12 +201,17 @@ function ConfigurarMesas({ mesas, onAtualizado }) {
   );
 }
 
-function Comanda({ mesa, onVoltar }) {
+function Comanda({ mesa, mesas, onVoltar }) {
   const [pedido, setPedido] = useState(undefined);
   const [precisaCliente, setPrecisaCliente] = useState(false);
   const [rodadas, setRodadas] = useState([]);
+  const [pagamentosParciais, setPagamentosParciais] = useState([]);
   const [lancando, setLancando] = useState(false);
   const [pagando, setPagando] = useState(false);
+  const [vendoConta, setVendoConta] = useState(false);
+  const [transferindoMesa, setTransferindoMesa] = useState(false);
+  const [transferindoItem, setTransferindoItem] = useState(null);
+  const [pagamentoParcialAberto, setPagamentoParcialAberto] = useState(false);
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
@@ -235,6 +241,7 @@ function Comanda({ mesa, onVoltar }) {
     if (existente && existente.status !== 'pago') {
       setPedido(existente);
       carregarRodadas(existente.id);
+      carregarPagamentosParciais(existente.id);
       return;
     }
 
@@ -271,10 +278,63 @@ function Comanda({ mesa, onVoltar }) {
   async function carregarRodadas(pedidoId) {
     const { data } = await supabase
       .from('pedido_rodadas')
-      .select('*, pedido_itens(*)')
+      .select('*, pedido_itens(*), usuarios(nome)')
       .eq('pedido_id', pedidoId)
       .order('criado_em');
     setRodadas(data || []);
+  }
+
+  async function carregarPagamentosParciais(pedidoId) {
+    const { data } = await supabase
+      .from('pedido_pagamentos')
+      .select('*')
+      .eq('pedido_id', pedidoId)
+      .order('criado_em');
+    setPagamentosParciais(data || []);
+  }
+
+  async function cancelarItem(itemId) {
+    if (!window.confirm('Cancelar esse item da comanda? O estoque volta a subir.')) return;
+    const { error } = await supabase.rpc('cancelar_item_pedido', { p_item_id: itemId });
+    if (error) {
+      avisar(error.message.replace('P0001: ', ''), 'danger');
+      return;
+    }
+    avisar('Item cancelado.', 'success');
+    carregarRodadas(pedido.id);
+  }
+
+  async function transferirMesaPara(mesaDestinoId) {
+    const { error } = await supabase.rpc('transferir_mesa', { p_pedido_id: pedido.id, p_mesa_destino_id: mesaDestinoId });
+    if (error) {
+      avisar(error.message.replace('P0001: ', ''), 'danger');
+      return;
+    }
+    setTransferindoMesa(false);
+    onVoltar();
+  }
+
+  async function transferirItemPara(itemId, mesaDestinoId) {
+    const { error } = await supabase.rpc('transferir_item_pedido', { p_item_id: itemId, p_mesa_destino_id: mesaDestinoId });
+    if (error) {
+      avisar(error.message.replace('P0001: ', ''), 'danger');
+      return;
+    }
+    setTransferindoItem(null);
+    avisar('Item transferido.', 'success');
+    carregarRodadas(pedido.id);
+  }
+
+  async function registrarPagamentoParcial(forma, valor) {
+    const { error } = await supabase.rpc('registrar_pagamento_parcial', { p_pedido_id: pedido.id, p_forma: forma, p_valor: valor });
+    if (error) {
+      avisar(error.message.replace('P0001: ', ''), 'danger');
+      return false;
+    }
+    setPagamentoParcialAberto(false);
+    avisar('Pagamento parcial registrado.', 'success');
+    carregarPagamentosParciais(pedido.id);
+    return true;
   }
 
   async function fecharComanda() {
@@ -299,7 +359,61 @@ function Comanda({ mesa, onVoltar }) {
     );
   }
 
-  const total = rodadas.reduce((s, r) => s + r.pedido_itens.reduce((si, i) => si + i.quantidade * i.preco_unitario, 0), 0);
+  const total = rodadas.reduce(
+    (s, r) => s + r.pedido_itens.filter((i) => !i.cancelado).reduce((si, i) => si + i.quantidade * i.preco_unitario, 0),
+    0
+  );
+  const valorPago = pagamentosParciais.reduce((s, p) => s + Number(p.valor), 0);
+  const restante = Math.max(0, total - valorPago);
+  const mesasDestinoTransferirMesa = mesas.filter((m) => m.id !== mesa.id && m.status === 'livre');
+  const mesasDestinoTransferirItem = mesas.filter((m) => m.id !== mesa.id);
+
+  if (vendoConta) {
+    return (
+      <ContaMesa
+        mesa={mesa}
+        pedido={pedido}
+        rodadas={rodadas}
+        total={total}
+        valorPago={valorPago}
+        restante={restante}
+        onVoltar={() => setVendoConta(false)}
+      />
+    );
+  }
+
+  if (transferindoMesa) {
+    return (
+      <TransferirMesaForm
+        mesa={mesa}
+        mesasDestino={mesasDestinoTransferirMesa}
+        onConfirmar={transferirMesaPara}
+        onVoltar={() => setTransferindoMesa(false)}
+      />
+    );
+  }
+
+  if (transferindoItem) {
+    return (
+      <TransferirItemForm
+        item={transferindoItem}
+        mesa={mesa}
+        mesasDestino={mesasDestinoTransferirItem}
+        onConfirmar={(mesaDestinoId) => transferirItemPara(transferindoItem.id, mesaDestinoId)}
+        onVoltar={() => setTransferindoItem(null)}
+      />
+    );
+  }
+
+  if (pagamentoParcialAberto) {
+    return (
+      <PagamentoParcialForm
+        restante={restante}
+        onConfirmar={registrarPagamentoParcial}
+        onVoltar={() => setPagamentoParcialAberto(false)}
+      />
+    );
+  }
 
   if (lancando) {
     return (
@@ -319,7 +433,7 @@ function Comanda({ mesa, onVoltar }) {
     return (
       <FinalizarPedido
         pedido={pedido}
-        total={total}
+        total={restante}
         onVoltar={() => setPagando(false)}
         onConcluido={() => {
           setPagando(false);
@@ -348,27 +462,69 @@ function Comanda({ mesa, onVoltar }) {
         {rodadas.length === 0 ? (
           <p className="muted" style={{ fontSize: 13, margin: 0 }}>Nenhum item lançado ainda.</p>
         ) : (
-          rodadas.map((r) => (
-            <div key={r.id} className="card">
-              <div className="row" style={{ marginBottom: 6 }}>
-                <span className={'chip ' + (r.status === 'pronto' ? 'chip-success' : 'chip-primary')}>
-                  {r.status === 'pronto' ? 'Pronto' : 'Na cozinha'}
-                </span>
-              </div>
-              {r.pedido_itens.map((i) => (
-                <div className="row" key={i.id} style={{ fontSize: 13, padding: '2px 0' }}>
-                  <span>{i.quantidade}x {i.nome_produto}</span>
-                  <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
+          rodadas.map((r) => {
+            const hora = new Date(r.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            return (
+              <div key={r.id} className="card">
+                <div className="row" style={{ marginBottom: 6 }}>
+                  <span className={'chip ' + (r.status === 'pronto' ? 'chip-success' : 'chip-primary')}>
+                    {r.status === 'pronto' ? 'Pronto' : 'Na cozinha'}
+                  </span>
+                  <span className="muted" style={{ fontSize: 12 }}>{r.usuarios?.nome || 'Operador'} · {hora}</span>
                 </div>
-              ))}
-            </div>
-          ))
+                {r.pedido_itens.map((i) => (
+                  <div className="row" key={i.id} style={{ fontSize: 13, padding: '2px 0', opacity: i.cancelado ? 0.5 : 1 }}>
+                    <span style={{ textDecoration: i.cancelado ? 'line-through' : 'none' }}>
+                      {i.quantidade}x {i.nome_produto}{i.cancelado ? ' (cancelado)' : ''}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
+                      {pedido.status === 'aberto' && !i.cancelado && (
+                        <>
+                          <button
+                            type="button"
+                            title="Transferir item"
+                            onClick={() => setTransferindoItem(i)}
+                            style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: 2 }}
+                          >
+                            <ArrowRightLeft size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            title="Cancelar item"
+                            onClick={() => cancelarItem(i.id)}
+                            style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: 2 }}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })
         )}
       </div>
 
-      <div className="card row">
-        <span className="muted">Total</span>
-        <span className="tabular" style={{ fontSize: 18, fontWeight: 800 }}>{money(total)}</span>
+      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div className="row">
+          <span className="muted">Total</span>
+          <span className="tabular" style={{ fontSize: 18, fontWeight: 800 }}>{money(total)}</span>
+        </div>
+        {valorPago > 0 && (
+          <>
+            <div className="row" style={{ fontSize: 13 }}>
+              <span className="muted">Valor pago</span>
+              <span className="tabular success-text">{money(valorPago)}</span>
+            </div>
+            <div className="row" style={{ fontSize: 13 }}>
+              <span className="muted">Valor a pagar</span>
+              <span className="tabular" style={{ fontWeight: 700 }}>{money(restante)}</span>
+            </div>
+          </>
+        )}
       </div>
 
       {toast && (
@@ -376,6 +532,22 @@ function Comanda({ mesa, onVoltar }) {
           {toast.msg}
         </div>
       )}
+
+      <div className="tab-row">
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setVendoConta(true)}>
+          <Receipt size={14} /> Imprimir conta
+        </button>
+        {pedido.status === 'aberto' && (
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setTransferindoMesa(true)} disabled={rodadas.length === 0}>
+            <ArrowRightLeft size={14} /> Transferir mesa
+          </button>
+        )}
+        {pedido.status !== 'pago' && restante > 0 && (
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPagamentoParcialAberto(true)}>
+            <Wallet size={14} /> Pagamento parcial
+          </button>
+        )}
+      </div>
 
       {pedido.status === 'aberto' && (
         <>
@@ -390,7 +562,7 @@ function Comanda({ mesa, onVoltar }) {
 
       {pedido.status === 'fechado' && (
         <button type="button" className="btn btn-primary btn-block" onClick={() => setPagando(true)}>
-          Receber pagamento
+          Receber pagamento{restante > 0 ? ` (${money(restante)})` : ''}
         </button>
       )}
 
@@ -398,6 +570,165 @@ function Comanda({ mesa, onVoltar }) {
         <p className="success-text" style={{ textAlign: 'center' }}>Comanda paga — mesa liberada para o próximo grupo.</p>
       )}
     </div>
+  );
+}
+
+function ContaMesa({ mesa, pedido, rodadas, total, valorPago, restante, onVoltar }) {
+  const itens = rodadas.flatMap((r) => r.pedido_itens.filter((i) => !i.cancelado).map((i) => ({ ...i, rodada: r })));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onVoltar}>
+        <X size={14} /> Voltar
+      </button>
+
+      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ textAlign: 'center' }}>
+          <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{mesa.nome}</h1>
+          {pedido.clientes?.nome && <p className="muted" style={{ fontSize: 13, margin: 0 }}>Cliente: {pedido.clientes.nome}</p>}
+        </div>
+
+        <div className="list">
+          {itens.length === 0 ? (
+            <p className="muted" style={{ fontSize: 13 }}>Nenhum item lançado.</p>
+          ) : (
+            itens.map((i) => (
+              <div key={i.id} className="row" style={{ fontSize: 13, padding: '3px 0' }}>
+                <span>{i.quantidade}x {i.nome_produto}</span>
+                <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="row" style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+          <span style={{ fontWeight: 700 }}>Total</span>
+          <span className="tabular" style={{ fontWeight: 800, fontSize: 18 }}>{money(total)}</span>
+        </div>
+        {valorPago > 0 && (
+          <>
+            <div className="row" style={{ fontSize: 13 }}>
+              <span className="muted">Já pago</span>
+              <span className="tabular success-text">{money(valorPago)}</span>
+            </div>
+            <div className="row" style={{ fontSize: 13 }}>
+              <span className="muted">Restante</span>
+              <span className="tabular" style={{ fontWeight: 700 }}>{money(restante)}</span>
+            </div>
+          </>
+        )}
+      </div>
+
+      <button type="button" className="btn btn-primary btn-block" onClick={() => window.print()}>
+        <Printer size={15} /> Imprimir
+      </button>
+    </div>
+  );
+}
+
+function TransferirMesaForm({ mesa, mesasDestino, onConfirmar, onVoltar }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onVoltar}>
+        <X size={14} /> Voltar
+      </button>
+      <div>
+        <h1 style={{ fontSize: 18, fontWeight: 800 }}>Transferir {mesa.nome}</h1>
+        <p className="muted" style={{ fontSize: 13 }}>Escolha uma mesa livre para levar toda a comanda.</p>
+      </div>
+      {mesasDestino.length === 0 ? (
+        <p className="muted" style={{ fontSize: 13 }}>Nenhuma mesa livre no momento.</p>
+      ) : (
+        <div className="list">
+          {mesasDestino.map((m) => (
+            <button key={m.id} type="button" className="card item" style={{ textAlign: 'left', cursor: 'pointer' }} onClick={() => onConfirmar(m.id)}>
+              {m.nome}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TransferirItemForm({ item, mesa, mesasDestino, onConfirmar, onVoltar }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onVoltar}>
+        <X size={14} /> Voltar
+      </button>
+      <div>
+        <h1 style={{ fontSize: 18, fontWeight: 800 }}>Transferir item</h1>
+        <p className="muted" style={{ fontSize: 13 }}>
+          {item.quantidade}x {item.nome_produto} · de {mesa.nome} para qual mesa?
+        </p>
+      </div>
+      {mesasDestino.length === 0 ? (
+        <p className="muted" style={{ fontSize: 13 }}>Nenhuma outra mesa cadastrada.</p>
+      ) : (
+        <div className="list">
+          {mesasDestino.map((m) => (
+            <button key={m.id} type="button" className="card item" style={{ textAlign: 'left', cursor: 'pointer' }} onClick={() => onConfirmar(m.id)}>
+              <span style={{ flex: 1 }}>{m.nome}</span>
+              <span className={'chip ' + (m.status === 'livre' ? 'chip-success' : 'chip-danger')}>{STATUS_LABEL[m.status] || m.status}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PagamentoParcialForm({ restante, onConfirmar, onVoltar }) {
+  const [forma, setForma] = useState('dinheiro');
+  const [valor, setValor] = useState(restante.toFixed(2));
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  async function confirmar(e) {
+    e.preventDefault();
+    setErro('');
+    const num = Number(valor.replace(',', '.'));
+    if (!(num > 0)) {
+      setErro('Informe um valor válido.');
+      return;
+    }
+    if (num > restante + 0.01) {
+      setErro('Esse valor é maior que o restante da comanda.');
+      return;
+    }
+    setEnviando(true);
+    const ok = await onConfirmar(forma, num);
+    setEnviando(false);
+    if (!ok) setErro('Não foi possível registrar o pagamento.');
+  }
+
+  return (
+    <form onSubmit={confirmar} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onVoltar}>
+        <X size={14} /> Voltar
+      </button>
+      <div>
+        <h1 style={{ fontSize: 18, fontWeight: 800 }}>Pagamento parcial</h1>
+        <p className="muted" style={{ fontSize: 13 }}>Restante da comanda: {money(restante)}</p>
+      </div>
+      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <span className="label">Forma de pagamento</span>
+        <select value={forma} onChange={(e) => setForma(e.target.value)}>
+          <option value="dinheiro">Dinheiro</option>
+          <option value="pix">Pix</option>
+          <option value="debito">Débito</option>
+          <option value="credito">Crédito</option>
+          <option value="outro">Outro</option>
+        </select>
+        <span className="label">Valor (R$)</span>
+        <input value={valor} onChange={(e) => setValor(e.target.value)} inputMode="decimal" />
+      </div>
+      {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
+      <button type="submit" className="btn btn-primary btn-block" disabled={enviando}>
+        {enviando ? 'Registrando…' : 'Registrar pagamento'}
+      </button>
+    </form>
   );
 }
 
