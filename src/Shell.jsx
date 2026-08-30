@@ -33,12 +33,12 @@ import Auditoria from './pages/Auditoria';
 const MODULOS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, papeis: ['admin', 'gerente'] },
   { id: 'pdv', label: 'PDV', icon: ShoppingCart, papeis: ['operador'] },
-  { id: 'cozinha', label: 'Painel de Pedidos', icon: ChefHat, papeis: ['admin', 'gerente', 'operador'] },
-  { id: 'produtos', label: 'Produtos', icon: Package, papeis: ['admin', 'gerente'] },
-  { id: 'clientes', label: 'Clientes', icon: Users, papeis: ['admin', 'gerente', 'operador'] },
   { id: 'caixa', label: 'Caixa', icon: Wallet, papeis: ['admin', 'gerente'] },
-  { id: 'relatorios', label: 'Relatórios', icon: BarChart3, papeis: ['admin', 'gerente'] },
+  { id: 'produtos', label: 'Produtos', icon: Package, papeis: ['admin', 'gerente'] },
+  { id: 'cozinha', label: 'Painel de Pedidos', icon: ChefHat, papeis: ['admin', 'gerente', 'operador'] },
+  { id: 'clientes', label: 'Clientes', icon: Users, papeis: ['admin', 'gerente', 'operador'] },
   { id: 'usuarios', label: 'Usuários', icon: UserCog, papeis: ['admin'] },
+  { id: 'relatorios', label: 'Relatórios', icon: BarChart3, papeis: ['admin', 'gerente'] },
   { id: 'auditoria', label: 'Auditoria', icon: History, papeis: ['admin'] },
 ];
 
