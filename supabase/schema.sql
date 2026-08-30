@@ -279,6 +279,10 @@ create index vendas_empresa_criado_em_idx on vendas (empresa_id, criado_em desc)
 create index produtos_empresa_ativo_idx on produtos (empresa_id, ativo);
 create index clientes_empresa_nome_idx on clientes (empresa_id, nome);
 
+-- Só pode existir 1 caixa aberto por empresa por vez.
+create unique index caixas_uma_aberta_por_empresa
+  on caixas (empresa_id) where fechado_em is null;
+
 -- ---------------------------------------------------------------------
 -- finalizar_venda: fecha uma venda inteira numa transação só — valida
 -- estoque, cria a venda, os itens e os pagamentos, e baixa o estoque dos
@@ -304,6 +308,7 @@ declare
   v_pagamento jsonb;
   v_produto produtos%rowtype;
   v_qtd numeric;
+  v_caixa_id uuid;
 begin
   if jsonb_array_length(p_itens) = 0 then
     raise exception 'A venda precisa ter ao menos um item.';
@@ -333,8 +338,12 @@ begin
     raise exception 'O total dos pagamentos (%) não bate com o valor da venda (%).', v_soma_pagamentos, v_total;
   end if;
 
-  insert into vendas (id, cliente_id, operador_id, subtotal, desconto, total)
-  values (v_venda_id, p_cliente_id, auth.uid(), v_subtotal, coalesce(p_desconto, 0), v_total);
+  select id into v_caixa_id from caixas
+  where empresa_id = empresa_id_atual() and fechado_em is null
+  order by aberto_em desc limit 1;
+
+  insert into vendas (id, cliente_id, caixa_id, operador_id, subtotal, desconto, total)
+  values (v_venda_id, p_cliente_id, v_caixa_id, auth.uid(), v_subtotal, coalesce(p_desconto, 0), v_total);
 
   for v_item in select * from jsonb_array_elements(p_itens)
   loop
@@ -417,5 +426,49 @@ begin
   values (p_produto_id, p_tipo, v_delta, auth.uid(), p_motivo);
 
   return v_novo_estoque;
+end;
+$$;
+
+-- ---------------------------------------------------------------------
+-- fechar_caixa: calcula o valor esperado (inicial + vendas em dinheiro +
+-- entradas - retiradas - sangrias - despesas) e grava a diferença contra o
+-- valor que o operador contou fisicamente.
+-- ---------------------------------------------------------------------
+create or replace function fechar_caixa(p_caixa_id uuid, p_valor_informado numeric)
+returns jsonb
+language plpgsql
+security invoker
+as $$
+declare
+  v_caixa caixas%rowtype;
+  v_vendas_dinheiro numeric := 0;
+  v_movimentos numeric := 0;
+  v_esperado numeric;
+  v_diferenca numeric;
+begin
+  select * into v_caixa from caixas where id = p_caixa_id;
+  if v_caixa is null then
+    raise exception 'Caixa não encontrado.';
+  end if;
+  if v_caixa.fechado_em is not null then
+    raise exception 'Esse caixa já está fechado.';
+  end if;
+
+  select coalesce(sum(pg.valor), 0) into v_vendas_dinheiro
+  from pagamentos pg
+  join vendas v on v.id = pg.venda_id
+  where v.caixa_id = p_caixa_id and pg.forma = 'dinheiro' and v.cancelada = false;
+
+  select coalesce(sum(case when tipo = 'entrada' then valor else -valor end), 0) into v_movimentos
+  from caixa_movimentos where caixa_id = p_caixa_id;
+
+  v_esperado := v_caixa.valor_inicial + v_vendas_dinheiro + v_movimentos;
+  v_diferenca := p_valor_informado - v_esperado;
+
+  update caixas
+  set fechado_em = now(), fechado_por = auth.uid(), valor_informado = p_valor_informado, diferenca = v_diferenca
+  where id = p_caixa_id;
+
+  return jsonb_build_object('esperado', v_esperado, 'diferenca', v_diferenca);
 end;
 $$;
