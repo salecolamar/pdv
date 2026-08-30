@@ -98,13 +98,17 @@ function FormularioCriarEmpresa() {
   async function criar(e) {
     e.preventDefault();
     setErro('');
+    if (!email.trim()) {
+      setErro('Informe um e-mail.');
+      return;
+    }
     if (senha.length < 6) {
       setErro('A senha precisa ter pelo menos 6 caracteres.');
       return;
     }
     setEnviando(true);
 
-    const { data: signUpData, error: erroSignUp } = await supabase.auth.signUp({ email, password: senha });
+    const { data: signUpData, error: erroSignUp } = await supabase.auth.signUp({ email: email.trim(), password: senha });
     if (erroSignUp) {
       setErro(erroSignUp.message.includes('already registered') ? 'Esse e-mail já está cadastrado.' : erroSignUp.message);
       setEnviando(false);
@@ -138,7 +142,7 @@ function FormularioCriarEmpresa() {
       id: signUpData.session.user.id,
       empresa_id: empresaId,
       nome: nome.trim() || 'Administrador',
-      email,
+      email: email.trim(),
       role: 'admin',
     });
     if (erroUsuario) {
