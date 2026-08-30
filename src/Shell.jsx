@@ -18,11 +18,12 @@ import Pdv from './pages/Pdv';
 import Clientes from './pages/Clientes';
 import Estoque from './pages/Estoque';
 import Caixa from './pages/Caixa';
+import Usuarios from './pages/Usuarios';
+import Relatorios from './pages/Relatorios';
 
 // Cada módulo diz quais papéis podem vê-lo (seção 10 do documento):
 // admin enxerga tudo; gerente não mexe em usuários; operador só vende e
-// atende (PDV/Clientes). Módulos ainda não construídos ficam comentados
-// pra lembrar a ordem do plano.
+// atende (PDV/Clientes).
 const MODULOS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, papeis: ['admin', 'gerente'] },
   { id: 'pdv', label: 'PDV', icon: ShoppingCart, papeis: ['admin', 'gerente', 'operador'] },
@@ -115,13 +116,9 @@ export default function Shell({ session }) {
         {abaAtiva === 'clientes' && <Clientes />}
         {abaAtiva === 'estoque' && <Estoque />}
         {abaAtiva === 'caixa' && <Caixa />}
-        {abaAtiva === 'relatorios' && <EmConstrucao nome="Relatórios" />}
-        {abaAtiva === 'usuarios' && <EmConstrucao nome="Usuários" />}
+        {abaAtiva === 'relatorios' && <Relatorios />}
+        {abaAtiva === 'usuarios' && <Usuarios />}
       </main>
     </div>
   );
-}
-
-function EmConstrucao({ nome }) {
-  return <p className="muted">Módulo "{nome}" ainda não construído — próximo da fila.</p>;
 }
