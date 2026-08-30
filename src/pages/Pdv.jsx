@@ -4,7 +4,7 @@ import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import { precoEfetivo } from '../utils/promocoes';
 
-const PLACEHOLDER_SVG = "<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44'><rect width='44' height='44' rx='10' fill='#10131a'/></svg>";
+const PLACEHOLDER_SVG = "<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44'><rect width='44' height='44' rx='10' fill='#f0eafa'/></svg>";
 const PLACEHOLDER_FOTO = 'data:image/svg+xml;utf8,' + encodeURIComponent(PLACEHOLDER_SVG);
 const CATEGORIA_TODAS = 'Todos';
 

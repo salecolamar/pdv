@@ -7,12 +7,14 @@ import {
   LayoutDashboard,
   LayoutGrid,
   LogOut,
+  Menu,
   Package,
   Percent,
   ShoppingCart,
   UserCog,
   Users,
   Wallet,
+  X,
 } from 'lucide-react';
 import { supabase } from './supabase';
 import { Centro } from './App';
@@ -51,6 +53,7 @@ const MODULOS = [
 export default function Shell({ session }) {
   const [perfil, setPerfil] = useState(undefined); // undefined = carregando, null = sem linha em usuarios
   const [aba, setAba] = useState('dashboard');
+  const [sidebarAberta, setSidebarAberta] = useState(false);
 
   useEffect(() => {
     let cancelado = false;
@@ -89,56 +92,70 @@ export default function Shell({ session }) {
 
   const modulosVisiveis = MODULOS.filter((m) => m.papeis.includes(perfil.role));
   const abaAtiva = modulosVisiveis.some((m) => m.id === aba) ? aba : modulosVisiveis[0]?.id;
+  const moduloAtivo = modulosVisiveis.find((m) => m.id === abaAtiva);
+
+  function irPara(id) {
+    setAba(id);
+    setSidebarAberta(false);
+  }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '14px 16px',
-          borderBottom: '1px solid var(--border)',
-          background: 'var(--panel)',
-        }}
-      >
-        <div>
-          <h1 style={{ fontSize: 17 }}>{perfil.empresas.nome}</h1>
-          <p className="muted" style={{ fontSize: 12 }}>
-            {perfil.nome} · <span className="chip chip-primary" style={{ padding: '1px 8px' }}>{perfil.role}</span>
-          </p>
+    <div className="app-shell">
+      <div className={'sidebar-overlay' + (sidebarAberta ? ' is-open' : '')} onClick={() => setSidebarAberta(false)} />
+
+      <aside className={'sidebar' + (sidebarAberta ? ' is-open' : '')}>
+        <div className="sidebar__brand">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="sidebar__brand-nome">{perfil.empresas.nome}</div>
+            <div className="sidebar__brand-cargo">{perfil.nome} · {perfil.role}</div>
+          </div>
+          <button type="button" className="sidebar-toggle" style={{ borderColor: 'rgba(255,255,255,0.3)', color: '#fff' }} onClick={() => setSidebarAberta(false)}>
+            <X size={16} />
+          </button>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
+
+        <nav className="sidebar__nav">
+          {modulosVisiveis.map((m) => (
+            <button key={m.id} type="button" className={'sidebar__link' + (abaAtiva === m.id ? ' is-active' : '')} onClick={() => irPara(m.id)}>
+              <m.icon size={17} />
+              {m.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="sidebar__footer">
+          <button type="button" className="sidebar__sair" onClick={() => supabase.auth.signOut()}>
+            <LogOut size={16} /> Sair
+          </button>
+        </div>
+      </aside>
+
+      <div className="main-area">
+        <header className="topbar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button type="button" className="sidebar-toggle" onClick={() => setSidebarAberta(true)}>
+              <Menu size={18} />
+            </button>
+            <h1 style={{ fontSize: 16 }}>{moduloAtivo?.label}</h1>
+          </div>
           {(perfil.role === 'admin' || perfil.role === 'gerente') && <Notificacoes />}
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => supabase.auth.signOut()}>
-            <LogOut size={14} /> Sair
-          </button>
-        </div>
-      </header>
+        </header>
 
-      <nav className="tab-row" style={{ padding: '10px 16px 0' }}>
-        {modulosVisiveis.map((m) => (
-          <button key={m.id} type="button" className="tab" aria-pressed={abaAtiva === m.id} onClick={() => setAba(m.id)}>
-            <m.icon size={14} style={{ marginRight: 5, verticalAlign: -2 }} />
-            {m.label}
-          </button>
-        ))}
-      </nav>
-
-      <main style={{ flex: 1, padding: 16 }}>
-        {abaAtiva === 'dashboard' && <Dashboard />}
-        {abaAtiva === 'pdv' && <Pdv />}
-        {abaAtiva === 'mesas' && <Mesas />}
-        {abaAtiva === 'cozinha' && <Cozinha />}
-        {abaAtiva === 'produtos' && <Produtos />}
-        {abaAtiva === 'promocoes' && <Promocoes />}
-        {abaAtiva === 'clientes' && <Clientes />}
-        {abaAtiva === 'estoque' && <Estoque />}
-        {abaAtiva === 'caixa' && <Caixa />}
-        {abaAtiva === 'relatorios' && <Relatorios />}
-        {abaAtiva === 'usuarios' && <Usuarios />}
-        {abaAtiva === 'auditoria' && <Auditoria />}
-      </main>
+        <main style={{ flex: 1, padding: 16 }}>
+          {abaAtiva === 'dashboard' && <Dashboard />}
+          {abaAtiva === 'pdv' && <Pdv />}
+          {abaAtiva === 'mesas' && <Mesas />}
+          {abaAtiva === 'cozinha' && <Cozinha />}
+          {abaAtiva === 'produtos' && <Produtos />}
+          {abaAtiva === 'promocoes' && <Promocoes />}
+          {abaAtiva === 'clientes' && <Clientes />}
+          {abaAtiva === 'estoque' && <Estoque />}
+          {abaAtiva === 'caixa' && <Caixa />}
+          {abaAtiva === 'relatorios' && <Relatorios />}
+          {abaAtiva === 'usuarios' && <Usuarios />}
+          {abaAtiva === 'auditoria' && <Auditoria />}
+        </main>
+      </div>
     </div>
   );
 }

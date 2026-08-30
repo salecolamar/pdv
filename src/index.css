@@ -1,19 +1,24 @@
 :root {
-  --bg: #0f1115;
-  --panel: #181b22;
-  --panel-2: #10131a;
-  --border: #2a2e38;
-  --text: #f2f2f2;
-  --text-dim: #9aa0ab;
-  --primary: #ff6a3d;
-  --primary-ink: #2a1206;
-  --info: #3b82f6;
-  --danger: #e5484d;
-  --success: #2fbf71;
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #f5f2fb;
+  --border: #e1d9f5;
+  --text: #221533;
+  --text-dim: #6f6485;
+  --primary: #7c3aed;
+  --primary-dark: #4c1d95;
+  --primary-ink: #ffffff;
+  --info: #2563eb;
+  --danger: #dc2626;
+  --success: #15803d;
+  --sidebar-bg: #4c1d95;
+  --sidebar-text: #ffffff;
+  --sidebar-text-dim: rgba(255, 255, 255, 0.68);
+  --sidebar-active-bg: rgba(255, 255, 255, 0.16);
   --radius: 14px;
 
   font: 16px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color-scheme: dark;
+  color-scheme: light;
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
@@ -105,9 +110,9 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 }
 
 .btn-danger {
-  background: rgba(229, 72, 77, 0.15);
+  background: rgba(220, 38, 38, 0.1);
   color: var(--danger);
-  border: 1px solid rgba(229, 72, 77, 0.4);
+  border: 1px solid rgba(220, 38, 38, 0.35);
 }
 
 .btn:disabled {
@@ -131,6 +136,7 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 15px;
+  box-shadow: 0 1px 2px rgba(76, 29, 149, 0.05);
 }
 
 .row {
@@ -177,9 +183,9 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
   font-weight: 600;
 }
 
-.chip-primary { background: rgba(255, 106, 61, 0.15); color: var(--primary); }
-.chip-danger { background: rgba(229, 72, 77, 0.15); color: var(--danger); }
-.chip-success { background: rgba(47, 191, 113, 0.15); color: var(--success); }
+.chip-primary { background: rgba(124, 58, 237, 0.12); color: var(--primary); }
+.chip-danger { background: rgba(220, 38, 38, 0.12); color: var(--danger); }
+.chip-success { background: rgba(21, 128, 61, 0.12); color: var(--success); }
 
 ::-webkit-scrollbar {
   width: 6px;
@@ -198,13 +204,13 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
   bottom: 20px;
   max-width: 488px;
   margin: 0 auto;
-  background: #22252d;
-  border: 1px solid var(--border);
-  color: var(--text);
+  background: #2d1b4e;
+  border: 1px solid var(--primary-dark);
+  color: #ffffff;
   font-size: 13px;
   padding: 12px 14px;
   border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 10px 30px rgba(76, 29, 149, 0.35);
   opacity: 0;
   transform: translateY(8px);
   transition: opacity 0.22s ease, transform 0.22s ease;
@@ -212,8 +218,115 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
   z-index: 20;
 }
 .toast.is-visible { opacity: 1; transform: translateY(0); }
-.toast.is-danger { border-color: var(--danger); color: #ffd7d2; }
-.toast.is-success { border-color: var(--success); color: #d3f7e4; }
+.toast.is-danger { border-color: var(--danger); background: #4c1414; }
+.toast.is-success { border-color: var(--success); background: #143a1e; }
+
+/* Sidebar em cascata (menu vertical fixo à esquerda) */
+.app-shell { display: flex; min-height: 100dvh; }
+.sidebar {
+  width: 240px;
+  flex: 0 0 240px;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  overflow-y: auto;
+}
+.sidebar__brand {
+  padding: 22px 18px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+.sidebar__brand-nome { font-weight: 800; font-size: 16px; line-height: 1.2; }
+.sidebar__brand-cargo { font-size: 11.5px; color: var(--sidebar-text-dim); margin-top: 2px; }
+.sidebar__nav { display: flex; flex-direction: column; padding: 12px; gap: 3px; flex: 1; overflow-y: auto; }
+.sidebar__link {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: transparent;
+  border: none;
+  color: var(--sidebar-text-dim);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.sidebar__link:hover { background: rgba(255, 255, 255, 0.09); color: #fff; }
+.sidebar__link.is-active { background: var(--sidebar-active-bg); color: #fff; }
+.sidebar__footer { padding: 12px; border-top: 1px solid rgba(255, 255, 255, 0.14); }
+.sidebar__sair {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: transparent;
+  border: none;
+  color: var(--sidebar-text-dim);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sidebar__sair:hover { background: rgba(255, 255, 255, 0.09); color: #fff; }
+
+.main-area { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  position: relative;
+}
+.sidebar-toggle {
+  display: none;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px;
+  color: var(--text);
+  cursor: pointer;
+}
+.sidebar-overlay { display: none; }
+
+@media (max-width: 899px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 41;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    box-shadow: 6px 0 30px rgba(34, 21, 51, 0.35);
+  }
+  .sidebar.is-open { transform: translateX(0); }
+  .sidebar-toggle { display: inline-flex; align-items: center; justify-content: center; }
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(34, 21, 51, 0.45);
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+  }
+  .sidebar-overlay.is-open { opacity: 1; pointer-events: auto; }
+}
 
 .tab-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
 .tab-row::-webkit-scrollbar { display: none; }
