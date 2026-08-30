@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { Download, Printer } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money, metodoLabel } from '../utils/format';
 import { inicioDoDia, inicioDoMes, subDias } from '../utils/datas';
+import { baixarCsv } from '../utils/exportar';
 
 const FILTROS = [
   ['hoje', 'Hoje'],
@@ -55,10 +57,11 @@ export default function Relatorios() {
 
     const { data: vendas, error: erroVendas } = await supabase
       .from('vendas')
-      .select('id, total, operador_id, usuarios(nome)')
+      .select('id, criado_em, subtotal, desconto, total, operador_id, usuarios(nome)')
       .eq('cancelada', false)
       .gte('criado_em', inicio.toISOString())
-      .lte('criado_em', fim.toISOString());
+      .lte('criado_em', fim.toISOString())
+      .order('criado_em');
 
     if (erroVendas) {
       setErro(erroVendas.message);
@@ -80,23 +83,48 @@ export default function Relatorios() {
     }
 
     let porFormaPagamento = new Map();
+    let maisVendidos = [];
     if (vendas.length > 0) {
-      const { data: pagamentos } = await supabase
-        .from('pagamentos')
-        .select('forma, valor')
-        .in('venda_id', vendas.map((v) => v.id));
-      for (const p of pagamentos || []) {
+      const [pagamentosResp, itensResp] = await Promise.all([
+        supabase.from('pagamentos').select('forma, valor').in('venda_id', vendas.map((v) => v.id)),
+        supabase.from('venda_itens').select('nome_produto, quantidade, preco_unitario').in('venda_id', vendas.map((v) => v.id)),
+      ]);
+      for (const p of pagamentosResp.data || []) {
         porFormaPagamento.set(p.forma, (porFormaPagamento.get(p.forma) || 0) + Number(p.valor));
       }
+      const mapaProdutos = new Map();
+      for (const i of itensResp.data || []) {
+        const atual = mapaProdutos.get(i.nome_produto) || { quantidade: 0, total: 0 };
+        atual.quantidade += Number(i.quantidade);
+        atual.total += Number(i.quantidade) * Number(i.preco_unitario);
+        mapaProdutos.set(i.nome_produto, atual);
+      }
+      maisVendidos = [...mapaProdutos.entries()].map(([nome, v]) => ({ nome, ...v })).sort((a, b) => b.total - a.total);
     }
 
     setResumo({
+      vendas,
       numeroVendas,
       faturamento,
       ticketMedio,
       porOperador: [...porOperador.entries()].sort((a, b) => b[1].total - a[1].total),
       porFormaPagamento: [...porFormaPagamento.entries()].sort((a, b) => b[1] - a[1]),
+      maisVendidos,
     });
+  }
+
+  function exportarCsv() {
+    baixarCsv(
+      `vendas-${filtro}.csv`,
+      ['Data', 'Operador', 'Subtotal', 'Desconto', 'Total'],
+      resumo.vendas.map((v) => [
+        new Date(v.criado_em).toLocaleString('pt-BR'),
+        v.usuarios?.nome || 'Sem operador',
+        v.subtotal,
+        v.desconto,
+        v.total,
+      ])
+    );
   }
 
   return (
@@ -131,7 +159,16 @@ export default function Relatorios() {
           <p className="muted" style={{ fontSize: 13 }}>Escolha as datas de início e fim.</p>
         )
       ) : (
-        <>
+        <div className="relatorio-print" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="no-print" style={{ display: 'flex', gap: 8 }}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={exportarCsv} disabled={resumo.numeroVendas === 0}>
+              <Download size={14} /> Exportar CSV
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => window.print()} disabled={resumo.numeroVendas === 0}>
+              <Printer size={14} /> Exportar PDF
+            </button>
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
             <Cartao titulo="Faturamento" valor={money(resumo.faturamento)} destaque />
             <Cartao titulo="Vendas" valor={resumo.numeroVendas} />
@@ -171,7 +208,25 @@ export default function Relatorios() {
               </div>
             )}
           </div>
-        </>
+
+          <div className="card">
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>Produtos mais vendidos</div>
+            {resumo.maisVendidos.length === 0 ? (
+              <p className="muted" style={{ fontSize: 13, margin: 0 }}>Nenhuma venda no período.</p>
+            ) : (
+              <div className="list">
+                {resumo.maisVendidos.map((p) => (
+                  <div className="item" key={p.nome}>
+                    <span>
+                      {p.nome} <span className="muted" style={{ fontSize: 11 }}>x{p.quantidade}</span>
+                    </span>
+                    <span className="tabular">{money(p.total)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

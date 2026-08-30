@@ -301,3 +301,12 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 .ticket-cozinha__itens { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 16px; }
 .ticket-cozinha__qtd { font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; }
 .ticket-cozinha__btn { padding: 14px; font-size: 15px; }
+
+/* Exportar PDF (Relatórios): isola só o relatório na impressão, o resto
+   do app (header, abas, botões) some. */
+@media print {
+  body * { visibility: hidden; }
+  .relatorio-print, .relatorio-print * { visibility: visible; }
+  .relatorio-print { position: absolute; left: 0; top: 0; width: 100%; }
+  .no-print { display: none !important; }
+}
