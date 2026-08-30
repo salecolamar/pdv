@@ -390,10 +390,25 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
   margin-bottom: 16px;
 }
 .cozinha__header h1 { font-size: 22px; }
-.cozinha__grid {
+.cozinha__colunas {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(3, minmax(280px, 1fr));
   gap: 16px;
+  align-items: start;
+}
+.cozinha__coluna {
+  background: var(--panel-2);
+  border-radius: 16px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 120px;
+}
+.cozinha__coluna-titulo { font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: 0.4px; padding: 0 4px; }
+.cozinha__coluna-lista { display: flex; flex-direction: column; gap: 12px; }
+@media (max-width: 899px) {
+  .cozinha__colunas { grid-template-columns: 1fr; }
 }
 .ticket-cozinha {
   background: var(--panel);
@@ -406,6 +421,7 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 }
 .ticket-cozinha--atencao { border-color: #d9a441; }
 .ticket-cozinha--danger { border-color: var(--danger); }
+.ticket-cozinha--pronto { border-color: var(--success, #2f9e5f); opacity: 0.85; }
 .ticket-cozinha__topo { display: flex; align-items: baseline; justify-content: space-between; }
 .ticket-cozinha__mesa { font-size: 20px; font-weight: 800; }
 .ticket-cozinha__tempo { font-size: 13px; color: var(--text-dim); }
