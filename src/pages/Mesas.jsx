@@ -93,6 +93,7 @@ function MapaMesas({ mesas, onAbrirMesa }) {
 
 function ConfigurarMesas({ mesas, onAtualizado }) {
   const [nome, setNome] = useState('');
+  const [quantidade, setQuantidade] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
 
@@ -111,6 +112,27 @@ function ConfigurarMesas({ mesas, onAtualizado }) {
     onAtualizado();
   }
 
+  async function criarVarias(e) {
+    e.preventDefault();
+    const qtd = Number(quantidade);
+    if (!(qtd > 0)) return;
+    setEnviando(true);
+    setErro('');
+    const maiorNumero = (mesas || []).reduce((max, m) => {
+      const n = Number(m.nome.match(/\d+/)?.[0]);
+      return Number.isNaN(n) ? max : Math.max(max, n);
+    }, 0);
+    const novas = Array.from({ length: qtd }, (_, i) => ({ nome: `Mesa ${maiorNumero + i + 1}` }));
+    const { error } = await supabase.from('mesas').insert(novas);
+    setEnviando(false);
+    if (error) {
+      setErro(error.message);
+      return;
+    }
+    setQuantidade('');
+    onAtualizado();
+  }
+
   async function remover(id) {
     await supabase.from('mesas').delete().eq('id', id);
     onAtualizado();
@@ -121,6 +143,16 @@ function ConfigurarMesas({ mesas, onAtualizado }) {
       <form onSubmit={adicionar} className="card row">
         <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Mesa 7" style={{ flex: 1 }} />
         <button type="submit" className="btn btn-primary btn-sm" disabled={enviando}>Adicionar</button>
+      </form>
+      <form onSubmit={criarVarias} className="card row">
+        <input
+          value={quantidade}
+          onChange={(e) => setQuantidade(e.target.value.replace(/\D/g, ''))}
+          inputMode="numeric"
+          placeholder="Quantidade de mesas"
+          style={{ flex: 1 }}
+        />
+        <button type="submit" className="btn btn-secondary btn-sm" disabled={enviando}>Criar várias</button>
       </form>
       {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
 
@@ -152,13 +184,14 @@ function ConfigurarMesas({ mesas, onAtualizado }) {
 
 function Comanda({ mesa, onVoltar }) {
   const [pedido, setPedido] = useState(undefined);
+  const [precisaCliente, setPrecisaCliente] = useState(false);
   const [rodadas, setRodadas] = useState([]);
   const [lancando, setLancando] = useState(false);
   const [pagando, setPagando] = useState(false);
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
-    abrirOuCarregar();
+    verificarPedido();
   }, []);
 
   useEffect(() => {
@@ -171,10 +204,10 @@ function Comanda({ mesa, onVoltar }) {
     setToast({ msg, kind, key: Date.now() });
   }
 
-  async function abrirOuCarregar() {
+  async function verificarPedido() {
     const { data: existente } = await supabase
       .from('pedidos')
-      .select('*')
+      .select('*, clientes(nome)')
       .eq('mesa_id', mesa.id)
       .in('status', ['aberto', 'fechado', 'pago'])
       .order('aberto_em', { ascending: false })
@@ -187,14 +220,34 @@ function Comanda({ mesa, onVoltar }) {
       return;
     }
 
-    const { data: novo, error } = await supabase.from('pedidos').insert({ mesa_id: mesa.id }).select().single();
+    setPrecisaCliente(true);
+  }
+
+  async function abrirComCliente(nomeCliente, telefone) {
+    const { data: cliente, error: erroCliente } = await supabase
+      .from('clientes')
+      .insert({ nome: nomeCliente, telefone: telefone || null })
+      .select()
+      .single();
+    if (erroCliente) {
+      avisar(erroCliente.message, 'danger');
+      return false;
+    }
+
+    const { data: novo, error } = await supabase
+      .from('pedidos')
+      .insert({ mesa_id: mesa.id, cliente_id: cliente.id })
+      .select('*, clientes(nome)')
+      .single();
     if (error) {
       avisar(error.message, 'danger');
-      setPedido(null);
-      return;
+      return false;
     }
+
+    setPrecisaCliente(false);
     setPedido(novo);
     setRodadas([]);
+    return true;
   }
 
   async function carregarRodadas(pedidoId) {
@@ -210,6 +263,10 @@ function Comanda({ mesa, onVoltar }) {
     await supabase.from('pedidos').update({ status: 'fechado', fechado_em: new Date().toISOString() }).eq('id', pedido.id);
     setPedido((p) => ({ ...p, status: 'fechado' }));
     avisar('Comanda fechada. Escolha a forma de pagamento.', 'success');
+  }
+
+  if (precisaCliente) {
+    return <FormAbrirMesa mesa={mesa} onAbrir={abrirComCliente} onVoltar={onVoltar} />;
   }
 
   if (pedido === undefined) return <p className="muted">Carregando…</p>;
@@ -264,6 +321,7 @@ function Comanda({ mesa, onVoltar }) {
       <div>
         <h1 style={{ fontSize: 18, fontWeight: 800 }}>{mesa.nome}</h1>
         <p className="muted" style={{ fontSize: 13 }}>
+          {pedido.clientes?.nome ? `Cliente: ${pedido.clientes.nome} · ` : ''}
           {pedido.status === 'aberto' ? 'Comanda aberta' : pedido.status === 'fechado' ? 'Aguardando pagamento' : 'Paga'}
         </p>
       </div>
@@ -322,6 +380,52 @@ function Comanda({ mesa, onVoltar }) {
         <p className="success-text" style={{ textAlign: 'center' }}>Comanda paga — mesa liberada para o próximo grupo.</p>
       )}
     </div>
+  );
+}
+
+function FormAbrirMesa({ mesa, onAbrir, onVoltar }) {
+  const [nome, setNome] = useState('');
+  const [telefone, setTelefone] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  async function abrir(e) {
+    e.preventDefault();
+    setErro('');
+    if (!nome.trim()) {
+      setErro('Informe o nome do cliente.');
+      return;
+    }
+    setEnviando(true);
+    const ok = await onAbrir(nome.trim(), telefone.trim());
+    setEnviando(false);
+    if (!ok) setErro('Não foi possível abrir a mesa. Tente de novo.');
+  }
+
+  return (
+    <form onSubmit={abrir} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onVoltar}>
+        <X size={14} /> Voltar ao mapa
+      </button>
+
+      <div>
+        <h1 style={{ fontSize: 18, fontWeight: 800 }}>{mesa.nome}</h1>
+        <p className="muted" style={{ fontSize: 13 }}>Antes de abrir, informe quem está sentando na mesa.</p>
+      </div>
+
+      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span className="label">Nome do cliente</span>
+        <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Ana" autoFocus />
+        <span className="label">Telefone (opcional)</span>
+        <input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="Ex: (11) 99999-9999" />
+      </div>
+
+      {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
+
+      <button type="submit" className="btn btn-primary btn-block" disabled={enviando}>
+        {enviando ? 'Abrindo…' : 'Abrir mesa'}
+      </button>
+    </form>
   );
 }
 

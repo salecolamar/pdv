@@ -38,8 +38,8 @@ import Auditoria from './pages/Auditoria';
 // venda em si — quem vende é o garçom.
 const MODULOS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, papeis: ['admin', 'gerente'] },
-  { id: 'pdv', label: 'PDV', icon: ShoppingCart, papeis: ['operador'] },
   { id: 'mesas', label: 'Mesas', icon: LayoutGrid, papeis: ['operador'] },
+  { id: 'pdv', label: 'PDV', icon: ShoppingCart, papeis: ['operador'] },
   { id: 'cozinha', label: 'Cozinha', icon: ChefHat, papeis: ['admin', 'gerente', 'operador'] },
   { id: 'produtos', label: 'Produtos', icon: Package, papeis: ['admin', 'gerente'] },
   { id: 'promocoes', label: 'Promoções', icon: Percent, papeis: ['admin', 'gerente'] },

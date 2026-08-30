@@ -412,6 +412,7 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 .ticket-cozinha--atencao .ticket-cozinha__tempo { color: #d9a441; font-weight: 700; }
 .ticket-cozinha--danger .ticket-cozinha__tempo { color: var(--danger); font-weight: 700; }
 .ticket-cozinha__itens { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 16px; }
+.ticket-cozinha__grupos { display: flex; flex-direction: column; gap: 4px; }
 .ticket-cozinha__qtd { font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; }
 .ticket-cozinha__btn { padding: 14px; font-size: 15px; }
 
