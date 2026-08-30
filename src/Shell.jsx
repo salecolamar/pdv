@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react';
 import {
   BarChart3,
-  Boxes,
   ChefHat,
   History,
   LayoutDashboard,
   LogOut,
   Menu,
   Package,
-  Percent,
   ShoppingCart,
   UserCog,
   Users,
@@ -19,11 +17,9 @@ import { supabase } from './supabase';
 import { Centro } from './App';
 import Dashboard from './pages/Dashboard';
 import Produtos from './pages/Produtos';
-import Promocoes from './pages/Promocoes';
 import Mesas from './pages/Mesas';
 import Cozinha from './pages/Cozinha';
 import Clientes from './pages/Clientes';
-import Estoque from './pages/Estoque';
 import Caixa from './pages/Caixa';
 import Usuarios from './pages/Usuarios';
 import Relatorios from './pages/Relatorios';
@@ -37,11 +33,9 @@ import Auditoria from './pages/Auditoria';
 const MODULOS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, papeis: ['admin', 'gerente'] },
   { id: 'pdv', label: 'PDV', icon: ShoppingCart, papeis: ['operador'] },
-  { id: 'cozinha', label: 'Cozinha', icon: ChefHat, papeis: ['admin', 'gerente', 'operador'] },
+  { id: 'cozinha', label: 'Painel de Pedidos', icon: ChefHat, papeis: ['admin', 'gerente', 'operador'] },
   { id: 'produtos', label: 'Produtos', icon: Package, papeis: ['admin', 'gerente'] },
-  { id: 'promocoes', label: 'Promoções', icon: Percent, papeis: ['admin', 'gerente'] },
   { id: 'clientes', label: 'Clientes', icon: Users, papeis: ['admin', 'gerente', 'operador'] },
-  { id: 'estoque', label: 'Estoque', icon: Boxes, papeis: ['admin', 'gerente'] },
   { id: 'caixa', label: 'Caixa', icon: Wallet, papeis: ['admin', 'gerente'] },
   { id: 'relatorios', label: 'Relatórios', icon: BarChart3, papeis: ['admin', 'gerente'] },
   { id: 'usuarios', label: 'Usuários', icon: UserCog, papeis: ['admin'] },
@@ -144,9 +138,7 @@ export default function Shell({ session }) {
           {abaAtiva === 'pdv' && <Mesas />}
           {abaAtiva === 'cozinha' && <Cozinha />}
           {abaAtiva === 'produtos' && <Produtos />}
-          {abaAtiva === 'promocoes' && <Promocoes />}
           {abaAtiva === 'clientes' && <Clientes />}
-          {abaAtiva === 'estoque' && <Estoque />}
           {abaAtiva === 'caixa' && <Caixa />}
           {abaAtiva === 'relatorios' && <Relatorios />}
           {abaAtiva === 'usuarios' && <Usuarios />}

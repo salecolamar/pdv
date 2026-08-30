@@ -47,7 +47,7 @@ export default function Cozinha() {
   return (
     <div className="cozinha">
       <header className="cozinha__header">
-        <h1>Cozinha</h1>
+        <h1>Painel de Pedidos</h1>
         <span className="muted">{rodadas ? `${pendentes} em preparo` : ''}</span>
       </header>
 

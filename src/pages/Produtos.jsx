@@ -3,6 +3,8 @@ import * as XLSX from 'xlsx';
 import { Upload } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
+import Promocoes from './Promocoes';
+import Estoque from './Estoque';
 
 const PLACEHOLDER_SVG = "<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44'><rect width='44' height='44' rx='10' fill='#f0eafa'/></svg>";
 const PLACEHOLDER_FOTO = 'data:image/svg+xml;utf8,' + encodeURIComponent(PLACEHOLDER_SVG);
@@ -29,9 +31,19 @@ export default function Produtos() {
         <button type="button" className="tab" aria-pressed={aba === 'categorias'} onClick={() => setAba('categorias')}>
           Categorias
         </button>
+        <button type="button" className="tab" aria-pressed={aba === 'promocoes'} onClick={() => setAba('promocoes')}>
+          Promoções
+        </button>
+        <button type="button" className="tab" aria-pressed={aba === 'estoque'} onClick={() => setAba('estoque')}>
+          Estoque
+        </button>
       </div>
       {aba === 'categorias' ? (
         <Categorias categorias={categorias} onMudou={carregarCategorias} />
+      ) : aba === 'promocoes' ? (
+        <Promocoes />
+      ) : aba === 'estoque' ? (
+        <Estoque />
       ) : (
         <ProdutosLista categorias={categorias || []} onCategoriasAtualizadas={carregarCategorias} />
       )}
