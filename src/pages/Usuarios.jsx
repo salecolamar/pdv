@@ -42,7 +42,7 @@ export default function Usuarios() {
         Convidar usuário
       </button>
 
-      {empresaId && <LinkGarcons empresaId={empresaId} />}
+      {empresaId && <LinkAcesso empresaId={empresaId} />}
 
       {usuarios === null ? (
         <p className="muted">Carregando…</p>
@@ -77,7 +77,7 @@ export default function Usuarios() {
   );
 }
 
-function LinkGarcons({ empresaId }) {
+function LinkAcesso({ empresaId }) {
   const [copiado, setCopiado] = useState(false);
   const link = `${window.location.origin}/garcom/${empresaId}`;
 
@@ -89,9 +89,9 @@ function LinkGarcons({ empresaId }) {
 
   return (
     <div className="card">
-      <div style={{ fontWeight: 700, marginBottom: 4 }}>Link de acesso dos garçons</div>
+      <div style={{ fontWeight: 700, marginBottom: 4 }}>Link de acesso do estabelecimento</div>
       <p className="muted" style={{ fontSize: 12.5, margin: '0 0 8px' }}>
-        Deixe esse link salvo no celular/tablet do balcão — os garçons cadastrados com PIN aparecem numa lista pra escolher o nome e digitar a senha.
+        Deixe esse link salvo no celular/tablet do balcão — quem abrir escolhe entre entrar como admin (e-mail e senha) ou como garçom (escolhe o nome na lista e digita o PIN).
       </p>
       <div className="row" style={{ gap: 8 }}>
         <input value={link} readOnly style={{ flex: 1, fontSize: 12.5 }} onFocus={(e) => e.target.select()} />

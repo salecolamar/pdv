@@ -1,9 +1,59 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, Lock } from 'lucide-react';
+import { ChevronLeft, Lock, ShieldCheck, UtensilsCrossed } from 'lucide-react';
 import { supabase } from '../supabase';
-import { Centro } from '../App';
+import { Centro, FormularioEntrar } from '../App';
 
-export default function GarcomLogin({ empresaId }) {
+export default function AcessoEmpresa({ empresaId }) {
+  const [modo, setModo] = useState(null); // null | 'admin' | 'garcom'
+
+  if (modo === 'admin') {
+    return (
+      <Centro>
+        <div className="card" style={{ width: 340, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <VoltarEscolha onVoltar={() => setModo(null)} titulo="Entrar como admin" />
+          <FormularioEntrar />
+        </div>
+      </Centro>
+    );
+  }
+
+  if (modo === 'garcom') {
+    return <AcessoGarcom empresaId={empresaId} onVoltar={() => setModo(null)} />;
+  }
+
+  return (
+    <Centro>
+      <div className="card" style={{ width: 340, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ textAlign: 'center' }}>
+          <Lock size={24} color="var(--primary)" style={{ margin: '0 auto 8px' }} />
+          <h1 style={{ fontSize: 20 }}>PDV</h1>
+          <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>Como você quer entrar?</p>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <button type="button" className="btn btn-primary btn-block" onClick={() => setModo('garcom')}>
+            <UtensilsCrossed size={16} /> Sou garçom
+          </button>
+          <button type="button" className="btn btn-secondary btn-block" onClick={() => setModo('admin')}>
+            <ShieldCheck size={16} /> Sou admin
+          </button>
+        </div>
+      </div>
+    </Centro>
+  );
+}
+
+function VoltarEscolha({ onVoltar, titulo }) {
+  return (
+    <div>
+      <button type="button" className="btn btn-secondary btn-sm" onClick={onVoltar}>
+        <ChevronLeft size={14} /> Voltar
+      </button>
+      <h1 style={{ fontSize: 18, textAlign: 'center', marginTop: 10 }}>{titulo}</h1>
+    </div>
+  );
+}
+
+function AcessoGarcom({ empresaId, onVoltar }) {
   const [garcons, setGarcons] = useState(undefined);
   const [selecionado, setSelecionado] = useState(null);
   const [pin, setPin] = useState('');
@@ -36,22 +86,11 @@ export default function GarcomLogin({ empresaId }) {
   return (
     <Centro>
       <div className="card" style={{ width: 340, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ textAlign: 'center' }}>
-          <Lock size={24} color="var(--primary)" style={{ margin: '0 auto 8px' }} />
-          <h1 style={{ fontSize: 20 }}>Acesso do garçom</h1>
-          {!selecionado && <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>Toque no seu nome pra entrar.</p>}
-        </div>
+        <VoltarEscolha onVoltar={selecionado ? () => { setSelecionado(null); setPin(''); setErro(''); } : onVoltar} titulo="Acesso do garçom" />
+        {!selecionado && <p className="muted" style={{ fontSize: 13, textAlign: 'center', marginTop: -8 }}>Toque no seu nome pra entrar.</p>}
 
         {selecionado ? (
           <form onSubmit={entrar} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              style={{ alignSelf: 'flex-start', marginBottom: 8 }}
-              onClick={() => { setSelecionado(null); setPin(''); setErro(''); }}
-            >
-              <ChevronLeft size={14} /> Trocar de garçom
-            </button>
             <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 17, marginBottom: 4 }}>{selecionado.nome}</div>
             <span className="label">PIN (6 dígitos)</span>
             <input
