@@ -16,6 +16,7 @@ import Dashboard from './pages/Dashboard';
 import Produtos from './pages/Produtos';
 import Pdv from './pages/Pdv';
 import Clientes from './pages/Clientes';
+import Estoque from './pages/Estoque';
 
 // Cada módulo diz quais papéis podem vê-lo (seção 10 do documento):
 // admin enxerga tudo; gerente não mexe em usuários; operador só vende e
@@ -111,7 +112,7 @@ export default function Shell({ session }) {
         {abaAtiva === 'pdv' && <Pdv />}
         {abaAtiva === 'produtos' && <Produtos />}
         {abaAtiva === 'clientes' && <Clientes />}
-        {abaAtiva === 'estoque' && <EmConstrucao nome="Estoque" />}
+        {abaAtiva === 'estoque' && <Estoque />}
         {abaAtiva === 'caixa' && <EmConstrucao nome="Caixa" />}
         {abaAtiva === 'relatorios' && <EmConstrucao nome="Relatórios" />}
         {abaAtiva === 'usuarios' && <EmConstrucao nome="Usuários" />}

@@ -347,8 +347,14 @@ begin
       (v_item->>'preco_unitario')::numeric
     );
 
-    update produtos set estoque = estoque - (v_item->>'quantidade')::numeric
-    where id = (v_item->>'produto_id')::uuid and estoque is not null;
+    select * into v_produto from produtos where id = (v_item->>'produto_id')::uuid;
+    if v_produto.estoque is not null then
+      update produtos set estoque = estoque - (v_item->>'quantidade')::numeric
+      where id = (v_item->>'produto_id')::uuid;
+
+      insert into estoque_movimentos (produto_id, tipo, quantidade, usuario_id, motivo)
+      values ((v_item->>'produto_id')::uuid, 'saida', -(v_item->>'quantidade')::numeric, auth.uid(), 'Venda');
+    end if;
   end loop;
 
   for v_pagamento in select * from jsonb_array_elements(p_pagamentos)
@@ -358,5 +364,58 @@ begin
   end loop;
 
   return v_venda_id;
+end;
+$$;
+
+-- ---------------------------------------------------------------------
+-- registrar_movimento_estoque: entrada, saída ou ajuste manual de estoque.
+-- quantidade em estoque_movimentos sempre guarda o DELTA aplicado
+-- (positivo ou negativo), então a soma dos deltas de um produto sempre
+-- bate com o estoque atual dele.
+-- ---------------------------------------------------------------------
+create or replace function registrar_movimento_estoque(
+  p_produto_id uuid,
+  p_tipo text,
+  p_quantidade numeric,
+  p_motivo text default null
+)
+returns numeric
+language plpgsql
+security invoker
+as $$
+declare
+  v_produto produtos%rowtype;
+  v_delta numeric;
+  v_novo_estoque numeric;
+begin
+  select * into v_produto from produtos where id = p_produto_id;
+  if v_produto is null then
+    raise exception 'Produto não encontrado.';
+  end if;
+  if v_produto.estoque is null then
+    raise exception 'Esse produto não tem controle de estoque.';
+  end if;
+
+  if p_tipo = 'entrada' then
+    v_delta := p_quantidade;
+  elsif p_tipo = 'saida' then
+    v_delta := -p_quantidade;
+  elsif p_tipo = 'ajuste' then
+    v_delta := p_quantidade - v_produto.estoque;
+  else
+    raise exception 'Tipo de movimentação inválido: %', p_tipo;
+  end if;
+
+  v_novo_estoque := v_produto.estoque + v_delta;
+  if v_novo_estoque < 0 then
+    raise exception 'Estoque não pode ficar negativo. Atual: %, tentando reduzir: %.', v_produto.estoque, abs(v_delta);
+  end if;
+
+  update produtos set estoque = v_novo_estoque where id = p_produto_id;
+
+  insert into estoque_movimentos (produto_id, tipo, quantidade, usuario_id, motivo)
+  values (p_produto_id, p_tipo, v_delta, auth.uid(), p_motivo);
+
+  return v_novo_estoque;
 end;
 $$;
