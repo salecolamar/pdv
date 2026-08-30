@@ -15,6 +15,8 @@ export default function Pdv() {
   const [desconto, setDesconto] = useState('0');
   const [finalizando, setFinalizando] = useState(false);
   const [toast, setToast] = useState(null);
+  const [clientes, setClientes] = useState([]);
+  const [clienteId, setClienteId] = useState('');
 
   useEffect(() => {
     carregar();
@@ -27,12 +29,14 @@ export default function Pdv() {
   }, [toast]);
 
   async function carregar() {
-    const [prodResp, catResp] = await Promise.all([
+    const [prodResp, catResp, cliResp] = await Promise.all([
       supabase.from('produtos').select('*').eq('ativo', true).order('nome'),
       supabase.from('categorias').select('*').order('ordem').order('nome'),
+      supabase.from('clientes').select('id, nome').order('nome'),
     ]);
     setProdutos(prodResp.data || []);
     setCategorias(catResp.data || []);
+    setClientes(cliResp.data || []);
   }
 
   function avisar(msg, kind) {
@@ -70,6 +74,7 @@ export default function Pdv() {
   function cancelarVenda() {
     setCarrinho([]);
     setDesconto('0');
+    setClienteId('');
   }
 
   const subtotal = useMemo(() => carrinho.reduce((s, i) => s + i.preco * i.quantidade, 0), [carrinho]);
@@ -91,6 +96,7 @@ export default function Pdv() {
         subtotal={subtotal}
         desconto={descontoNum}
         total={total}
+        clienteId={clienteId || null}
         onVoltar={() => setFinalizando(false)}
         onConcluida={() => {
           cancelarVenda();
@@ -179,6 +185,15 @@ export default function Pdv() {
             ))}
           </div>
           <div className="row">
+            <span className="label" style={{ margin: 0 }}>Cliente (opcional)</span>
+            <select value={clienteId} onChange={(e) => setClienteId(e.target.value)} style={{ width: 180 }}>
+              <option value="">Não identificado</option>
+              {clientes.map((c) => (
+                <option key={c.id} value={c.id}>{c.nome}</option>
+              ))}
+            </select>
+          </div>
+          <div className="row">
             <span className="label" style={{ margin: 0 }}>Desconto (R$)</span>
             <input
               value={desconto}
@@ -209,7 +224,7 @@ export default function Pdv() {
   );
 }
 
-function FinalizarVenda({ itens, subtotal, desconto, total, onVoltar, onConcluida, avisar }) {
+function FinalizarVenda({ itens, subtotal, desconto, total, clienteId, onVoltar, onConcluida, avisar }) {
   const [pagamentos, setPagamentos] = useState([{ forma: 'dinheiro', valor: total.toFixed(2) }]);
   const [recebido, setRecebido] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -244,7 +259,7 @@ function FinalizarVenda({ itens, subtotal, desconto, total, onVoltar, onConcluid
       p_itens: itens.map((i) => ({ produto_id: i.produto_id, nome_produto: i.nome, quantidade: i.quantidade, preco_unitario: i.preco })),
       p_pagamentos: pagamentos.map((p) => ({ forma: p.forma, valor: Number(p.valor.replace(',', '.')) || 0 })),
       p_desconto: desconto,
-      p_cliente_id: null,
+      p_cliente_id: clienteId,
     });
     setEnviando(false);
     if (error) {
