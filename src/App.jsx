@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { Lock } from 'lucide-react';
 import { supabase } from './supabase';
 import Shell from './Shell';
+import GarcomLogin from './pages/GarcomLogin';
+
+const ROTA_GARCOM = window.location.pathname.match(/^\/garcom\/([0-9a-f-]{36})$/i);
 
 export default function App() {
   const [session, setSession] = useState(undefined); // undefined = carregando, null = deslogado
@@ -19,7 +22,7 @@ export default function App() {
   }
 
   if (!session) {
-    return <Auth />;
+    return ROTA_GARCOM ? <GarcomLogin empresaId={ROTA_GARCOM[1]} /> : <Auth />;
   }
 
   return <Shell session={session} />;

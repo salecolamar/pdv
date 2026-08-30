@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { randomUUID } from 'node:crypto';
 
 const PAPEIS_CONVIDAVEIS = ['gerente', 'operador'];
 
@@ -31,10 +32,32 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { nome, email, senha, role, permissoes } = req.body || {};
-  if (!nome || !email || !senha || !PAPEIS_CONVIDAVEIS.includes(role)) {
-    res.status(400).json({ error: 'Preencha nome, email, senha e um papel válido.' });
+  const { nome, tipo } = req.body || {};
+  if (!nome) {
+    res.status(400).json({ error: 'Informe o nome.' });
     return;
+  }
+
+  let email, senha, role, permissoes, loginTipo;
+
+  if (tipo === 'garcom') {
+    const { pin } = req.body || {};
+    if (!/^\d{6}$/.test(pin || '')) {
+      res.status(400).json({ error: 'O PIN precisa ter exatamente 6 dígitos numéricos.' });
+      return;
+    }
+    email = `garcom-${randomUUID()}@garcons.pdv.internal`;
+    senha = pin;
+    role = 'operador';
+    permissoes = { realizar_vendas: true };
+    loginTipo = 'pin';
+  } else {
+    ({ email, senha, role, permissoes } = req.body || {});
+    if (!email || !senha || !PAPEIS_CONVIDAVEIS.includes(role)) {
+      res.status(400).json({ error: 'Preencha nome, email, senha e um papel válido.' });
+      return;
+    }
+    loginTipo = 'email';
   }
 
   const { data: novoUsuario, error: createError } = await admin.auth.admin.createUser({
@@ -54,6 +77,7 @@ export default async function handler(req, res) {
     email,
     role,
     permissoes: permissoes || {},
+    login_tipo: loginTipo,
   });
   if (insertError) {
     await admin.auth.admin.deleteUser(novoUsuario.user.id);

@@ -33,12 +33,13 @@ import Notificacoes from './pages/Notificacoes';
 import Auditoria from './pages/Auditoria';
 
 // Cada módulo diz quais papéis podem vê-lo (seção 10 do documento):
-// admin enxerga tudo; gerente não mexe em usuários; operador só vende e
-// atende (PDV/Mesas/Cozinha/Clientes).
+// garçom (operador, login por PIN) só vende e atende (PDV/Mesas/Cozinha/
+// Clientes); admin e gerente enxergam toda a gestão, menos as telas de
+// venda em si — quem vende é o garçom.
 const MODULOS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, papeis: ['admin', 'gerente'] },
-  { id: 'pdv', label: 'PDV', icon: ShoppingCart, papeis: ['admin', 'gerente', 'operador'] },
-  { id: 'mesas', label: 'Mesas', icon: LayoutGrid, papeis: ['admin', 'gerente', 'operador'] },
+  { id: 'pdv', label: 'PDV', icon: ShoppingCart, papeis: ['operador'] },
+  { id: 'mesas', label: 'Mesas', icon: LayoutGrid, papeis: ['operador'] },
   { id: 'cozinha', label: 'Cozinha', icon: ChefHat, papeis: ['admin', 'gerente', 'operador'] },
   { id: 'produtos', label: 'Produtos', icon: Package, papeis: ['admin', 'gerente'] },
   { id: 'promocoes', label: 'Promoções', icon: Percent, papeis: ['admin', 'gerente'] },

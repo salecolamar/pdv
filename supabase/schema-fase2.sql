@@ -413,3 +413,28 @@ begin
   values (auth.uid(), 'cancelar_venda', jsonb_build_object('venda_id', p_venda_id, 'motivo', p_motivo, 'total', v_venda.total));
 end;
 $$;
+
+-- ---------------------------------------------------------------------
+-- Login de garçom por PIN numérico: admin cadastra o garçom com nome+PIN
+-- (sem e-mail real), a tela pública /garcom/<empresa_id> lista quem tem
+-- login_tipo='pin' pra ele escolher o nome e digitar o PIN.
+-- ---------------------------------------------------------------------
+alter table usuarios add column login_tipo text not null default 'email' check (login_tipo in ('email', 'pin'));
+
+-- listar_garcons: lista pública (sem login) dos garçons de uma empresa pra
+-- montar a tela de seleção antes do PIN. Só devolve id/nome/email (o email
+-- é sintético, gerado no cadastro, só serve pra autenticar — não é usado
+-- pra contato). security definer pra funcionar sem sessão autenticada.
+create or replace function listar_garcons(p_empresa_id uuid)
+returns table(id uuid, nome text, email text)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select id, nome, email from usuarios
+  where empresa_id = p_empresa_id and role = 'operador' and login_tipo = 'pin' and ativo = true
+  order by nome;
+$$;
+
+grant execute on function listar_garcons(uuid) to anon, authenticated;
