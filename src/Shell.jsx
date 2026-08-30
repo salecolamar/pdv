@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import {
   BarChart3,
   Boxes,
+  ChefHat,
   LayoutDashboard,
+  LayoutGrid,
   LogOut,
   Package,
   ShoppingCart,
@@ -15,6 +17,8 @@ import { Centro } from './App';
 import Dashboard from './pages/Dashboard';
 import Produtos from './pages/Produtos';
 import Pdv from './pages/Pdv';
+import Mesas from './pages/Mesas';
+import Cozinha from './pages/Cozinha';
 import Clientes from './pages/Clientes';
 import Estoque from './pages/Estoque';
 import Caixa from './pages/Caixa';
@@ -23,10 +27,12 @@ import Relatorios from './pages/Relatorios';
 
 // Cada módulo diz quais papéis podem vê-lo (seção 10 do documento):
 // admin enxerga tudo; gerente não mexe em usuários; operador só vende e
-// atende (PDV/Clientes).
+// atende (PDV/Mesas/Cozinha/Clientes).
 const MODULOS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, papeis: ['admin', 'gerente'] },
   { id: 'pdv', label: 'PDV', icon: ShoppingCart, papeis: ['admin', 'gerente', 'operador'] },
+  { id: 'mesas', label: 'Mesas', icon: LayoutGrid, papeis: ['admin', 'gerente', 'operador'] },
+  { id: 'cozinha', label: 'Cozinha', icon: ChefHat, papeis: ['admin', 'gerente', 'operador'] },
   { id: 'produtos', label: 'Produtos', icon: Package, papeis: ['admin', 'gerente'] },
   { id: 'clientes', label: 'Clientes', icon: Users, papeis: ['admin', 'gerente', 'operador'] },
   { id: 'estoque', label: 'Estoque', icon: Boxes, papeis: ['admin', 'gerente'] },
@@ -112,6 +118,8 @@ export default function Shell({ session }) {
       <main style={{ flex: 1, padding: 16 }}>
         {abaAtiva === 'dashboard' && <Dashboard />}
         {abaAtiva === 'pdv' && <Pdv />}
+        {abaAtiva === 'mesas' && <Mesas />}
+        {abaAtiva === 'cozinha' && <Cozinha />}
         {abaAtiva === 'produtos' && <Produtos />}
         {abaAtiva === 'clientes' && <Clientes />}
         {abaAtiva === 'estoque' && <Estoque />}

@@ -240,3 +240,64 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 }
 .stepper-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .stepper-qty { min-width: 20px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.mesa-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 10px; }
+.mesa-card {
+  background: transparent;
+  border: none;
+  padding: 4px 0 6px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.mesa-card:disabled, .mesa-card.is-blocked { opacity: 0.4; cursor: not-allowed; }
+.table-wrap { position: relative; width: 72px; height: 72px; }
+.table-chair { position: absolute; width: 15px; height: 15px; border-radius: 4px; opacity: 0.55; }
+.table-chair--top { top: 0; left: 28.5px; }
+.table-chair--bottom { bottom: 0; left: 28.5px; }
+.table-chair--left { left: 0; top: 28.5px; }
+.table-chair--right { right: 0; top: 28.5px; }
+.table-top {
+  position: absolute; left: 8px; top: 8px; width: 56px; height: 56px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 800; font-size: 20px;
+}
+.mesa-card__status { font-size: 10.5px; font-weight: 700; }
+
+.cozinha { padding: 4px 0 24px; }
+.cozinha__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.cozinha__header h1 { font-size: 22px; }
+.cozinha__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+.ticket-cozinha {
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ticket-cozinha--atencao { border-color: #d9a441; }
+.ticket-cozinha--danger { border-color: var(--danger); }
+.ticket-cozinha__topo { display: flex; align-items: baseline; justify-content: space-between; }
+.ticket-cozinha__mesa { font-size: 20px; font-weight: 800; }
+.ticket-cozinha__tempo { font-size: 13px; color: var(--text-dim); }
+.ticket-cozinha--atencao .ticket-cozinha__tempo { color: #d9a441; font-weight: 700; }
+.ticket-cozinha--danger .ticket-cozinha__tempo { color: var(--danger); font-weight: 700; }
+.ticket-cozinha__itens { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 16px; }
+.ticket-cozinha__qtd { font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; }
+.ticket-cozinha__btn { padding: 14px; font-size: 15px; }

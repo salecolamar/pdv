@@ -1,0 +1,555 @@
+import { useEffect, useState } from 'react';
+import { Minus, Plus, Trash2, X } from 'lucide-react';
+import { supabase } from '../supabase';
+import { money } from '../utils/format';
+
+const STATUS_LABEL = { livre: 'Livre', ocupada: 'Ocupada' };
+
+export default function Mesas() {
+  const [aba, setAba] = useState('mapa');
+  const [mesaSelecionada, setMesaSelecionada] = useState(null);
+  const [mesas, setMesas] = useState(null);
+
+  useEffect(() => {
+    carregar();
+  }, []);
+
+  async function carregar() {
+    const { data } = await supabase.from('mesas').select('*').order('nome');
+    setMesas(
+      (data || []).sort((a, b) => {
+        const na = Number(a.nome.match(/\d+/)?.[0]);
+        const nb = Number(b.nome.match(/\d+/)?.[0]);
+        if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+        return a.nome.localeCompare(b.nome);
+      })
+    );
+  }
+
+  if (mesaSelecionada) {
+    return (
+      <Comanda
+        mesa={mesaSelecionada}
+        onVoltar={() => {
+          setMesaSelecionada(null);
+          carregar();
+        }}
+      />
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="tab-row">
+        <button type="button" className="tab" aria-pressed={aba === 'mapa'} onClick={() => setAba('mapa')}>
+          Mapa
+        </button>
+        <button type="button" className="tab" aria-pressed={aba === 'configurar'} onClick={() => setAba('configurar')}>
+          Configurar mesas
+        </button>
+      </div>
+
+      {aba === 'mapa' ? (
+        <MapaMesas mesas={mesas} onAbrirMesa={setMesaSelecionada} />
+      ) : (
+        <ConfigurarMesas mesas={mesas} onAtualizado={carregar} />
+      )}
+    </div>
+  );
+}
+
+function MapaMesas({ mesas, onAbrirMesa }) {
+  if (mesas === null) return <p className="muted">Carregando…</p>;
+  if (mesas.length === 0) {
+    return <p className="muted" style={{ fontSize: 13 }}>Nenhuma mesa cadastrada. Use "Configurar mesas" pra criar.</p>;
+  }
+
+  return (
+    <>
+      <p className="muted" style={{ fontSize: 13 }}>Azul = livre, vermelho = ocupada. Toque numa mesa pra ver a comanda.</p>
+      <div className="mesa-grid">
+        {mesas.map((m) => {
+          const livre = m.status === 'livre';
+          const cor = livre ? 'var(--info)' : 'var(--danger)';
+          const numero = (m.nome.match(/\d+/) || [m.nome])[0];
+          return (
+            <button key={m.id} type="button" className="mesa-card" onClick={() => onAbrirMesa(m)}>
+              <span className="table-wrap">
+                <span className="table-chair table-chair--top" style={{ background: cor }} />
+                <span className="table-chair table-chair--bottom" style={{ background: cor }} />
+                <span className="table-chair table-chair--left" style={{ background: cor }} />
+                <span className="table-chair table-chair--right" style={{ background: cor }} />
+                <span className="table-top" style={{ background: cor }}>{numero}</span>
+              </span>
+              <span className="mesa-card__status" style={{ color: cor }}>{STATUS_LABEL[m.status] || m.status}</span>
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+function ConfigurarMesas({ mesas, onAtualizado }) {
+  const [nome, setNome] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  async function adicionar(e) {
+    e.preventDefault();
+    if (!nome.trim()) return;
+    setEnviando(true);
+    setErro('');
+    const { error } = await supabase.from('mesas').insert({ nome: nome.trim() });
+    setEnviando(false);
+    if (error) {
+      setErro(error.message);
+      return;
+    }
+    setNome('');
+    onAtualizado();
+  }
+
+  async function remover(id) {
+    await supabase.from('mesas').delete().eq('id', id);
+    onAtualizado();
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <form onSubmit={adicionar} className="card row">
+        <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Mesa 7" style={{ flex: 1 }} />
+        <button type="submit" className="btn btn-primary btn-sm" disabled={enviando}>Adicionar</button>
+      </form>
+      {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
+
+      {mesas === null ? (
+        <p className="muted">Carregando…</p>
+      ) : mesas.length === 0 ? (
+        <p className="muted" style={{ fontSize: 13 }}>Nenhuma mesa cadastrada ainda.</p>
+      ) : (
+        <div className="list">
+          {mesas.map((m) => (
+            <div key={m.id} className="item" style={{ alignItems: 'center' }}>
+              <span style={{ flex: 1 }}>{m.nome}</span>
+              <span className={'chip ' + (m.status === 'livre' ? 'chip-success' : 'chip-danger')}>{STATUS_LABEL[m.status] || m.status}</span>
+              <button
+                type="button"
+                onClick={() => remover(m.id)}
+                disabled={m.status !== 'livre'}
+                style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: m.status === 'livre' ? 'pointer' : 'not-allowed', opacity: m.status === 'livre' ? 1 : 0.35, padding: 4, marginLeft: 8 }}
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Comanda({ mesa, onVoltar }) {
+  const [pedido, setPedido] = useState(undefined);
+  const [rodadas, setRodadas] = useState([]);
+  const [lancando, setLancando] = useState(false);
+  const [pagando, setPagando] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    abrirOuCarregar();
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2600);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  function avisar(msg, kind) {
+    setToast({ msg, kind, key: Date.now() });
+  }
+
+  async function abrirOuCarregar() {
+    const { data: existente } = await supabase
+      .from('pedidos')
+      .select('*')
+      .eq('mesa_id', mesa.id)
+      .in('status', ['aberto', 'fechado', 'pago'])
+      .order('aberto_em', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existente && existente.status !== 'pago') {
+      setPedido(existente);
+      carregarRodadas(existente.id);
+      return;
+    }
+
+    const { data: novo, error } = await supabase.from('pedidos').insert({ mesa_id: mesa.id }).select().single();
+    if (error) {
+      avisar(error.message, 'danger');
+      setPedido(null);
+      return;
+    }
+    setPedido(novo);
+    setRodadas([]);
+  }
+
+  async function carregarRodadas(pedidoId) {
+    const { data } = await supabase
+      .from('pedido_rodadas')
+      .select('*, pedido_itens(*)')
+      .eq('pedido_id', pedidoId)
+      .order('criado_em');
+    setRodadas(data || []);
+  }
+
+  async function fecharComanda() {
+    await supabase.from('pedidos').update({ status: 'fechado', fechado_em: new Date().toISOString() }).eq('id', pedido.id);
+    setPedido((p) => ({ ...p, status: 'fechado' }));
+    avisar('Comanda fechada. Escolha a forma de pagamento.', 'success');
+  }
+
+  if (pedido === undefined) return <p className="muted">Carregando…</p>;
+  if (pedido === null) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <p className="muted">Não foi possível abrir essa mesa.</p>
+        <button type="button" className="btn btn-secondary" style={{ alignSelf: 'flex-start' }} onClick={onVoltar}>
+          <X size={14} /> Voltar ao mapa
+        </button>
+      </div>
+    );
+  }
+
+  const total = rodadas.reduce((s, r) => s + r.pedido_itens.reduce((si, i) => si + i.quantidade * i.preco_unitario, 0), 0);
+
+  if (lancando) {
+    return (
+      <LancarItens
+        pedido={pedido}
+        onVoltar={() => setLancando(false)}
+        onLancado={() => {
+          setLancando(false);
+          carregarRodadas(pedido.id);
+          avisar('Itens lançados na cozinha!', 'success');
+        }}
+      />
+    );
+  }
+
+  if (pagando) {
+    return (
+      <FinalizarPedido
+        pedido={pedido}
+        total={total}
+        onVoltar={() => setPagando(false)}
+        onConcluido={() => {
+          setPagando(false);
+          setPedido((p) => ({ ...p, status: 'pago' }));
+          avisar('Comanda paga! Mesa liberada.', 'success');
+        }}
+      />
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onVoltar}>
+        <X size={14} /> Voltar ao mapa
+      </button>
+
+      <div>
+        <h1 style={{ fontSize: 18, fontWeight: 800 }}>{mesa.nome}</h1>
+        <p className="muted" style={{ fontSize: 13 }}>
+          {pedido.status === 'aberto' ? 'Comanda aberta' : pedido.status === 'fechado' ? 'Aguardando pagamento' : 'Paga'}
+        </p>
+      </div>
+
+      <div className="list">
+        {rodadas.length === 0 ? (
+          <p className="muted" style={{ fontSize: 13, margin: 0 }}>Nenhum item lançado ainda.</p>
+        ) : (
+          rodadas.map((r) => (
+            <div key={r.id} className="card">
+              <div className="row" style={{ marginBottom: 6 }}>
+                <span className={'chip ' + (r.status === 'pronto' ? 'chip-success' : 'chip-primary')}>
+                  {r.status === 'pronto' ? 'Pronto' : 'Na cozinha'}
+                </span>
+              </div>
+              {r.pedido_itens.map((i) => (
+                <div className="row" key={i.id} style={{ fontSize: 13, padding: '2px 0' }}>
+                  <span>{i.quantidade}x {i.nome_produto}</span>
+                  <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
+                </div>
+              ))}
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="card row">
+        <span className="muted">Total</span>
+        <span className="tabular" style={{ fontSize: 18, fontWeight: 800 }}>{money(total)}</span>
+      </div>
+
+      {toast && (
+        <div className={'toast is-visible' + (toast.kind ? ' is-' + toast.kind : '')} key={toast.key}>
+          {toast.msg}
+        </div>
+      )}
+
+      {pedido.status === 'aberto' && (
+        <>
+          <button type="button" className="btn btn-primary btn-block" onClick={() => setLancando(true)}>
+            Lançar itens
+          </button>
+          <button type="button" className="btn btn-secondary btn-block" onClick={fecharComanda} disabled={rodadas.length === 0}>
+            Fechar comanda
+          </button>
+        </>
+      )}
+
+      {pedido.status === 'fechado' && (
+        <button type="button" className="btn btn-primary btn-block" onClick={() => setPagando(true)}>
+          Receber pagamento
+        </button>
+      )}
+
+      {pedido.status === 'pago' && (
+        <p className="success-text" style={{ textAlign: 'center' }}>Comanda paga — mesa liberada para o próximo grupo.</p>
+      )}
+    </div>
+  );
+}
+
+const PLACEHOLDER_SVG = "<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44'><rect width='44' height='44' rx='10' fill='#10131a'/></svg>";
+const PLACEHOLDER_FOTO = 'data:image/svg+xml;utf8,' + encodeURIComponent(PLACEHOLDER_SVG);
+const CATEGORIA_TODAS = 'Todos';
+
+function LancarItens({ pedido, onVoltar, onLancado }) {
+  const [produtos, setProdutos] = useState(null);
+  const [categorias, setCategorias] = useState([]);
+  const [categoriaAtiva, setCategoriaAtiva] = useState(CATEGORIA_TODAS);
+  const [carrinho, setCarrinho] = useState([]);
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('produtos').select('*').eq('ativo', true).order('nome'),
+      supabase.from('categorias').select('*').order('ordem').order('nome'),
+    ]).then(([prodResp, catResp]) => {
+      setProdutos(prodResp.data || []);
+      setCategorias(catResp.data || []);
+    });
+  }, []);
+
+  function adicionar(p) {
+    setCarrinho((atual) => {
+      const existente = atual.find((i) => i.produto_id === p.id);
+      if (existente) {
+        return atual.map((i) => (i.produto_id === p.id ? { ...i, quantidade: i.quantidade + 1 } : i));
+      }
+      return [...atual, { produto_id: p.id, nome: p.nome, preco: Number(p.preco_promocional ?? p.preco), quantidade: 1 }];
+    });
+  }
+
+  function alterarQuantidade(produtoId, delta) {
+    setCarrinho((atual) =>
+      atual.map((i) => (i.produto_id === produtoId ? { ...i, quantidade: i.quantidade + delta } : i)).filter((i) => i.quantidade > 0)
+    );
+  }
+
+  const categoriasComTodos = [CATEGORIA_TODAS, ...categorias.map((c) => c.nome)];
+  const produtosFiltrados =
+    produtos === null
+      ? []
+      : categoriaAtiva === CATEGORIA_TODAS
+        ? produtos
+        : produtos.filter((p) => categorias.find((c) => c.id === p.categoria_id)?.nome === categoriaAtiva);
+
+  const total = carrinho.reduce((s, i) => s + i.preco * i.quantidade, 0);
+
+  async function confirmar() {
+    setErro('');
+    setEnviando(true);
+    const { error } = await supabase.rpc('lancar_pedido_itens', {
+      p_pedido_id: pedido.id,
+      p_itens: carrinho.map((i) => ({ produto_id: i.produto_id, nome_produto: i.nome, quantidade: i.quantidade, preco_unitario: i.preco })),
+    });
+    setEnviando(false);
+    if (error) {
+      setErro(error.message.replace('P0001: ', ''));
+      return;
+    }
+    onLancado();
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onVoltar}>
+        <X size={14} /> Voltar
+      </button>
+
+      <div className="tab-row">
+        {categoriasComTodos.map((c) => (
+          <button key={c} type="button" className="tab" aria-pressed={categoriaAtiva === c} onClick={() => setCategoriaAtiva(c)}>
+            {c}
+          </button>
+        ))}
+      </div>
+
+      {produtos === null ? (
+        <p className="muted">Carregando…</p>
+      ) : produtosFiltrados.length === 0 ? (
+        <p className="muted" style={{ fontSize: 13 }}>Nenhum produto ativo nessa categoria.</p>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+          {produtosFiltrados.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className="card"
+              onClick={() => adicionar(p)}
+              style={{ textAlign: 'left', cursor: 'pointer' }}
+            >
+              <img src={p.foto_url || PLACEHOLDER_FOTO} alt="" style={{ width: '100%', aspectRatio: '1', borderRadius: 8, objectFit: 'cover', background: 'var(--panel-2)', marginBottom: 6 }} />
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{p.nome}</div>
+              <div className="tabular" style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 700, marginTop: 2 }}>
+                {money(p.preco_promocional ?? p.preco)}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {carrinho.length > 0 && (
+        <div className="card" style={{ position: 'sticky', bottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="list">
+            {carrinho.map((i) => (
+              <div key={i.produto_id} className="item" style={{ alignItems: 'center' }}>
+                <span style={{ flex: 1 }}>{i.nome}</span>
+                <div className="stepper">
+                  <button type="button" className="stepper-btn" onClick={() => alterarQuantidade(i.produto_id, -1)}>
+                    <Minus size={12} />
+                  </button>
+                  <span className="stepper-qty tabular">{i.quantidade}</span>
+                  <button type="button" className="stepper-btn" onClick={() => alterarQuantidade(i.produto_id, 1)}>
+                    <Plus size={12} />
+                  </button>
+                </div>
+                <span className="tabular" style={{ width: 70, textAlign: 'right' }}>{money(i.preco * i.quantidade)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="row">
+            <span style={{ fontWeight: 700 }}>Total da rodada</span>
+            <span className="tabular" style={{ fontWeight: 800, fontSize: 18 }}>{money(total)}</span>
+          </div>
+          {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
+          <button type="button" className="btn btn-primary btn-block" disabled={enviando} onClick={confirmar}>
+            {enviando ? 'Enviando…' : 'Enviar para a cozinha'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FinalizarPedido({ pedido, total, onVoltar, onConcluido }) {
+  const [pagamentos, setPagamentos] = useState([{ forma: 'dinheiro', valor: total.toFixed(2) }]);
+  const [desconto, setDesconto] = useState('0');
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  const descontoNum = Number(desconto.replace(',', '.')) || 0;
+  const totalComDesconto = Math.max(0, total - descontoNum);
+  const somaPagamentos = pagamentos.reduce((s, p) => s + (Number(p.valor.replace(',', '.')) || 0), 0);
+  const restante = totalComDesconto - somaPagamentos;
+
+  function atualizarPagamento(idx, campo, valor) {
+    setPagamentos((atual) => atual.map((p, i) => (i === idx ? { ...p, [campo]: valor } : p)));
+  }
+
+  function adicionarPagamento() {
+    setPagamentos((atual) => [...atual, { forma: 'pix', valor: Math.max(0, restante).toFixed(2) }]);
+  }
+
+  function removerPagamento(idx) {
+    setPagamentos((atual) => atual.filter((_, i) => i !== idx));
+  }
+
+  async function confirmar() {
+    setErro('');
+    if (Math.abs(restante) > 0.01) {
+      setErro('A soma das formas de pagamento precisa bater com o total.');
+      return;
+    }
+    setEnviando(true);
+    const { error } = await supabase.rpc('finalizar_pedido_mesa', {
+      p_pedido_id: pedido.id,
+      p_pagamentos: pagamentos.map((p) => ({ forma: p.forma, valor: Number(p.valor.replace(',', '.')) || 0 })),
+      p_desconto: descontoNum,
+    });
+    setEnviando(false);
+    if (error) {
+      setErro(error.message.replace('P0001: ', ''));
+      return;
+    }
+    onConcluido();
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onVoltar}>
+        <X size={14} /> Voltar
+      </button>
+
+      <div className="card" style={{ textAlign: 'center' }}>
+        <p className="muted" style={{ fontSize: 12 }}>Valor total</p>
+        <p className="tabular" style={{ fontSize: 28, fontWeight: 800 }}>{money(totalComDesconto)}</p>
+      </div>
+
+      <div className="card">
+        <span className="label">Desconto (R$)</span>
+        <input value={desconto} onChange={(e) => setDesconto(e.target.value)} inputMode="decimal" />
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {pagamentos.map((p, idx) => (
+          <div key={idx} className="card row">
+            <select value={p.forma} onChange={(e) => atualizarPagamento(idx, 'forma', e.target.value)} style={{ flex: 1 }}>
+              <option value="dinheiro">Dinheiro</option>
+              <option value="pix">Pix</option>
+              <option value="debito">Débito</option>
+              <option value="credito">Crédito</option>
+              <option value="outro">Outro</option>
+            </select>
+            <input value={p.valor} onChange={(e) => atualizarPagamento(idx, 'valor', e.target.value)} inputMode="decimal" style={{ width: 100, textAlign: 'right' }} />
+            {pagamentos.length > 1 && (
+              <button type="button" onClick={() => removerPagamento(idx)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}>
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
+        ))}
+        <button type="button" className="btn btn-secondary btn-sm" onClick={adicionarPagamento}>
+          + Pagamento dividido
+        </button>
+      </div>
+
+      <div className="row" style={{ fontSize: 13 }}>
+        <span className="muted">Restante a pagar</span>
+        <span className={'tabular ' + (Math.abs(restante) > 0.01 ? 'danger-text' : 'success-text')}>{money(restante)}</span>
+      </div>
+
+      {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
+
+      <button type="button" className="btn btn-primary btn-block" disabled={enviando} onClick={confirmar}>
+        {enviando ? 'Finalizando…' : 'Confirmar pagamento'}
+      </button>
+    </div>
+  );
+}
