@@ -26,6 +26,7 @@ import Estoque from './pages/Estoque';
 import Caixa from './pages/Caixa';
 import Usuarios from './pages/Usuarios';
 import Relatorios from './pages/Relatorios';
+import Notificacoes from './pages/Notificacoes';
 
 // Cada módulo diz quais papéis podem vê-lo (seção 10 do documento):
 // admin enxerga tudo; gerente não mexe em usuários; operador só vende e
@@ -104,9 +105,12 @@ export default function Shell({ session }) {
             {perfil.nome} · <span className="chip chip-primary" style={{ padding: '1px 8px' }}>{perfil.role}</span>
           </p>
         </div>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={() => supabase.auth.signOut()}>
-          <LogOut size={14} /> Sair
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
+          {(perfil.role === 'admin' || perfil.role === 'gerente') && <Notificacoes />}
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => supabase.auth.signOut()}>
+            <LogOut size={14} /> Sair
+          </button>
+        </div>
       </header>
 
       <nav className="tab-row" style={{ padding: '10px 16px 0' }}>
