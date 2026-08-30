@@ -8,6 +8,7 @@ import {
   Menu,
   Package,
   ShoppingCart,
+  Table2,
   UserCog,
   Users,
   Wallet,
@@ -25,6 +26,7 @@ import Usuarios from './pages/Usuarios';
 import Relatorios from './pages/Relatorios';
 import Notificacoes from './pages/Notificacoes';
 import Auditoria from './pages/Auditoria';
+import PosPago from './pages/PosPago';
 
 // Cada módulo diz quais papéis podem vê-lo (seção 10 do documento):
 // garçom (operador, login por PIN) só vende e atende (PDV/Mesas/Cozinha/
@@ -35,6 +37,7 @@ const MODULOS = [
   { id: 'pdv', label: 'PDV', icon: ShoppingCart, papeis: ['operador'] },
   { id: 'caixa', label: 'Caixa', icon: Wallet, papeis: ['admin', 'gerente'] },
   { id: 'produtos', label: 'Produtos', icon: Package, papeis: ['admin', 'gerente'] },
+  { id: 'pospago', label: 'Pós-pago', icon: Table2, papeis: ['admin'] },
   { id: 'cozinha', label: 'Painel de Pedidos', icon: ChefHat, papeis: ['admin', 'gerente', 'operador'] },
   { id: 'clientes', label: 'Clientes', icon: Users, papeis: ['admin', 'gerente', 'operador'] },
   { id: 'usuarios', label: 'Usuários', icon: UserCog, papeis: ['admin'] },
@@ -138,6 +141,7 @@ export default function Shell({ session }) {
           {abaAtiva === 'pdv' && <Mesas />}
           {abaAtiva === 'cozinha' && <Cozinha />}
           {abaAtiva === 'produtos' && <Produtos />}
+          {abaAtiva === 'pospago' && <PosPago />}
           {abaAtiva === 'clientes' && <Clientes />}
           {abaAtiva === 'caixa' && <Caixa />}
           {abaAtiva === 'relatorios' && <Relatorios />}

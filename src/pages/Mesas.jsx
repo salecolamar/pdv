@@ -8,7 +8,6 @@ import Pdv from './Pdv';
 const STATUS_LABEL = { livre: 'Livre', ocupada: 'Ocupada' };
 
 export default function Mesas() {
-  const [aba, setAba] = useState('mapa');
   const [mesaSelecionada, setMesaSelecionada] = useState(null);
   const [vendaAvulsa, setVendaAvulsa] = useState(false);
   const [mesas, setMesas] = useState(null);
@@ -55,25 +54,10 @@ export default function Mesas() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div className="tab-row">
-        <button type="button" className="tab" aria-pressed={aba === 'mapa'} onClick={() => setAba('mapa')}>
-          Mapa
-        </button>
-        <button type="button" className="tab" aria-pressed={aba === 'configurar'} onClick={() => setAba('configurar')}>
-          Configurar mesas
-        </button>
-      </div>
-
-      {aba === 'mapa' ? (
-        <>
-          <MapaMesas mesas={mesas} onAbrirMesa={setMesaSelecionada} />
-          <button type="button" className="btn btn-secondary btn-block" onClick={() => setVendaAvulsa(true)}>
-            <ShoppingCart size={15} /> Venda avulsa (sem mesa)
-          </button>
-        </>
-      ) : (
-        <ConfigurarMesas mesas={mesas} onAtualizado={carregar} />
-      )}
+      <MapaMesas mesas={mesas} onAbrirMesa={setMesaSelecionada} />
+      <button type="button" className="btn btn-secondary btn-block" onClick={() => setVendaAvulsa(true)}>
+        <ShoppingCart size={15} /> Venda avulsa (sem mesa)
+      </button>
     </div>
   );
 }
@@ -81,7 +65,7 @@ export default function Mesas() {
 function MapaMesas({ mesas, onAbrirMesa }) {
   if (mesas === null) return <p className="muted">Carregando…</p>;
   if (mesas.length === 0) {
-    return <p className="muted" style={{ fontSize: 13 }}>Nenhuma mesa cadastrada. Use "Configurar mesas" pra criar.</p>;
+    return <p className="muted" style={{ fontSize: 13 }}>Nenhuma mesa cadastrada ainda. Peça pro admin cadastrar em Pós-pago.</p>;
   }
 
   return (
@@ -107,97 +91,6 @@ function MapaMesas({ mesas, onAbrirMesa }) {
         })}
       </div>
     </>
-  );
-}
-
-function ConfigurarMesas({ mesas, onAtualizado }) {
-  const [nome, setNome] = useState('');
-  const [quantidade, setQuantidade] = useState('');
-  const [enviando, setEnviando] = useState(false);
-  const [erro, setErro] = useState('');
-
-  async function adicionar(e) {
-    e.preventDefault();
-    if (!nome.trim()) return;
-    setEnviando(true);
-    setErro('');
-    const { error } = await supabase.from('mesas').insert({ nome: nome.trim() });
-    setEnviando(false);
-    if (error) {
-      setErro(error.message);
-      return;
-    }
-    setNome('');
-    onAtualizado();
-  }
-
-  async function criarVarias(e) {
-    e.preventDefault();
-    const qtd = Number(quantidade);
-    if (!(qtd > 0)) return;
-    setEnviando(true);
-    setErro('');
-    const maiorNumero = (mesas || []).reduce((max, m) => {
-      const n = Number(m.nome.match(/\d+/)?.[0]);
-      return Number.isNaN(n) ? max : Math.max(max, n);
-    }, 0);
-    const novas = Array.from({ length: qtd }, (_, i) => ({ nome: `Mesa ${maiorNumero + i + 1}` }));
-    const { error } = await supabase.from('mesas').insert(novas);
-    setEnviando(false);
-    if (error) {
-      setErro(error.message);
-      return;
-    }
-    setQuantidade('');
-    onAtualizado();
-  }
-
-  async function remover(id) {
-    await supabase.from('mesas').delete().eq('id', id);
-    onAtualizado();
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <form onSubmit={adicionar} className="card row">
-        <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Mesa 7" style={{ flex: 1 }} />
-        <button type="submit" className="btn btn-primary btn-sm" disabled={enviando}>Adicionar</button>
-      </form>
-      <form onSubmit={criarVarias} className="card row">
-        <input
-          value={quantidade}
-          onChange={(e) => setQuantidade(e.target.value.replace(/\D/g, ''))}
-          inputMode="numeric"
-          placeholder="Quantidade de mesas"
-          style={{ flex: 1 }}
-        />
-        <button type="submit" className="btn btn-secondary btn-sm" disabled={enviando}>Criar várias</button>
-      </form>
-      {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
-
-      {mesas === null ? (
-        <p className="muted">Carregando…</p>
-      ) : mesas.length === 0 ? (
-        <p className="muted" style={{ fontSize: 13 }}>Nenhuma mesa cadastrada ainda.</p>
-      ) : (
-        <div className="list">
-          {mesas.map((m) => (
-            <div key={m.id} className="item" style={{ alignItems: 'center' }}>
-              <span style={{ flex: 1 }}>{m.nome}</span>
-              <span className={'chip ' + (m.status === 'livre' ? 'chip-success' : 'chip-danger')}>{STATUS_LABEL[m.status] || m.status}</span>
-              <button
-                type="button"
-                onClick={() => remover(m.id)}
-                disabled={m.status !== 'livre'}
-                style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: m.status === 'livre' ? 'pointer' : 'not-allowed', opacity: m.status === 'livre' ? 1 : 0.35, padding: 4, marginLeft: 8 }}
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
 

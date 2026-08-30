@@ -1,0 +1,117 @@
+import { useEffect, useState } from 'react';
+import { Trash2 } from 'lucide-react';
+import { supabase } from '../supabase';
+
+const STATUS_LABEL = { livre: 'Livre', ocupada: 'Ocupada' };
+
+export default function PosPago() {
+  const [mesas, setMesas] = useState(null);
+  const [nome, setNome] = useState('');
+  const [quantidade, setQuantidade] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  useEffect(() => {
+    carregar();
+  }, []);
+
+  async function carregar() {
+    const { data } = await supabase.from('mesas').select('*').order('nome');
+    setMesas(
+      (data || []).sort((a, b) => {
+        const na = Number(a.nome.match(/\d+/)?.[0]);
+        const nb = Number(b.nome.match(/\d+/)?.[0]);
+        if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+        return a.nome.localeCompare(b.nome);
+      })
+    );
+  }
+
+  async function adicionar(e) {
+    e.preventDefault();
+    if (!nome.trim()) return;
+    setEnviando(true);
+    setErro('');
+    const { error } = await supabase.from('mesas').insert({ nome: nome.trim() });
+    setEnviando(false);
+    if (error) {
+      setErro(error.message);
+      return;
+    }
+    setNome('');
+    carregar();
+  }
+
+  async function criarVarias(e) {
+    e.preventDefault();
+    const qtd = Number(quantidade);
+    if (!(qtd > 0)) return;
+    setEnviando(true);
+    setErro('');
+    const maiorNumero = (mesas || []).reduce((max, m) => {
+      const n = Number(m.nome.match(/\d+/)?.[0]);
+      return Number.isNaN(n) ? max : Math.max(max, n);
+    }, 0);
+    const novas = Array.from({ length: qtd }, (_, i) => ({ nome: `Mesa ${maiorNumero + i + 1}` }));
+    const { error } = await supabase.from('mesas').insert(novas);
+    setEnviando(false);
+    if (error) {
+      setErro(error.message);
+      return;
+    }
+    setQuantidade('');
+    carregar();
+  }
+
+  async function remover(id) {
+    await supabase.from('mesas').delete().eq('id', id);
+    carregar();
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <p className="muted" style={{ fontSize: 13 }}>
+        Cadastre aqui as mesas que o garçom vai usar no mapa de mesas do PDV.
+      </p>
+
+      <form onSubmit={adicionar} className="card row">
+        <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Mesa 7" style={{ flex: 1 }} />
+        <button type="submit" className="btn btn-primary btn-sm" disabled={enviando}>Adicionar</button>
+      </form>
+      <form onSubmit={criarVarias} className="card row">
+        <input
+          value={quantidade}
+          onChange={(e) => setQuantidade(e.target.value.replace(/\D/g, ''))}
+          inputMode="numeric"
+          placeholder="Quantidade de mesas"
+          style={{ flex: 1 }}
+        />
+        <button type="submit" className="btn btn-secondary btn-sm" disabled={enviando}>Criar várias</button>
+      </form>
+      {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
+
+      {mesas === null ? (
+        <p className="muted">Carregando…</p>
+      ) : mesas.length === 0 ? (
+        <p className="muted" style={{ fontSize: 13 }}>Nenhuma mesa cadastrada ainda.</p>
+      ) : (
+        <div className="list">
+          {mesas.map((m) => (
+            <div key={m.id} className="item" style={{ alignItems: 'center' }}>
+              <span style={{ flex: 1 }}>{m.nome}</span>
+              <span className={'chip ' + (m.status === 'livre' ? 'chip-success' : 'chip-danger')}>{STATUS_LABEL[m.status] || m.status}</span>
+              <button
+                type="button"
+                onClick={() => remover(m.id)}
+                disabled={m.status !== 'livre'}
+                style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: m.status === 'livre' ? 'pointer' : 'not-allowed', opacity: m.status === 'livre' ? 1 : 0.35, padding: 4, marginLeft: 8 }}
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
