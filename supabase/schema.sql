@@ -21,7 +21,7 @@ create table empresas (
 
 create table usuarios (
   id uuid primary key references auth.users(id) on delete cascade,
-  empresa_id uuid not null references empresas(id) on delete cascade,
+  empresa_id uuid not null default empresa_id_atual() references empresas(id) on delete cascade,
   nome text not null,
   email text not null,
   role text not null default 'operador' check (role in ('admin', 'gerente', 'operador')),
@@ -100,7 +100,7 @@ create policy "usuarios_update_self_ou_admin" on usuarios
 -- categorias
 create table categorias (
   id uuid primary key default gen_random_uuid(),
-  empresa_id uuid not null references empresas(id) on delete cascade,
+  empresa_id uuid not null default empresa_id_atual() references empresas(id) on delete cascade,
   nome text not null,
   ordem integer not null default 0
 );
@@ -111,7 +111,7 @@ create policy "categorias_isolamento" on categorias for all to authenticated
 -- produtos
 create table produtos (
   id uuid primary key default gen_random_uuid(),
-  empresa_id uuid not null references empresas(id) on delete cascade,
+  empresa_id uuid not null default empresa_id_atual() references empresas(id) on delete cascade,
   categoria_id uuid references categorias(id) on delete set null,
   nome text not null,
   descricao text,
@@ -156,7 +156,7 @@ create policy "produto_complementos_isolamento" on produto_complementos for all 
 -- clientes
 create table clientes (
   id uuid primary key default gen_random_uuid(),
-  empresa_id uuid not null references empresas(id) on delete cascade,
+  empresa_id uuid not null default empresa_id_atual() references empresas(id) on delete cascade,
   nome text not null,
   telefone text,
   email text,
@@ -172,7 +172,7 @@ create policy "clientes_isolamento" on clientes for all to authenticated
 -- caixas (sessão de caixa: abertura/fechamento)
 create table caixas (
   id uuid primary key default gen_random_uuid(),
-  empresa_id uuid not null references empresas(id) on delete cascade,
+  empresa_id uuid not null default empresa_id_atual() references empresas(id) on delete cascade,
   valor_inicial numeric(10, 2) not null default 0,
   aberto_por uuid references usuarios(id),
   aberto_em timestamptz not null default now(),
@@ -203,7 +203,7 @@ create policy "caixa_movimentos_isolamento" on caixa_movimentos for all to authe
 -- vendas
 create table vendas (
   id uuid primary key default gen_random_uuid(),
-  empresa_id uuid not null references empresas(id) on delete cascade,
+  empresa_id uuid not null default empresa_id_atual() references empresas(id) on delete cascade,
   cliente_id uuid references clientes(id) on delete set null,
   caixa_id uuid references caixas(id),
   operador_id uuid references usuarios(id),
@@ -248,7 +248,7 @@ create policy "pagamentos_isolamento" on pagamentos for all to authenticated
 -- estoque_movimentos
 create table estoque_movimentos (
   id uuid primary key default gen_random_uuid(),
-  empresa_id uuid not null references empresas(id) on delete cascade,
+  empresa_id uuid not null default empresa_id_atual() references empresas(id) on delete cascade,
   produto_id uuid not null references produtos(id) on delete cascade,
   tipo text not null check (tipo in ('entrada', 'saida', 'ajuste')),
   quantidade numeric(10, 2) not null,
@@ -263,7 +263,7 @@ create policy "estoque_movimentos_isolamento" on estoque_movimentos for all to a
 -- audit_logs
 create table audit_logs (
   id uuid primary key default gen_random_uuid(),
-  empresa_id uuid not null references empresas(id) on delete cascade,
+  empresa_id uuid not null default empresa_id_atual() references empresas(id) on delete cascade,
   usuario_id uuid references usuarios(id),
   acao text not null,
   detalhes jsonb not null default '{}'::jsonb,
