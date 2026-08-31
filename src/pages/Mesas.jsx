@@ -896,7 +896,11 @@ function LancarItens({ pedido, onVoltar, onLancado }) {
 }
 
 function FinalizarPedido({ pedido, total, valorPago, taxaPercentual, taxaAtiva, onAlternarTaxa, onVoltar, onConcluido }) {
-  const [pagamentos, setPagamentos] = useState([{ forma: 'dinheiro', valor: '0.00' }]);
+  // pagamentos[i].auto = true enquanto o valor ainda não foi editado à mão
+  // pelo garçom — nesse caso ele sempre reflete o valor a pagar mais
+  // recente (some com desconto/taxa/pagamento parcial na hora). Assim que
+  // o garçom mexe no campo (ou divide o pagamento), vira manual.
+  const [pagamentos, setPagamentos] = useState([{ forma: 'dinheiro', valor: '0.00', auto: true }]);
   const [desconto, setDesconto] = useState('0');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
@@ -907,20 +911,22 @@ function FinalizarPedido({ pedido, total, valorPago, taxaPercentual, taxaAtiva, 
   const totalFinal = totalComDesconto + taxaValor;
   const totalAPagarAgora = Math.max(0, totalFinal - valorPago);
 
-  useEffect(() => {
-    setPagamentos([{ forma: 'dinheiro', valor: totalAPagarAgora.toFixed(2) }]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  function valorEfetivo(p) {
+    return p.auto ? totalAPagarAgora.toFixed(2) : p.valor;
+  }
 
-  const somaPagamentos = pagamentos.reduce((s, p) => s + (Number(p.valor.replace(',', '.')) || 0), 0);
+  const somaPagamentos = pagamentos.reduce((s, p) => s + (Number(valorEfetivo(p).replace(',', '.')) || 0), 0);
   const restante = totalAPagarAgora - somaPagamentos;
 
   function atualizarPagamento(idx, campo, valor) {
-    setPagamentos((atual) => atual.map((p, i) => (i === idx ? { ...p, [campo]: valor } : p)));
+    setPagamentos((atual) => atual.map((p, i) => (i === idx ? { ...p, [campo]: valor, auto: campo === 'valor' ? false : p.auto } : p)));
   }
 
   function adicionarPagamento() {
-    setPagamentos((atual) => [...atual, { forma: 'pix', valor: Math.max(0, restante).toFixed(2) }]);
+    setPagamentos((atual) => [
+      ...atual.map((p) => (p.auto ? { ...p, valor: totalAPagarAgora.toFixed(2), auto: false } : p)),
+      { forma: 'pix', valor: Math.max(0, restante).toFixed(2), auto: false },
+    ]);
   }
 
   function removerPagamento(idx) {
@@ -936,7 +942,7 @@ function FinalizarPedido({ pedido, total, valorPago, taxaPercentual, taxaAtiva, 
     setEnviando(true);
     const { error } = await supabase.rpc('finalizar_pedido_mesa', {
       p_pedido_id: pedido.id,
-      p_pagamentos: pagamentos.map((p) => ({ forma: p.forma, valor: Number(p.valor.replace(',', '.')) || 0 })),
+      p_pagamentos: pagamentos.map((p) => ({ forma: p.forma, valor: Number(valorEfetivo(p).replace(',', '.')) || 0 })),
       p_desconto: descontoNum,
       p_taxa_servico: taxaValor,
     });
@@ -987,7 +993,7 @@ function FinalizarPedido({ pedido, total, valorPago, taxaPercentual, taxaAtiva, 
               <option value="credito">Crédito</option>
               <option value="outro">Outro</option>
             </select>
-            <input value={p.valor} onChange={(e) => atualizarPagamento(idx, 'valor', e.target.value)} inputMode="decimal" style={{ width: 100, textAlign: 'right' }} />
+            <input value={valorEfetivo(p)} onChange={(e) => atualizarPagamento(idx, 'valor', e.target.value)} inputMode="decimal" style={{ width: 100, textAlign: 'right' }} />
             {pagamentos.length > 1 && (
               <button type="button" onClick={() => removerPagamento(idx)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}>
                 <Trash2 size={14} />

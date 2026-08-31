@@ -233,7 +233,9 @@ export default function Pdv() {
 function FinalizarVenda({ itens, subtotal, desconto, total, clienteId, onVoltar, onConcluida, avisar }) {
   const [taxaPercentual, setTaxaPercentual] = useState(0);
   const [taxaAtiva, setTaxaAtiva] = useState(true);
-  const [pagamentos, setPagamentos] = useState([{ forma: 'dinheiro', valor: total.toFixed(2) }]);
+  // pagamentos[i].auto = true enquanto o valor ainda não foi editado à mão —
+  // nesse caso ele sempre reflete o total mais recente (desconto/taxa).
+  const [pagamentos, setPagamentos] = useState([{ forma: 'dinheiro', valor: total.toFixed(2), auto: true }]);
   const [recebido, setRecebido] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
@@ -244,28 +246,31 @@ function FinalizarVenda({ itens, subtotal, desconto, total, clienteId, onVoltar,
       .select('empresas(taxa_servico_percentual)')
       .limit(1)
       .maybeSingle()
-      .then(({ data }) => {
-        const pct = Number(data?.empresas?.taxa_servico_percentual) || 0;
-        setTaxaPercentual(pct);
-        const taxa = Math.round(total * (pct / 100) * 100) / 100;
-        setPagamentos([{ forma: 'dinheiro', valor: (total + taxa).toFixed(2) }]);
-      });
+      .then(({ data }) => setTaxaPercentual(Number(data?.empresas?.taxa_servico_percentual) || 0));
   }, []);
 
   const taxaValor = taxaAtiva ? Math.round(total * (taxaPercentual / 100) * 100) / 100 : 0;
   const totalFinal = total + taxaValor;
-  const somaPagamentos = pagamentos.reduce((s, p) => s + (Number(p.valor.replace(',', '.')) || 0), 0);
+
+  function valorEfetivo(p) {
+    return p.auto ? totalFinal.toFixed(2) : p.valor;
+  }
+
+  const somaPagamentos = pagamentos.reduce((s, p) => s + (Number(valorEfetivo(p).replace(',', '.')) || 0), 0);
   const restante = totalFinal - somaPagamentos;
   const troco = pagamentos.length === 1 && pagamentos[0].forma === 'dinheiro' && recebido
     ? Number(recebido.replace(',', '.')) - totalFinal
     : null;
 
   function atualizarPagamento(idx, campo, valor) {
-    setPagamentos((atual) => atual.map((p, i) => (i === idx ? { ...p, [campo]: valor } : p)));
+    setPagamentos((atual) => atual.map((p, i) => (i === idx ? { ...p, [campo]: valor, auto: campo === 'valor' ? false : p.auto } : p)));
   }
 
   function adicionarPagamento() {
-    setPagamentos((atual) => [...atual, { forma: 'pix', valor: Math.max(0, restante).toFixed(2) }]);
+    setPagamentos((atual) => [
+      ...atual.map((p) => (p.auto ? { ...p, valor: totalFinal.toFixed(2), auto: false } : p)),
+      { forma: 'pix', valor: Math.max(0, restante).toFixed(2), auto: false },
+    ]);
   }
 
   function removerPagamento(idx) {
@@ -281,7 +286,7 @@ function FinalizarVenda({ itens, subtotal, desconto, total, clienteId, onVoltar,
     setEnviando(true);
     const { error } = await supabase.rpc('finalizar_venda', {
       p_itens: itens.map((i) => ({ produto_id: i.produto_id, nome_produto: i.nome, quantidade: i.quantidade, preco_unitario: i.preco })),
-      p_pagamentos: pagamentos.map((p) => ({ forma: p.forma, valor: Number(p.valor.replace(',', '.')) || 0 })),
+      p_pagamentos: pagamentos.map((p) => ({ forma: p.forma, valor: Number(valorEfetivo(p).replace(',', '.')) || 0 })),
       p_desconto: desconto,
       p_cliente_id: clienteId,
       p_taxa_servico: taxaValor,
@@ -332,7 +337,7 @@ function FinalizarVenda({ itens, subtotal, desconto, total, clienteId, onVoltar,
               <option value="outro">Outro</option>
             </select>
             <input
-              value={p.valor}
+              value={valorEfetivo(p)}
               onChange={(e) => atualizarPagamento(idx, 'valor', e.target.value)}
               inputMode="decimal"
               style={{ width: 100, textAlign: 'right' }}
