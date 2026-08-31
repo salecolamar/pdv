@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   BarChart3,
+  CalendarClock,
   ChefHat,
   History,
   LayoutDashboard,
@@ -28,6 +29,7 @@ import Relatorios from './pages/Relatorios';
 import Notificacoes from './pages/Notificacoes';
 import Auditoria from './pages/Auditoria';
 import PosPago from './pages/PosPago';
+import Reservas from './pages/Reservas';
 
 // Cada módulo diz quais papéis podem vê-lo (seção 10 do documento):
 // garçom (operador, login por PIN) só vende e atende (PDV/Mesas/Cozinha/
@@ -40,6 +42,7 @@ const MODULOS = [
   { id: 'produtos', label: 'Produtos', icon: Package, papeis: ['admin', 'gerente'] },
   { id: 'pospago', label: 'Pós-pago', icon: Table2, papeis: ['admin'] },
   { id: 'cozinha', label: 'Painel de Pedidos', icon: ChefHat, papeis: ['admin', 'gerente', 'operador'] },
+  { id: 'reservas', label: 'Reservas', icon: CalendarClock, papeis: ['admin', 'gerente', 'operador'] },
   { id: 'clientes', label: 'Clientes', icon: Users, papeis: ['admin', 'gerente'] },
   { id: 'usuarios', label: 'Usuários', icon: UserCog, papeis: ['admin'] },
   { id: 'relatorios', label: 'Relatórios', icon: BarChart3, papeis: ['admin', 'gerente'] },
@@ -154,6 +157,7 @@ export default function Shell({ session }) {
           {abaAtiva === 'cozinha' && <Cozinha />}
           {abaAtiva === 'produtos' && <Produtos />}
           {abaAtiva === 'pospago' && <PosPago />}
+          {abaAtiva === 'reservas' && <Reservas />}
           {abaAtiva === 'clientes' && <Clientes />}
           {abaAtiva === 'caixa' && <Caixa />}
           {abaAtiva === 'relatorios' && <Relatorios />}

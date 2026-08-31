@@ -10,6 +10,7 @@ const TIPOS_MOVIMENTO = [
 ];
 
 export default function Caixa() {
+  const [aba, setAba] = useState('caixa');
   const [caixa, setCaixa] = useState(undefined); // undefined = carregando, null = nenhum aberto
 
   useEffect(() => {
@@ -27,9 +28,71 @@ export default function Caixa() {
     setCaixa(data || null);
   }
 
-  if (caixa === undefined) return <p className="muted">Carregando…</p>;
-  if (caixa === null) return <AbrirCaixa onAberto={carregar} />;
-  return <CaixaAberto caixa={caixa} onFechado={carregar} />;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="tab-row">
+        <button type="button" className="tab" aria-pressed={aba === 'caixa'} onClick={() => setAba('caixa')}>
+          Caixa
+        </button>
+        <button type="button" className="tab" aria-pressed={aba === 'historico'} onClick={() => setAba('historico')}>
+          Histórico
+        </button>
+      </div>
+
+      {aba === 'historico' ? (
+        <HistoricoCaixas />
+      ) : caixa === undefined ? (
+        <p className="muted">Carregando…</p>
+      ) : caixa === null ? (
+        <AbrirCaixa onAberto={carregar} />
+      ) : (
+        <CaixaAberto caixa={caixa} onFechado={carregar} />
+      )}
+    </div>
+  );
+}
+
+function HistoricoCaixas() {
+  const [historico, setHistorico] = useState(null);
+
+  useEffect(() => {
+    supabase
+      .from('caixas')
+      .select('*, aberto_por_usuario:usuarios!caixas_aberto_por_fkey(nome), fechado_por_usuario:usuarios!caixas_fechado_por_fkey(nome)')
+      .not('fechado_em', 'is', null)
+      .order('fechado_em', { ascending: false })
+      .limit(50)
+      .then(({ data }) => setHistorico(data || []));
+  }, []);
+
+  if (historico === null) return <p className="muted">Carregando…</p>;
+  if (historico.length === 0) return <p className="muted" style={{ fontSize: 13 }}>Nenhum caixa fechado ainda.</p>;
+
+  return (
+    <div className="list">
+      {historico.map((c) => {
+        const diferenca = Number(c.diferenca);
+        return (
+          <div key={c.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div className="row">
+              <span style={{ fontWeight: 600 }}>{new Date(c.fechado_em).toLocaleString('pt-BR')}</span>
+              <span className={'tabular ' + (Math.abs(diferenca) < 0.01 ? '' : diferenca > 0 ? 'success-text' : 'danger-text')}>
+                {diferenca > 0 ? '+' : ''}{money(diferenca)}
+              </span>
+            </div>
+            <div className="muted" style={{ fontSize: 12 }}>
+              Aberto por {c.aberto_por_usuario?.nome || '—'} às {new Date(c.aberto_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              {' · '}Fechado por {c.fechado_por_usuario?.nome || '—'}
+            </div>
+            <div className="row" style={{ fontSize: 12 }}>
+              <span className="muted">Inicial {money(c.valor_inicial)}</span>
+              <span className="muted">Informado {money(c.valor_informado)}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function AbrirCaixa({ onAberto }) {

@@ -156,6 +156,7 @@ function EditarUsuario({ usuario, onCancelar, onSalvo }) {
   const [role, setRole] = useState(usuario.role);
   const [ativo, setAtivo] = useState(usuario.ativo);
   const [permissoes, setPermissoes] = useState(usuario.permissoes || {});
+  const [comissao, setComissao] = useState(String(usuario.comissao_percentual ?? 0));
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
 
@@ -166,7 +167,8 @@ function EditarUsuario({ usuario, onCancelar, onSalvo }) {
   async function salvar() {
     setEnviando(true);
     setErro('');
-    const { error } = await supabase.from('usuarios').update({ role, ativo, permissoes }).eq('id', usuario.id);
+    const comissaoNum = Number(comissao.replace(',', '.')) || 0;
+    const { error } = await supabase.from('usuarios').update({ role, ativo, permissoes, comissao_percentual: comissaoNum }).eq('id', usuario.id);
     setEnviando(false);
     if (error) {
       setErro(error.message);
@@ -187,6 +189,8 @@ function EditarUsuario({ usuario, onCancelar, onSalvo }) {
         <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} />
         Ativo
       </label>
+      <span className="label" style={{ marginTop: 4 }}>Comissão sobre vendas (%)</span>
+      <input value={comissao} onChange={(e) => setComissao(e.target.value.replace(/[^\d,.-]/g, ''))} inputMode="decimal" placeholder="Ex: 10" />
       <span className="label" style={{ marginTop: 4 }}>Permissões</span>
       {PERMISSOES.map(([chave, label]) => (
         <label key={chave} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>

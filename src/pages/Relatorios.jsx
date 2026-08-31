@@ -59,7 +59,7 @@ export default function Relatorios() {
 
     const { data: vendas, error: erroVendas } = await supabase
       .from('vendas')
-      .select('id, criado_em, subtotal, desconto, total, operador_id, usuarios(nome)')
+      .select('id, criado_em, subtotal, desconto, total, operador_id, usuarios(nome, comissao_percentual)')
       .eq('cancelada', false)
       .gte('criado_em', inicio.toISOString())
       .lte('criado_em', fim.toISOString())
@@ -78,9 +78,11 @@ export default function Relatorios() {
     const porOperador = new Map();
     for (const v of vendas) {
       const nome = v.usuarios?.nome || 'Sem operador';
-      const atual = porOperador.get(nome) || { quantidade: 0, total: 0 };
+      const pct = Number(v.usuarios?.comissao_percentual) || 0;
+      const atual = porOperador.get(nome) || { quantidade: 0, total: 0, comissaoPercentual: pct, comissao: 0 };
       atual.quantidade += 1;
       atual.total += Number(v.total);
+      atual.comissao += Number(v.total) * (pct / 100);
       porOperador.set(nome, atual);
     }
 
@@ -225,11 +227,19 @@ export default function Relatorios() {
             ) : (
               <div className="list">
                 {resumo.porOperador.map(([nome, v]) => (
-                  <div className="item" key={nome}>
-                    <span>
-                      {nome} <span className="muted" style={{ fontSize: 11 }}>x{v.quantidade}</span>
-                    </span>
-                    <span className="tabular">{money(v.total)}</span>
+                  <div className="item" key={nome} style={{ flexDirection: 'column', alignItems: 'stretch', gap: 2 }}>
+                    <div className="row">
+                      <span>
+                        {nome} <span className="muted" style={{ fontSize: 11 }}>x{v.quantidade}</span>
+                      </span>
+                      <span className="tabular">{money(v.total)}</span>
+                    </div>
+                    {v.comissaoPercentual > 0 && (
+                      <div className="row">
+                        <span className="muted" style={{ fontSize: 11 }}>Comissão ({v.comissaoPercentual}%)</span>
+                        <span className="tabular success-text" style={{ fontSize: 12 }}>{money(v.comissao)}</span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowRightLeft, Minus, Plus, Printer, Receipt, ShoppingCart, Trash2, Wallet, X } from 'lucide-react';
+import { ArrowRightLeft, Minus, Plus, Printer, Receipt, ShoppingCart, Trash2, Users2, Wallet, X } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import { precoEfetivo } from '../utils/promocoes';
@@ -13,6 +13,7 @@ export default function Mesas() {
   const [vendaAvulsa, setVendaAvulsa] = useState(false);
   const [mesas, setMesas] = useState(null);
   const [ultimoPedidoPorMesa, setUltimoPedidoPorMesa] = useState(new Map());
+  const [grupoPorMesa, setGrupoPorMesa] = useState(new Map());
   const [agora, setAgora] = useState(() => Date.now());
 
   useEffect(() => {
@@ -29,24 +30,31 @@ export default function Mesas() {
   async function carregar() {
     const [mesasResp, pedidosResp] = await Promise.all([
       supabase.from('mesas').select('*').order('nome'),
-      supabase.from('pedidos').select('mesa_id, aberto_em, pedido_rodadas(criado_em)').eq('status', 'aberto'),
+      supabase.from('pedidos').select('mesa_id, mesas_juntadas, aberto_em, pedido_rodadas(criado_em)').eq('status', 'aberto'),
     ]);
-    setMesas(
-      (mesasResp.data || []).sort((a, b) => {
-        const na = Number(a.nome.match(/\d+/)?.[0]);
-        const nb = Number(b.nome.match(/\d+/)?.[0]);
-        if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
-        return a.nome.localeCompare(b.nome);
-      })
-    );
+    const listaMesas = (mesasResp.data || []).sort((a, b) => {
+      const na = Number(a.nome.match(/\d+/)?.[0]);
+      const nb = Number(b.nome.match(/\d+/)?.[0]);
+      if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+      return a.nome.localeCompare(b.nome);
+    });
+    setMesas(listaMesas);
 
-    const mapa = new Map();
+    const mapaNomes = new Map(listaMesas.map((m) => [m.id, m.nome]));
+    const mapaUltimo = new Map();
+    const mapaGrupo = new Map();
     for (const p of pedidosResp.data || []) {
       const horarios = (p.pedido_rodadas || []).map((r) => new Date(r.criado_em).getTime());
       const ultimo = horarios.length ? Math.max(...horarios) : new Date(p.aberto_em).getTime();
-      mapa.set(p.mesa_id, ultimo);
+      const grupo = [p.mesa_id, ...(p.mesas_juntadas || [])];
+      const nomesGrupo = grupo.map((id) => mapaNomes.get(id)).filter(Boolean);
+      for (const mesaId of grupo) {
+        mapaUltimo.set(mesaId, ultimo);
+        if (grupo.length > 1) mapaGrupo.set(mesaId, nomesGrupo);
+      }
     }
-    setUltimoPedidoPorMesa(mapa);
+    setUltimoPedidoPorMesa(mapaUltimo);
+    setGrupoPorMesa(mapaGrupo);
   }
 
   if (mesaSelecionada) {
@@ -78,7 +86,7 @@ export default function Mesas() {
       <button type="button" className="btn btn-secondary btn-block" onClick={() => setVendaAvulsa(true)}>
         <ShoppingCart size={15} /> Venda avulsa (sem mesa)
       </button>
-      <MapaMesas mesas={mesas} ultimoPedidoPorMesa={ultimoPedidoPorMesa} agora={agora} onAbrirMesa={setMesaSelecionada} />
+      <MapaMesas mesas={mesas} ultimoPedidoPorMesa={ultimoPedidoPorMesa} grupoPorMesa={grupoPorMesa} agora={agora} onAbrirMesa={setMesaSelecionada} />
     </div>
   );
 }
@@ -92,7 +100,7 @@ function corMesa(mesa, ultimoPedidoPorMesa, agora) {
   return { cor: 'var(--danger)', label: 'Ocupada' };
 }
 
-function MapaMesas({ mesas, ultimoPedidoPorMesa, agora, onAbrirMesa }) {
+function MapaMesas({ mesas, ultimoPedidoPorMesa, grupoPorMesa, agora, onAbrirMesa }) {
   if (mesas === null) return <p className="muted">Carregando…</p>;
   if (mesas.length === 0) {
     return <p className="muted" style={{ fontSize: 13 }}>Nenhuma mesa cadastrada ainda. Peça pro admin cadastrar em Pós-pago.</p>;
@@ -103,6 +111,7 @@ function MapaMesas({ mesas, ultimoPedidoPorMesa, agora, onAbrirMesa }) {
       {mesas.map((m) => {
         const { cor, label } = corMesa(m, ultimoPedidoPorMesa, agora);
         const numero = (m.nome.match(/\d+/) || [m.nome])[0];
+        const grupo = grupoPorMesa.get(m.id);
         return (
           <button key={m.id} type="button" className="mesa-card" onClick={() => onAbrirMesa(m)}>
             <span className="table-wrap">
@@ -113,6 +122,7 @@ function MapaMesas({ mesas, ultimoPedidoPorMesa, agora, onAbrirMesa }) {
               <span className="table-top" style={{ background: cor }}>{numero}</span>
             </span>
             <span className="mesa-card__nome" style={{ fontWeight: 700, fontSize: 13 }}>MESA {numero}</span>
+            {grupo && <span className="muted" style={{ fontSize: 10 }}>junto com {grupo.filter((n) => n !== m.nome).join(', ')}</span>}
             <span className="mesa-card__status" style={{ color: cor }}>{label}</span>
           </button>
         );
@@ -130,6 +140,7 @@ function Comanda({ mesa, mesas, onVoltar }) {
   const [pagando, setPagando] = useState(false);
   const [vendoConta, setVendoConta] = useState(false);
   const [transferindoMesa, setTransferindoMesa] = useState(false);
+  const [juntandoMesas, setJuntandoMesas] = useState(false);
   const [transferindoItem, setTransferindoItem] = useState(null);
   const [pagamentoParcialAberto, setPagamentoParcialAberto] = useState(false);
   const [toast, setToast] = useState(null);
@@ -163,7 +174,7 @@ function Comanda({ mesa, mesas, onVoltar }) {
     const { data: existente } = await supabase
       .from('pedidos')
       .select('*, clientes(nome)')
-      .eq('mesa_id', mesa.id)
+      .or(`mesa_id.eq.${mesa.id},mesas_juntadas.cs.{${mesa.id}}`)
       .in('status', ['aberto', 'fechado', 'pago'])
       .order('aberto_em', { ascending: false })
       .limit(1)
@@ -233,6 +244,27 @@ function Comanda({ mesa, mesas, onVoltar }) {
     }
     avisar('Item cancelado.', 'success');
     carregarRodadas(pedido.id);
+  }
+
+  async function juntarMesas(mesaIds) {
+    const { error } = await supabase.rpc('juntar_mesas', { p_pedido_id: pedido.id, p_mesa_ids: mesaIds });
+    if (error) {
+      avisar(error.message.replace('P0001: ', ''), 'danger');
+      return;
+    }
+    setJuntandoMesas(false);
+    avisar('Mesas juntadas!', 'success');
+    verificarPedido();
+  }
+
+  async function separarMesa(mesaId) {
+    const { error } = await supabase.rpc('separar_mesa', { p_pedido_id: pedido.id, p_mesa_id: mesaId });
+    if (error) {
+      avisar(error.message.replace('P0001: ', ''), 'danger');
+      return;
+    }
+    avisar('Mesa separada.', 'success');
+    verificarPedido();
   }
 
   async function transferirMesaPara(mesaDestinoId) {
@@ -308,8 +340,14 @@ function Comanda({ mesa, mesas, onVoltar }) {
   const totalComTaxa = total + taxaValor;
   const valorPago = pagamentosParciais.reduce((s, p) => s + Number(p.valor), 0);
   const restante = Math.max(0, totalComTaxa - valorPago);
-  const mesasDestinoTransferirMesa = mesas.filter((m) => m.id !== mesa.id && m.status === 'livre');
-  const mesasDestinoTransferirItem = mesas.filter((m) => m.id !== mesa.id);
+  const grupoMesasIds = [pedido.mesa_id, ...(pedido.mesas_juntadas || [])];
+  const mesasEnvolvidas = grupoMesasIds.map((id) => mesas.find((m) => m.id === id)).filter(Boolean);
+  const tituloComanda = mesasEnvolvidas.length > 1
+    ? mesasEnvolvidas.map((m) => `MESA ${(m.nome.match(/\d+/) || [m.nome])[0]}`).join(' + ')
+    : mesa.nome;
+  const mesasDestinoTransferirMesa = mesas.filter((m) => !grupoMesasIds.includes(m.id) && m.status === 'livre');
+  const mesasDestinoTransferirItem = mesas.filter((m) => !grupoMesasIds.includes(m.id));
+  const mesasDestinoJuntar = mesas.filter((m) => !grupoMesasIds.includes(m.id) && m.status === 'livre');
 
   if (vendoConta) {
     return (
@@ -333,6 +371,16 @@ function Comanda({ mesa, mesas, onVoltar }) {
         mesasDestino={mesasDestinoTransferirMesa}
         onConfirmar={transferirMesaPara}
         onVoltar={() => setTransferindoMesa(false)}
+      />
+    );
+  }
+
+  if (juntandoMesas) {
+    return (
+      <JuntarMesasForm
+        mesasDestino={mesasDestinoJuntar}
+        onConfirmar={juntarMesas}
+        onVoltar={() => setJuntandoMesas(false)}
       />
     );
   }
@@ -399,11 +447,20 @@ function Comanda({ mesa, mesas, onVoltar }) {
       </button>
 
       <div>
-        <h1 style={{ fontSize: 18, fontWeight: 800 }}>{mesa.nome}</h1>
+        <h1 style={{ fontSize: 18, fontWeight: 800 }}>{tituloComanda}</h1>
         <p className="muted" style={{ fontSize: 13 }}>
           {pedido.clientes?.nome ? `Cliente: ${pedido.clientes.nome} · ` : ''}
           {pedido.status === 'aberto' ? 'Comanda aberta' : pedido.status === 'fechado' ? 'Aguardando pagamento' : 'Paga'}
         </p>
+        {mesasEnvolvidas.length > 1 && pedido.status === 'aberto' && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+            {mesasEnvolvidas.filter((m) => m.id !== pedido.mesa_id).map((m) => (
+              <button key={m.id} type="button" className="chip chip-primary" style={{ border: 'none', cursor: 'pointer' }} onClick={() => separarMesa(m.id)}>
+                {m.nome} ✕
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="list">
@@ -503,6 +560,11 @@ function Comanda({ mesa, mesas, onVoltar }) {
         {pedido.status === 'aberto' && (
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setTransferindoMesa(true)} disabled={rodadas.length === 0}>
             <ArrowRightLeft size={14} /> Transferir mesa
+          </button>
+        )}
+        {pedido.status === 'aberto' && (
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setJuntandoMesas(true)} disabled={mesasDestinoJuntar.length === 0}>
+            <Users2 size={14} /> Juntar mesa
           </button>
         )}
         {pedido.status !== 'pago' && restante > 0 && (
@@ -632,6 +694,47 @@ function TransferirMesaForm({ mesa, mesasDestino, onConfirmar, onVoltar }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function JuntarMesasForm({ mesasDestino, onConfirmar, onVoltar }) {
+  const [selecionadas, setSelecionadas] = useState([]);
+
+  function alternar(id) {
+    setSelecionadas((atual) => (atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id]));
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onVoltar}>
+        <X size={14} /> Voltar
+      </button>
+      <div>
+        <h1 style={{ fontSize: 18, fontWeight: 800 }}>Juntar mesas</h1>
+        <p className="muted" style={{ fontSize: 13 }}>Escolha quais mesas livres entram nessa comanda.</p>
+      </div>
+      {mesasDestino.length === 0 ? (
+        <p className="muted" style={{ fontSize: 13 }}>Nenhuma mesa livre no momento.</p>
+      ) : (
+        <div className="list">
+          {mesasDestino.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className="card item"
+              style={{ textAlign: 'left', cursor: 'pointer', borderColor: selecionadas.includes(m.id) ? 'var(--primary)' : undefined }}
+              onClick={() => alternar(m.id)}
+            >
+              <span style={{ flex: 1 }}>{m.nome}</span>
+              {selecionadas.includes(m.id) && <span className="chip chip-primary">Selecionada</span>}
+            </button>
+          ))}
+        </div>
+      )}
+      <button type="button" className="btn btn-primary btn-block" disabled={selecionadas.length === 0} onClick={() => onConfirmar(selecionadas)}>
+        Juntar {selecionadas.length > 0 ? `(${selecionadas.length})` : ''}
+      </button>
     </div>
   );
 }
@@ -912,6 +1015,7 @@ function FinalizarPedido({ pedido, total, valorPago, taxaPercentual, taxaAtiva, 
   // o garçom mexe no campo (ou divide o pagamento), vira manual.
   const [pagamentos, setPagamentos] = useState([{ forma: 'dinheiro', valor: '0.00', auto: true }]);
   const [desconto, setDesconto] = useState('0');
+  const [numPessoas, setNumPessoas] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
 
@@ -941,6 +1045,20 @@ function FinalizarPedido({ pedido, total, valorPago, taxaPercentual, taxaAtiva, 
 
   function removerPagamento(idx) {
     setPagamentos((atual) => atual.filter((_, i) => i !== idx));
+  }
+
+  function dividirEntrePessoas() {
+    const n = Number(numPessoas);
+    if (!(n > 1)) return;
+    const base = Math.floor((totalAPagarAgora / n) * 100) / 100;
+    const ultimoValor = Math.round((totalAPagarAgora - base * (n - 1)) * 100) / 100;
+    setPagamentos(
+      Array.from({ length: n }, (_, i) => ({
+        forma: 'dinheiro',
+        valor: (i === n - 1 ? ultimoValor : base).toFixed(2),
+        auto: false,
+      }))
+    );
   }
 
   async function confirmar() {
@@ -993,9 +1111,26 @@ function FinalizarPedido({ pedido, total, valorPago, taxaPercentual, taxaAtiva, 
         </div>
       )}
 
+      <div className="card row">
+        <span className="label" style={{ margin: 0 }}>Dividir conta entre quantas pessoas?</span>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            value={numPessoas}
+            onChange={(e) => setNumPessoas(e.target.value.replace(/\D/g, ''))}
+            inputMode="numeric"
+            placeholder="Ex: 3"
+            style={{ width: 60, textAlign: 'center' }}
+          />
+          <button type="button" className="btn btn-secondary btn-sm" onClick={dividirEntrePessoas} disabled={!(Number(numPessoas) > 1)}>
+            Dividir
+          </button>
+        </div>
+      </div>
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {pagamentos.map((p, idx) => (
           <div key={idx} className="card row">
+            {pagamentos.length > 1 && <span className="muted tabular" style={{ fontSize: 11 }}>{idx + 1}</span>}
             <select value={p.forma} onChange={(e) => atualizarPagamento(idx, 'forma', e.target.value)} style={{ flex: 1 }}>
               <option value="dinheiro">Dinheiro</option>
               <option value="pix">Pix</option>
