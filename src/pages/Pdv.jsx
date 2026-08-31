@@ -231,15 +231,33 @@ export default function Pdv() {
 }
 
 function FinalizarVenda({ itens, subtotal, desconto, total, clienteId, onVoltar, onConcluida, avisar }) {
+  const [taxaPercentual, setTaxaPercentual] = useState(0);
+  const [taxaAtiva, setTaxaAtiva] = useState(true);
   const [pagamentos, setPagamentos] = useState([{ forma: 'dinheiro', valor: total.toFixed(2) }]);
   const [recebido, setRecebido] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
 
+  useEffect(() => {
+    supabase
+      .from('usuarios')
+      .select('empresas(taxa_servico_percentual)')
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        const pct = Number(data?.empresas?.taxa_servico_percentual) || 0;
+        setTaxaPercentual(pct);
+        const taxa = Math.round(total * (pct / 100) * 100) / 100;
+        setPagamentos([{ forma: 'dinheiro', valor: (total + taxa).toFixed(2) }]);
+      });
+  }, []);
+
+  const taxaValor = taxaAtiva ? Math.round(total * (taxaPercentual / 100) * 100) / 100 : 0;
+  const totalFinal = total + taxaValor;
   const somaPagamentos = pagamentos.reduce((s, p) => s + (Number(p.valor.replace(',', '.')) || 0), 0);
-  const restante = total - somaPagamentos;
+  const restante = totalFinal - somaPagamentos;
   const troco = pagamentos.length === 1 && pagamentos[0].forma === 'dinheiro' && recebido
-    ? Number(recebido.replace(',', '.')) - total
+    ? Number(recebido.replace(',', '.')) - totalFinal
     : null;
 
   function atualizarPagamento(idx, campo, valor) {
@@ -266,6 +284,7 @@ function FinalizarVenda({ itens, subtotal, desconto, total, clienteId, onVoltar,
       p_pagamentos: pagamentos.map((p) => ({ forma: p.forma, valor: Number(p.valor.replace(',', '.')) || 0 })),
       p_desconto: desconto,
       p_cliente_id: clienteId,
+      p_taxa_servico: taxaValor,
     });
     setEnviando(false);
     if (error) {
@@ -284,11 +303,23 @@ function FinalizarVenda({ itens, subtotal, desconto, total, clienteId, onVoltar,
 
       <div className="card" style={{ textAlign: 'center' }}>
         <p className="muted" style={{ fontSize: 12 }}>Valor total</p>
-        <p className="tabular" style={{ fontSize: 28, fontWeight: 800 }}>{money(total)}</p>
+        <p className="tabular" style={{ fontSize: 28, fontWeight: 800 }}>{money(totalFinal)}</p>
         {desconto > 0 && (
           <p className="muted" style={{ fontSize: 12 }}>Subtotal {money(subtotal)} · Desconto {money(desconto)}</p>
         )}
       </div>
+
+      {taxaPercentual > 0 && (
+        <div className="card row">
+          <div>
+            <span style={{ fontWeight: 600 }}>Taxa de serviço ({taxaPercentual}%)</span>
+            <p className="muted tabular" style={{ fontSize: 12, margin: 0 }}>{taxaAtiva ? money(taxaValor) : 'Desativada'}</p>
+          </div>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setTaxaAtiva((a) => !a)}>
+            {taxaAtiva ? 'Desativar' : 'Ativar'}
+          </button>
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {pagamentos.map((p, idx) => (
@@ -321,7 +352,7 @@ function FinalizarVenda({ itens, subtotal, desconto, total, clienteId, onVoltar,
       {pagamentos.length === 1 && pagamentos[0].forma === 'dinheiro' && (
         <div className="card">
           <span className="label">Valor recebido</span>
-          <input value={recebido} onChange={(e) => setRecebido(e.target.value)} inputMode="decimal" placeholder={total.toFixed(2)} />
+          <input value={recebido} onChange={(e) => setRecebido(e.target.value)} inputMode="decimal" placeholder={totalFinal.toFixed(2)} />
           {troco !== null && troco >= 0 && (
             <p className="success-text" style={{ marginTop: 8 }}>Troco: {money(troco)}</p>
           )}

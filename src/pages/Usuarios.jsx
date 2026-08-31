@@ -43,6 +43,7 @@ export default function Usuarios() {
       </button>
 
       {empresaId && <LinkAcesso empresaId={empresaId} />}
+      {empresaId && <TaxaServico empresaId={empresaId} />}
 
       {usuarios === null ? (
         <p className="muted">Carregando…</p>
@@ -100,6 +101,54 @@ function LinkAcesso({ empresaId }) {
         </button>
       </div>
     </div>
+  );
+}
+
+function TaxaServico({ empresaId }) {
+  const [percentual, setPercentual] = useState('');
+  const [carregado, setCarregado] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [salvo, setSalvo] = useState(false);
+
+  useEffect(() => {
+    supabase
+      .from('empresas')
+      .select('taxa_servico_percentual')
+      .eq('id', empresaId)
+      .maybeSingle()
+      .then(({ data }) => {
+        setPercentual(String(data?.taxa_servico_percentual ?? 10));
+        setCarregado(true);
+      });
+  }, [empresaId]);
+
+  async function salvar(e) {
+    e.preventDefault();
+    const valor = Number(percentual.replace(',', '.'));
+    if (!(valor >= 0)) return;
+    setSalvando(true);
+    await supabase.from('empresas').update({ taxa_servico_percentual: valor }).eq('id', empresaId);
+    setSalvando(false);
+    setSalvo(true);
+    setTimeout(() => setSalvo(false), 2000);
+  }
+
+  if (!carregado) return null;
+
+  return (
+    <form onSubmit={salvar} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ fontWeight: 700 }}>Taxa de serviço</div>
+      <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+        Percentual sugerido na hora de fechar a conta (o garçom pode desativar por venda, na tela de pagamento). Deixe 0 pra não cobrar.
+      </p>
+      <div className="row" style={{ gap: 8 }}>
+        <input value={percentual} onChange={(e) => setPercentual(e.target.value.replace(/[^\d,.-]/g, ''))} inputMode="decimal" style={{ width: 90 }} />
+        <span className="muted">%</span>
+        <button type="submit" className="btn btn-primary btn-sm" disabled={salvando} style={{ marginLeft: 'auto' }}>
+          {salvando ? 'Salvando…' : salvo ? 'Salvo!' : 'Salvar'}
+        </button>
+      </div>
+    </form>
   );
 }
 

@@ -5,27 +5,48 @@ import { money } from '../utils/format';
 import { precoEfetivo } from '../utils/promocoes';
 import Pdv from './Pdv';
 
-const STATUS_LABEL = { livre: 'Livre', ocupada: 'Ocupada' };
+const STATUS_LABEL = { livre: 'Disponível', ocupada: 'Ocupada' };
+const LIMITE_SEM_PEDIDO_MS = 20 * 60 * 1000;
 
 export default function Mesas() {
   const [mesaSelecionada, setMesaSelecionada] = useState(null);
   const [vendaAvulsa, setVendaAvulsa] = useState(false);
   const [mesas, setMesas] = useState(null);
+  const [ultimoPedidoPorMesa, setUltimoPedidoPorMesa] = useState(new Map());
+  const [agora, setAgora] = useState(() => Date.now());
 
   useEffect(() => {
     carregar();
+    const t = setInterval(carregar, 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    const t = setInterval(() => setAgora(Date.now()), 30000);
+    return () => clearInterval(t);
   }, []);
 
   async function carregar() {
-    const { data } = await supabase.from('mesas').select('*').order('nome');
+    const [mesasResp, pedidosResp] = await Promise.all([
+      supabase.from('mesas').select('*').order('nome'),
+      supabase.from('pedidos').select('mesa_id, aberto_em, pedido_rodadas(criado_em)').eq('status', 'aberto'),
+    ]);
     setMesas(
-      (data || []).sort((a, b) => {
+      (mesasResp.data || []).sort((a, b) => {
         const na = Number(a.nome.match(/\d+/)?.[0]);
         const nb = Number(b.nome.match(/\d+/)?.[0]);
         if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
         return a.nome.localeCompare(b.nome);
       })
     );
+
+    const mapa = new Map();
+    for (const p of pedidosResp.data || []) {
+      const horarios = (p.pedido_rodadas || []).map((r) => new Date(r.criado_em).getTime());
+      const ultimo = horarios.length ? Math.max(...horarios) : new Date(p.aberto_em).getTime();
+      mapa.set(p.mesa_id, ultimo);
+    }
+    setUltimoPedidoPorMesa(mapa);
   }
 
   if (mesaSelecionada) {
@@ -54,43 +75,48 @@ export default function Mesas() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <MapaMesas mesas={mesas} onAbrirMesa={setMesaSelecionada} />
       <button type="button" className="btn btn-secondary btn-block" onClick={() => setVendaAvulsa(true)}>
         <ShoppingCart size={15} /> Venda avulsa (sem mesa)
       </button>
+      <MapaMesas mesas={mesas} ultimoPedidoPorMesa={ultimoPedidoPorMesa} agora={agora} onAbrirMesa={setMesaSelecionada} />
     </div>
   );
 }
 
-function MapaMesas({ mesas, onAbrirMesa }) {
+function corMesa(mesa, ultimoPedidoPorMesa, agora) {
+  if (mesa.status === 'livre') return { cor: 'var(--success)', label: 'Disponível' };
+  const ultimo = ultimoPedidoPorMesa.get(mesa.id);
+  if (ultimo && agora - ultimo > LIMITE_SEM_PEDIDO_MS) {
+    return { cor: 'var(--atencao)', label: `Sem pedido há ${Math.floor((agora - ultimo) / 60000)}min` };
+  }
+  return { cor: 'var(--danger)', label: 'Ocupada' };
+}
+
+function MapaMesas({ mesas, ultimoPedidoPorMesa, agora, onAbrirMesa }) {
   if (mesas === null) return <p className="muted">Carregando…</p>;
   if (mesas.length === 0) {
     return <p className="muted" style={{ fontSize: 13 }}>Nenhuma mesa cadastrada ainda. Peça pro admin cadastrar em Pós-pago.</p>;
   }
 
   return (
-    <>
-      <p className="muted" style={{ fontSize: 13 }}>Azul = livre, vermelho = ocupada. Toque numa mesa pra ver a comanda.</p>
-      <div className="mesa-grid">
-        {mesas.map((m) => {
-          const livre = m.status === 'livre';
-          const cor = livre ? 'var(--info)' : 'var(--danger)';
-          const numero = (m.nome.match(/\d+/) || [m.nome])[0];
-          return (
-            <button key={m.id} type="button" className="mesa-card" onClick={() => onAbrirMesa(m)}>
-              <span className="table-wrap">
-                <span className="table-chair table-chair--top" style={{ background: cor }} />
-                <span className="table-chair table-chair--bottom" style={{ background: cor }} />
-                <span className="table-chair table-chair--left" style={{ background: cor }} />
-                <span className="table-chair table-chair--right" style={{ background: cor }} />
-                <span className="table-top" style={{ background: cor }}>{numero}</span>
-              </span>
-              <span className="mesa-card__status" style={{ color: cor }}>{STATUS_LABEL[m.status] || m.status}</span>
-            </button>
-          );
-        })}
-      </div>
-    </>
+    <div className="mesa-grid">
+      {mesas.map((m) => {
+        const { cor, label } = corMesa(m, ultimoPedidoPorMesa, agora);
+        const numero = (m.nome.match(/\d+/) || [m.nome])[0];
+        return (
+          <button key={m.id} type="button" className="mesa-card" onClick={() => onAbrirMesa(m)}>
+            <span className="table-wrap">
+              <span className="table-chair table-chair--top" style={{ background: cor }} />
+              <span className="table-chair table-chair--bottom" style={{ background: cor }} />
+              <span className="table-chair table-chair--left" style={{ background: cor }} />
+              <span className="table-chair table-chair--right" style={{ background: cor }} />
+              <span className="table-top" style={{ background: cor }}>{numero}</span>
+            </span>
+            <span className="mesa-card__status" style={{ color: cor }}>{label}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -822,15 +848,33 @@ function LancarItens({ pedido, onVoltar, onLancado }) {
 }
 
 function FinalizarPedido({ pedido, total, onVoltar, onConcluido }) {
+  const [taxaPercentual, setTaxaPercentual] = useState(0);
+  const [taxaAtiva, setTaxaAtiva] = useState(true);
   const [pagamentos, setPagamentos] = useState([{ forma: 'dinheiro', valor: total.toFixed(2) }]);
   const [desconto, setDesconto] = useState('0');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
 
+  useEffect(() => {
+    supabase
+      .from('usuarios')
+      .select('empresas(taxa_servico_percentual)')
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        const pct = Number(data?.empresas?.taxa_servico_percentual) || 0;
+        setTaxaPercentual(pct);
+        const taxa = Math.round(total * (pct / 100) * 100) / 100;
+        setPagamentos([{ forma: 'dinheiro', valor: (total + taxa).toFixed(2) }]);
+      });
+  }, []);
+
   const descontoNum = Number(desconto.replace(',', '.')) || 0;
   const totalComDesconto = Math.max(0, total - descontoNum);
+  const taxaValor = taxaAtiva ? Math.round(totalComDesconto * (taxaPercentual / 100) * 100) / 100 : 0;
+  const totalFinal = totalComDesconto + taxaValor;
   const somaPagamentos = pagamentos.reduce((s, p) => s + (Number(p.valor.replace(',', '.')) || 0), 0);
-  const restante = totalComDesconto - somaPagamentos;
+  const restante = totalFinal - somaPagamentos;
 
   function atualizarPagamento(idx, campo, valor) {
     setPagamentos((atual) => atual.map((p, i) => (i === idx ? { ...p, [campo]: valor } : p)));
@@ -855,6 +899,7 @@ function FinalizarPedido({ pedido, total, onVoltar, onConcluido }) {
       p_pedido_id: pedido.id,
       p_pagamentos: pagamentos.map((p) => ({ forma: p.forma, valor: Number(p.valor.replace(',', '.')) || 0 })),
       p_desconto: descontoNum,
+      p_taxa_servico: taxaValor,
     });
     setEnviando(false);
     if (error) {
@@ -872,13 +917,25 @@ function FinalizarPedido({ pedido, total, onVoltar, onConcluido }) {
 
       <div className="card" style={{ textAlign: 'center' }}>
         <p className="muted" style={{ fontSize: 12 }}>Valor total</p>
-        <p className="tabular" style={{ fontSize: 28, fontWeight: 800 }}>{money(totalComDesconto)}</p>
+        <p className="tabular" style={{ fontSize: 28, fontWeight: 800 }}>{money(totalFinal)}</p>
       </div>
 
       <div className="card">
         <span className="label">Desconto (R$)</span>
         <input value={desconto} onChange={(e) => setDesconto(e.target.value)} inputMode="decimal" />
       </div>
+
+      {taxaPercentual > 0 && (
+        <div className="card row">
+          <div>
+            <span style={{ fontWeight: 600 }}>Taxa de serviço ({taxaPercentual}%)</span>
+            <p className="muted tabular" style={{ fontSize: 12, margin: 0 }}>{taxaAtiva ? money(taxaValor) : 'Desativada'}</p>
+          </div>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setTaxaAtiva((a) => !a)}>
+            {taxaAtiva ? 'Desativar' : 'Ativar'}
+          </button>
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {pagamentos.map((p, idx) => (
