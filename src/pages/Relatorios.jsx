@@ -84,6 +84,17 @@ export default function Relatorios() {
       porOperador.set(nome, atual);
     }
 
+    const vendasComDesconto = vendas.filter((v) => Number(v.desconto) > 0);
+    const totalDescontos = vendasComDesconto.reduce((s, v) => s + Number(v.desconto), 0);
+    const descontoPorOperador = new Map();
+    for (const v of vendasComDesconto) {
+      const nome = v.usuarios?.nome || 'Sem operador';
+      const atual = descontoPorOperador.get(nome) || { quantidade: 0, total: 0 };
+      atual.quantidade += 1;
+      atual.total += Number(v.desconto);
+      descontoPorOperador.set(nome, atual);
+    }
+
     let porFormaPagamento = new Map();
     let maisVendidos = [];
     if (vendas.length > 0) {
@@ -112,6 +123,9 @@ export default function Relatorios() {
       porOperador: [...porOperador.entries()].sort((a, b) => b[1].total - a[1].total),
       porFormaPagamento: [...porFormaPagamento.entries()].sort((a, b) => b[1] - a[1]),
       maisVendidos,
+      totalDescontos,
+      vendasComDesconto,
+      descontoPorOperador: [...descontoPorOperador.entries()].sort((a, b) => b[1].total - a[1].total),
     });
   }
 
@@ -219,6 +233,39 @@ export default function Relatorios() {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+
+          <div className="card">
+            <div className="row" style={{ marginBottom: 8 }}>
+              <span style={{ fontWeight: 700 }}>Descontos</span>
+              <span className="tabular danger-text" style={{ fontWeight: 800 }}>{money(resumo.totalDescontos)}</span>
+            </div>
+            {resumo.descontoPorOperador.length === 0 ? (
+              <p className="muted" style={{ fontSize: 13, margin: 0 }}>Nenhum desconto dado no período.</p>
+            ) : (
+              <>
+                <div className="list">
+                  {resumo.descontoPorOperador.map(([nome, v]) => (
+                    <div className="item" key={nome}>
+                      <span>
+                        {nome} <span className="muted" style={{ fontSize: 11 }}>x{v.quantidade}</span>
+                      </span>
+                      <span className="tabular">{money(v.total)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="list no-print" style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                  {resumo.vendasComDesconto.map((v) => (
+                    <div className="item" key={v.id} style={{ fontSize: 12.5 }}>
+                      <span>
+                        {new Date(v.criado_em).toLocaleString('pt-BR')} <span className="muted">· {v.usuarios?.nome || 'Sem operador'}</span>
+                      </span>
+                      <span className="tabular">{money(v.desconto)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
 
