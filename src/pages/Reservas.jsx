@@ -10,25 +10,40 @@ export default function Reservas() {
 
   useEffect(() => {
     carregar();
-    supabase
-      .from('mesas')
-      .select('id, nome')
-      .order('nome')
-      .then(({ data }) => setMesas(data || []));
   }, []);
 
   async function carregar() {
-    const { data } = await supabase.from('reservas').select('*, mesas(nome)').order('horario', { ascending: true });
-    setReservas(data || []);
+    const [reservasResp, mesasResp] = await Promise.all([
+      supabase.from('reservas').select('*').order('horario', { ascending: true }),
+      supabase.from('mesas').select('id, nome, status').order('nome'),
+    ]);
+    setReservas(reservasResp.data || []);
+    setMesas(mesasResp.data || []);
   }
 
-  async function mudarStatus(id, status) {
-    await supabase.from('reservas').update({ status }).eq('id', id);
+  function nomesMesas(mesaIds) {
+    return (mesaIds || []).map((id) => mesas.find((m) => m.id === id)?.nome).filter(Boolean);
+  }
+
+  async function liberarMesas(mesaIds) {
+    if (!mesaIds || mesaIds.length === 0) return;
+    await supabase.from('mesas').update({ status: 'livre' }).in('id', mesaIds).eq('status', 'reservada');
+  }
+
+  async function mudarStatus(reserva, status) {
+    await supabase.from('reservas').update({ status }).eq('id', reserva.id);
+    await liberarMesas(reserva.mesa_ids);
     carregar();
   }
 
   if (criando) {
-    return <NovaReserva mesas={mesas} onVoltar={() => setCriando(false)} onCriada={() => { setCriando(false); carregar(); }} />;
+    return (
+      <NovaReserva
+        mesas={mesas.filter((m) => m.status === 'livre')}
+        onVoltar={() => setCriando(false)}
+        onCriada={() => { setCriando(false); carregar(); }}
+      />
+    );
   }
 
   const agora = Date.now();
@@ -62,6 +77,7 @@ export default function Reservas() {
           {listaFiltrada.map((r) => {
             const horario = new Date(r.horario);
             const atrasada = r.status === 'pendente' && horario.getTime() < agora;
+            const mesasDaReserva = nomesMesas(r.mesa_ids);
             return (
               <div key={r.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <div className="row">
@@ -72,18 +88,18 @@ export default function Reservas() {
                 </div>
                 <div className="muted" style={{ fontSize: 12.5 }}>
                   {horario.toLocaleDateString('pt-BR')} às {horario.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                  {r.mesas?.nome ? ` · ${r.mesas.nome}` : ''}
+                  {mesasDaReserva.length > 0 ? ` · ${mesasDaReserva.join(', ')}` : ''}
                   {r.telefone ? ` · ${r.telefone}` : ''}
                 </div>
                 {r.observacao && <div className="muted" style={{ fontSize: 12.5 }}>{r.observacao}</div>}
                 {r.status === 'pendente' && (
                   <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => mudarStatus(r.id, 'concluida')}>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => mudarStatus(r, 'concluida')}>
                       Cliente chegou
                     </button>
                     <button
                       type="button"
-                      onClick={() => mudarStatus(r.id, 'cancelada')}
+                      onClick={() => mudarStatus(r, 'cancelada')}
                       style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: 4, marginLeft: 'auto' }}
                     >
                       <Trash2 size={14} />
@@ -104,10 +120,14 @@ function NovaReserva({ mesas, onVoltar, onCriada }) {
   const [telefone, setTelefone] = useState('');
   const [data, setData] = useState('');
   const [hora, setHora] = useState('');
-  const [mesaId, setMesaId] = useState('');
+  const [mesaIds, setMesaIds] = useState([]);
   const [observacao, setObservacao] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
+
+  function alternarMesa(id) {
+    setMesaIds((atual) => (atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id]));
+  }
 
   async function salvar(e) {
     e.preventDefault();
@@ -129,15 +149,19 @@ function NovaReserva({ mesas, onVoltar, onCriada }) {
       nome_cliente: nome.trim(),
       telefone: telefone.trim() || null,
       horario: horario.toISOString(),
-      mesa_id: mesaId || null,
+      mesa_ids: mesaIds,
       observacao: observacao.trim() || null,
       criado_por: user.id,
     });
-    setEnviando(false);
     if (error) {
+      setEnviando(false);
       setErro(error.message);
       return;
     }
+    if (mesaIds.length > 0) {
+      await supabase.from('mesas').update({ status: 'reservada' }).in('id', mesaIds);
+    }
+    setEnviando(false);
     onCriada();
   }
 
@@ -162,13 +186,34 @@ function NovaReserva({ mesas, onVoltar, onCriada }) {
             <input type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
           </div>
         </div>
-        <span className="label">Mesa (opcional)</span>
-        <select value={mesaId} onChange={(e) => setMesaId(e.target.value)}>
-          <option value="">Sem mesa definida</option>
-          {mesas.map((m) => (
-            <option key={m.id} value={m.id}>{m.nome}</option>
-          ))}
-        </select>
+        <span className="label">Mesas (opcional, pode marcar mais de uma)</span>
+        {mesas.length === 0 ? (
+          <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>Nenhuma mesa livre no momento.</p>
+        ) : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {mesas.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                className={'chip ' + (mesaIds.includes(m.id) ? 'chip-primary' : '')}
+                style={{
+                  cursor: 'pointer',
+                  border: mesaIds.includes(m.id) ? 'none' : '1px solid var(--border)',
+                  background: mesaIds.includes(m.id) ? undefined : 'transparent',
+                  color: mesaIds.includes(m.id) ? undefined : 'var(--text)',
+                }}
+                onClick={() => alternarMesa(m.id)}
+              >
+                {m.nome}
+              </button>
+            ))}
+          </div>
+        )}
+        {mesaIds.length > 0 && (
+          <p className="muted" style={{ fontSize: 11.5, margin: '4px 0 0' }}>
+            Essas mesas ficam indisponíveis no mapa até o cliente chegar ou a reserva ser cancelada.
+          </p>
+        )}
         <span className="label">Observação (opcional)</span>
         <input value={observacao} onChange={(e) => setObservacao(e.target.value)} placeholder="Ex: aniversário, 6 pessoas…" />
       </div>

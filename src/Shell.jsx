@@ -40,7 +40,7 @@ const MODULOS = [
   { id: 'pdv', label: 'PDV', icon: ShoppingCart, papeis: ['operador'] },
   { id: 'caixa', label: 'Caixa', icon: Wallet, papeis: ['admin', 'gerente'] },
   { id: 'produtos', label: 'Produtos', icon: Package, papeis: ['admin', 'gerente'] },
-  { id: 'pospago', label: 'Pós-pago', icon: Table2, papeis: ['admin'] },
+  { id: 'pospago', label: 'Mapa de Mesas', icon: Table2, papeis: ['admin'] },
   { id: 'cozinha', label: 'Painel de Pedidos', icon: ChefHat, papeis: ['admin', 'gerente', 'operador'] },
   { id: 'reservas', label: 'Reservas', icon: CalendarClock, papeis: ['admin', 'gerente', 'operador'] },
   { id: 'clientes', label: 'Clientes', icon: Users, papeis: ['admin', 'gerente'] },

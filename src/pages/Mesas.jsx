@@ -5,7 +5,7 @@ import { money } from '../utils/format';
 import { precoEfetivo } from '../utils/promocoes';
 import Pdv from './Pdv';
 
-const STATUS_LABEL = { livre: 'Disponível', ocupada: 'Ocupada' };
+const STATUS_LABEL = { livre: 'Disponível', ocupada: 'Ocupada', reservada: 'Reservada' };
 const LIMITE_SEM_PEDIDO_MS = 20 * 60 * 1000;
 
 export default function Mesas() {
@@ -93,6 +93,7 @@ export default function Mesas() {
 
 function corMesa(mesa, ultimoPedidoPorMesa, agora) {
   if (mesa.status === 'livre') return { cor: 'var(--success)', label: 'Disponível' };
+  if (mesa.status === 'reservada') return { cor: 'var(--info)', label: 'Reservada' };
   const ultimo = ultimoPedidoPorMesa.get(mesa.id);
   if (ultimo && agora - ultimo > LIMITE_SEM_PEDIDO_MS) {
     return { cor: 'var(--atencao)', label: `Sem pedido há ${Math.floor((agora - ultimo) / 60000)}min` };
@@ -103,7 +104,7 @@ function corMesa(mesa, ultimoPedidoPorMesa, agora) {
 function MapaMesas({ mesas, ultimoPedidoPorMesa, grupoPorMesa, agora, onAbrirMesa }) {
   if (mesas === null) return <p className="muted">Carregando…</p>;
   if (mesas.length === 0) {
-    return <p className="muted" style={{ fontSize: 13 }}>Nenhuma mesa cadastrada ainda. Peça pro admin cadastrar em Pós-pago.</p>;
+    return <p className="muted" style={{ fontSize: 13 }}>Nenhuma mesa cadastrada ainda. Peça pro admin cadastrar em Mapa de Mesas.</p>;
   }
 
   return (
@@ -113,7 +114,7 @@ function MapaMesas({ mesas, ultimoPedidoPorMesa, grupoPorMesa, agora, onAbrirMes
         const numero = (m.nome.match(/\d+/) || [m.nome])[0];
         const grupo = grupoPorMesa.get(m.id);
         return (
-          <button key={m.id} type="button" className="mesa-card" onClick={() => onAbrirMesa(m)}>
+          <button key={m.id} type="button" className="mesa-card" disabled={m.status === 'reservada'} onClick={() => onAbrirMesa(m)}>
             <span className="table-wrap">
               <span className="table-chair table-chair--top" style={{ background: cor }} />
               <span className="table-chair table-chair--bottom" style={{ background: cor }} />

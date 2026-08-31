@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { supabase } from '../supabase';
 
-const STATUS_LABEL = { livre: 'Livre', ocupada: 'Ocupada' };
+const STATUS_LABEL = { livre: 'Livre', ocupada: 'Ocupada', reservada: 'Reservada' };
+const STATUS_CHIP = { livre: 'chip-success', ocupada: 'chip-danger', reservada: 'chip-primary' };
 
 export default function PosPago() {
   const [mesas, setMesas] = useState(null);
   const [nome, setNome] = useState('');
   const [quantidade, setQuantidade] = useState('');
+  const [editandoId, setEditandoId] = useState(null);
+  const [nomeEditado, setNomeEditado] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
 
@@ -63,6 +66,26 @@ export default function PosPago() {
     carregar();
   }
 
+  function comecarEdicao(m) {
+    setEditandoId(m.id);
+    setNomeEditado(m.nome);
+    setErro('');
+  }
+
+  async function salvarNome(id) {
+    if (!nomeEditado.trim()) return;
+    setEnviando(true);
+    setErro('');
+    const { error } = await supabase.from('mesas').update({ nome: nomeEditado.trim() }).eq('id', id);
+    setEnviando(false);
+    if (error) {
+      setErro(error.message);
+      return;
+    }
+    setEditandoId(null);
+    carregar();
+  }
+
   async function remover(id) {
     await supabase.from('mesas').delete().eq('id', id);
     carregar();
@@ -96,20 +119,35 @@ export default function PosPago() {
         <p className="muted" style={{ fontSize: 13 }}>Nenhuma mesa cadastrada ainda.</p>
       ) : (
         <div className="list">
-          {mesas.map((m) => (
-            <div key={m.id} className="item" style={{ alignItems: 'center' }}>
-              <span style={{ flex: 1 }}>{m.nome}</span>
-              <span className={'chip ' + (m.status === 'livre' ? 'chip-success' : 'chip-danger')}>{STATUS_LABEL[m.status] || m.status}</span>
-              <button
-                type="button"
-                onClick={() => remover(m.id)}
-                disabled={m.status !== 'livre'}
-                style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: m.status === 'livre' ? 'pointer' : 'not-allowed', opacity: m.status === 'livre' ? 1 : 0.35, padding: 4, marginLeft: 8 }}
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
+          {mesas.map((m) =>
+            editandoId === m.id ? (
+              <div key={m.id} className="item" style={{ alignItems: 'center', gap: 8 }}>
+                <input value={nomeEditado} onChange={(e) => setNomeEditado(e.target.value)} style={{ flex: 1 }} autoFocus />
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditandoId(null)}>Cancelar</button>
+                <button type="button" className="btn btn-primary btn-sm" disabled={enviando} onClick={() => salvarNome(m.id)}>Salvar</button>
+              </div>
+            ) : (
+              <div key={m.id} className="item" style={{ alignItems: 'center' }}>
+                <span style={{ flex: 1 }}>{m.nome}</span>
+                <span className={'chip ' + (STATUS_CHIP[m.status] || 'chip-danger')}>{STATUS_LABEL[m.status] || m.status}</span>
+                <button
+                  type="button"
+                  onClick={() => comecarEdicao(m)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: 4, marginLeft: 8 }}
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => remover(m.id)}
+                  disabled={m.status !== 'livre'}
+                  style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: m.status === 'livre' ? 'pointer' : 'not-allowed', opacity: m.status === 'livre' ? 1 : 0.35, padding: 4 }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            )
+          )}
         </div>
       )}
     </div>
