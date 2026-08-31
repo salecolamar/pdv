@@ -300,7 +300,6 @@ function Comanda({ mesa, mesas, onVoltar }) {
         rodadas={rodadas}
         total={total}
         valorPago={valorPago}
-        restante={restante}
         onVoltar={() => setVendoConta(false)}
       />
     );
@@ -500,8 +499,22 @@ function Comanda({ mesa, mesas, onVoltar }) {
   );
 }
 
-function ContaMesa({ mesa, pedido, rodadas, total, valorPago, restante, onVoltar }) {
+function ContaMesa({ mesa, pedido, rodadas, total, valorPago, onVoltar }) {
   const itens = rodadas.flatMap((r) => r.pedido_itens.filter((i) => !i.cancelado).map((i) => ({ ...i, rodada: r })));
+  const [taxaPercentual, setTaxaPercentual] = useState(0);
+
+  useEffect(() => {
+    supabase
+      .from('usuarios')
+      .select('empresas(taxa_servico_percentual)')
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => setTaxaPercentual(Number(data?.empresas?.taxa_servico_percentual) || 0));
+  }, []);
+
+  const taxaValor = Math.round(total * (taxaPercentual / 100) * 100) / 100;
+  const totalComTaxa = total + taxaValor;
+  const restanteComTaxa = Math.max(0, totalComTaxa - valorPago);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -528,9 +541,19 @@ function ContaMesa({ mesa, pedido, rodadas, total, valorPago, restante, onVoltar
           )}
         </div>
 
-        <div className="row" style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+        <div className="row" style={{ borderTop: '1px solid var(--border)', paddingTop: 8, fontSize: 13 }}>
+          <span className="muted">Subtotal</span>
+          <span className="tabular">{money(total)}</span>
+        </div>
+        {taxaValor > 0 && (
+          <div className="row" style={{ fontSize: 13 }}>
+            <span className="muted">Taxa de serviço ({taxaPercentual}%)</span>
+            <span className="tabular">{money(taxaValor)}</span>
+          </div>
+        )}
+        <div className="row">
           <span style={{ fontWeight: 700 }}>Total</span>
-          <span className="tabular" style={{ fontWeight: 800, fontSize: 18 }}>{money(total)}</span>
+          <span className="tabular" style={{ fontWeight: 800, fontSize: 18 }}>{money(totalComTaxa)}</span>
         </div>
         {valorPago > 0 && (
           <>
@@ -540,7 +563,7 @@ function ContaMesa({ mesa, pedido, rodadas, total, valorPago, restante, onVoltar
             </div>
             <div className="row" style={{ fontSize: 13 }}>
               <span className="muted">Restante</span>
-              <span className="tabular" style={{ fontWeight: 700 }}>{money(restante)}</span>
+              <span className="tabular" style={{ fontWeight: 700 }}>{money(restanteComTaxa)}</span>
             </div>
           </>
         )}
