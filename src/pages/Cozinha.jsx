@@ -102,10 +102,14 @@ function TicketCozinha({ rodada, agora, acao, onAvancar }) {
     porCategoria.get(categoria).push(i);
   }
 
+  const nomeMesa = rodada.pedidos?.mesas?.nome;
+  const numeroMesa = nomeMesa?.match(/\d+/)?.[0];
+  const tituloMesa = numeroMesa ? `MESA ${numeroMesa}` : nomeMesa ? nomeMesa.toUpperCase() : 'VENDA AVULSA';
+
   return (
     <div className={'ticket-cozinha ticket-cozinha--' + urgencia}>
       <div className="ticket-cozinha__topo">
-        <span className="ticket-cozinha__mesa">{rodada.pedidos?.mesas?.nome || 'Mesa'}</span>
+        <span className="ticket-cozinha__mesa">{tituloMesa}</span>
         <span className="ticket-cozinha__tempo">{minutos === 0 ? 'agora' : `há ${minutos} min`}</span>
       </div>
       <span className="muted" style={{ fontSize: 12, marginTop: -8 }}>
