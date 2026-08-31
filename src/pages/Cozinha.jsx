@@ -1,5 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Printer, PrinterCheck } from 'lucide-react';
 import { supabase } from '../supabase';
+import {
+  esquecerImpressora,
+  imprimirTexto,
+  impressoraConfigurada,
+  parearImpressora,
+  suportaImpressaoBluetooth,
+  ticketRodada,
+} from '../utils/impressora';
 
 const COLUNAS = [
   { status: 'novo', titulo: 'Novos', acao: 'Iniciar preparo', proximo: 'fazendo' },
@@ -13,14 +22,44 @@ function inicioDoDia() {
   return d.toISOString();
 }
 
+function tituloMesaDe(rodada) {
+  const nomeMesa = rodada.pedidos?.mesas?.nome;
+  const numeroMesa = nomeMesa?.match(/\d+/)?.[0];
+  return numeroMesa ? `MESA ${numeroMesa}` : nomeMesa ? nomeMesa.toUpperCase() : 'VENDA AVULSA';
+}
+
+function agruparPorCategoria(itens) {
+  const porCategoria = new Map();
+  for (const i of itens) {
+    const categoria = i.produtos?.categorias?.nome || 'Sem categoria';
+    if (!porCategoria.has(categoria)) porCategoria.set(categoria, []);
+    porCategoria.get(categoria).push(i);
+  }
+  return porCategoria;
+}
+
 export default function Cozinha() {
   const [rodadas, setRodadas] = useState(null);
   const [agora, setAgora] = useState(() => Date.now());
+  const [impressoraPronta, setImpressoraPronta] = useState(() => impressoraConfigurada());
+  const [pareando, setPareando] = useState(false);
+  const [erroImpressora, setErroImpressora] = useState('');
+  const impressoraProntaRef = useRef(impressoraPronta);
+  const imprimindoRef = useRef(new Set());
 
   useEffect(() => {
     carregar();
     const t = setInterval(carregar, 15000);
-    return () => clearInterval(t);
+
+    const canal = supabase
+      .channel('pedido_rodadas_novas')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedido_rodadas' }, () => carregar())
+      .subscribe();
+
+    return () => {
+      clearInterval(t);
+      supabase.removeChannel(canal);
+    };
   }, []);
 
   useEffect(() => {
@@ -35,11 +74,58 @@ export default function Cozinha() {
       .gte('criado_em', inicioDoDia())
       .order('criado_em');
     setRodadas(data || []);
+    imprimirNovas(data || []);
+  }
+
+  async function imprimirNovas(lista) {
+    if (!impressoraProntaRef.current) return;
+    const pendentes = lista.filter((r) => r.status === 'novo' && !r.impresso && !imprimindoRef.current.has(r.id));
+    for (const r of pendentes) {
+      imprimindoRef.current.add(r.id);
+      try {
+        const linhas = ticketRodada({
+          tituloMesa: tituloMesaDe(r),
+          cliente: r.pedidos?.clientes?.nome,
+          operador: r.usuarios?.nome,
+          horario: new Date(r.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          grupos: [...agruparPorCategoria(r.pedido_itens).entries()],
+        });
+        await imprimirTexto(linhas);
+        await supabase.from('pedido_rodadas').update({ impresso: true }).eq('id', r.id);
+        setRodadas((atual) => atual.map((x) => (x.id === r.id ? { ...x, impresso: true } : x)));
+        setErroImpressora('');
+      } catch (e) {
+        setErroImpressora('Falha ao imprimir: ' + e.message);
+      } finally {
+        imprimindoRef.current.delete(r.id);
+      }
+    }
   }
 
   async function mudarStatus(id, status) {
     await supabase.from('pedido_rodadas').update({ status }).eq('id', id);
     carregar();
+  }
+
+  async function parear() {
+    setPareando(true);
+    setErroImpressora('');
+    try {
+      await parearImpressora();
+      impressoraProntaRef.current = true;
+      setImpressoraPronta(true);
+      carregar();
+    } catch (e) {
+      setErroImpressora(e.message);
+    } finally {
+      setPareando(false);
+    }
+  }
+
+  function esquecer() {
+    esquecerImpressora();
+    impressoraProntaRef.current = false;
+    setImpressoraPronta(false);
   }
 
   const pendentes = (rodadas || []).filter((r) => r.status !== 'pronto').length;
@@ -48,8 +134,25 @@ export default function Cozinha() {
     <div className="cozinha">
       <header className="cozinha__header">
         <h1>Painel de Pedidos</h1>
-        <span className="muted">{rodadas ? `${pendentes} em preparo` : ''}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span className="muted">{rodadas ? `${pendentes} em preparo` : ''}</span>
+          {suportaImpressaoBluetooth() ? (
+            impressoraPronta ? (
+              <button type="button" className="btn btn-secondary btn-sm" onClick={esquecer} title="Esquecer impressora pareada">
+                <PrinterCheck size={14} /> Impressora pareada
+              </button>
+            ) : (
+              <button type="button" className="btn btn-secondary btn-sm" onClick={parear} disabled={pareando}>
+                <Printer size={14} /> {pareando ? 'Pareando…' : 'Parear impressora'}
+              </button>
+            )
+          ) : (
+            <span className="muted" style={{ fontSize: 11 }}>Impressão automática só no Chrome/Edge Android</span>
+          )}
+        </div>
       </header>
+
+      {erroImpressora && <p className="danger-text" style={{ fontSize: 12.5, marginTop: -8 }}>{erroImpressora}</p>}
 
       {rodadas === null ? (
         <p className="muted" style={{ fontSize: 18 }}>Carregando…</p>
@@ -94,17 +197,8 @@ function TicketCozinha({ rodada, agora, acao, onAvancar }) {
   const urgencia = rodada.status === 'pronto' ? 'pronto' : minutos >= 10 ? 'danger' : minutos >= 5 ? 'atencao' : 'normal';
   const data = criadoEm.toLocaleDateString('pt-BR');
   const horario = criadoEm.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
-  const porCategoria = new Map();
-  for (const i of rodada.pedido_itens) {
-    const categoria = i.produtos?.categorias?.nome || 'Sem categoria';
-    if (!porCategoria.has(categoria)) porCategoria.set(categoria, []);
-    porCategoria.get(categoria).push(i);
-  }
-
-  const nomeMesa = rodada.pedidos?.mesas?.nome;
-  const numeroMesa = nomeMesa?.match(/\d+/)?.[0];
-  const tituloMesa = numeroMesa ? `MESA ${numeroMesa}` : nomeMesa ? nomeMesa.toUpperCase() : 'VENDA AVULSA';
+  const porCategoria = agruparPorCategoria(rodada.pedido_itens);
+  const tituloMesa = tituloMesaDe(rodada);
 
   return (
     <div className={'ticket-cozinha ticket-cozinha--' + urgencia}>
@@ -113,7 +207,7 @@ function TicketCozinha({ rodada, agora, acao, onAvancar }) {
         <span className="ticket-cozinha__tempo">{minutos === 0 ? 'agora' : `há ${minutos} min`}</span>
       </div>
       <span className="muted" style={{ fontSize: 12, marginTop: -8 }}>
-        {data} {horario} · {rodada.usuarios?.nome || 'Operador'}
+        {data} {horario} · {rodada.usuarios?.nome || 'Operador'}{rodada.impresso ? ' · impresso' : ''}
       </span>
       {rodada.pedidos?.clientes?.nome && (
         <span className="muted" style={{ fontSize: 13, marginTop: -6 }}>Cliente: {rodada.pedidos.clientes.nome}</span>
