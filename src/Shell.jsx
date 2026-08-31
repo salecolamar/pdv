@@ -151,7 +151,7 @@ export default function Shell({ session }) {
           {(perfil.role === 'admin' || perfil.role === 'gerente') && <Notificacoes />}
         </header>
 
-        <main style={{ flex: 1, padding: 16 }}>
+        <main className="page-content">
           {abaAtiva === 'dashboard' && <Dashboard />}
           {abaAtiva === 'pdv' && <Mesas />}
           {abaAtiva === 'cozinha' && <Cozinha />}
