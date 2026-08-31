@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { Printer, PrinterCheck } from 'lucide-react';
+import { Printer, PrinterCheck, X } from 'lucide-react';
 import { supabase } from '../supabase';
 import {
+  configurarImpressoraWifi,
   esquecerImpressora,
   imprimirTexto,
   impressoraConfigurada,
-  parearImpressora,
+  impressoraWifiIp,
+  obterModo,
+  parearImpressoraBluetooth,
   suportaImpressaoBluetooth,
+  testarImpressoraWifi,
   ticketRodada,
 } from '../utils/impressora';
 
@@ -42,7 +46,7 @@ export default function Cozinha() {
   const [rodadas, setRodadas] = useState(null);
   const [agora, setAgora] = useState(() => Date.now());
   const [impressoraPronta, setImpressoraPronta] = useState(() => impressoraConfigurada());
-  const [pareando, setPareando] = useState(false);
+  const [configAberta, setConfigAberta] = useState(false);
   const [erroImpressora, setErroImpressora] = useState('');
   const impressoraProntaRef = useRef(impressoraPronta);
   const imprimindoRef = useRef(new Set());
@@ -107,25 +111,14 @@ export default function Cozinha() {
     carregar();
   }
 
-  async function parear() {
-    setPareando(true);
-    setErroImpressora('');
-    try {
-      await parearImpressora();
-      impressoraProntaRef.current = true;
-      setImpressoraPronta(true);
-      carregar();
-    } catch (e) {
-      setErroImpressora(e.message);
-    } finally {
-      setPareando(false);
-    }
+  function marcarImpressoraPronta(pronta) {
+    impressoraProntaRef.current = pronta;
+    setImpressoraPronta(pronta);
   }
 
   function esquecer() {
     esquecerImpressora();
-    impressoraProntaRef.current = false;
-    setImpressoraPronta(false);
+    marcarImpressoraPronta(false);
   }
 
   const pendentes = (rodadas || []).filter((r) => r.status !== 'pronto').length;
@@ -136,23 +129,32 @@ export default function Cozinha() {
         <h1>Painel de Pedidos</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span className="muted">{rodadas ? `${pendentes} em preparo` : ''}</span>
-          {suportaImpressaoBluetooth() ? (
-            impressoraPronta ? (
-              <button type="button" className="btn btn-secondary btn-sm" onClick={esquecer} title="Esquecer impressora pareada">
-                <PrinterCheck size={14} /> Impressora pareada
-              </button>
-            ) : (
-              <button type="button" className="btn btn-secondary btn-sm" onClick={parear} disabled={pareando}>
-                <Printer size={14} /> {pareando ? 'Pareando…' : 'Parear impressora'}
-              </button>
-            )
+          {impressoraPronta ? (
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfigAberta(true)}>
+              <PrinterCheck size={14} /> Impressora configurada
+            </button>
           ) : (
-            <span className="muted" style={{ fontSize: 11 }}>Impressão automática só no Chrome/Edge Android</span>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfigAberta(true)}>
+              <Printer size={14} /> Configurar impressora
+            </button>
           )}
         </div>
       </header>
 
       {erroImpressora && <p className="danger-text" style={{ fontSize: 12.5, marginTop: -8 }}>{erroImpressora}</p>}
+
+      {configAberta && (
+        <ConfigImpressora
+          impressoraPronta={impressoraPronta}
+          onPronta={() => {
+            marcarImpressoraPronta(true);
+            carregar();
+          }}
+          onEsquecer={esquecer}
+          onErro={setErroImpressora}
+          onFechar={() => setConfigAberta(false)}
+        />
+      )}
 
       {rodadas === null ? (
         <p className="muted" style={{ fontSize: 18 }}>Carregando…</p>
@@ -186,6 +188,116 @@ export default function Cozinha() {
             );
           })}
         </div>
+      )}
+    </div>
+  );
+}
+
+function ConfigImpressora({ impressoraPronta, onPronta, onEsquecer, onErro, onFechar }) {
+  const [modo, setModo] = useState(() => obterModo());
+  const [ip, setIp] = useState(() => impressoraWifiIp());
+  const [ocupado, setOcupado] = useState(false);
+  const [mensagem, setMensagem] = useState('');
+
+  async function parearBluetooth() {
+    setOcupado(true);
+    setMensagem('');
+    onErro('');
+    try {
+      await parearImpressoraBluetooth();
+      onPronta();
+      onFechar();
+    } catch (e) {
+      onErro(e.message);
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function testarWifi() {
+    if (!ip.trim()) return;
+    setOcupado(true);
+    setMensagem('');
+    onErro('');
+    try {
+      await testarImpressoraWifi(ip.trim());
+      setMensagem('Impressora respondeu! Pode salvar.');
+    } catch (e) {
+      onErro(e.message);
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  function salvarWifi() {
+    try {
+      configurarImpressoraWifi(ip);
+      onPronta();
+      onFechar();
+    } catch (e) {
+      onErro(e.message);
+    }
+  }
+
+  return (
+    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 4 }}>
+      <div className="row">
+        <span style={{ fontWeight: 700 }}>Impressora térmica</span>
+        <button type="button" onClick={onFechar} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>
+          <X size={16} />
+        </button>
+      </div>
+
+      {impressoraPronta && (
+        <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onEsquecer}>
+          Esquecer impressora configurada
+        </button>
+      )}
+
+      <div className="tab-row">
+        <button type="button" className="tab" aria-pressed={modo === 'bluetooth'} onClick={() => setModo('bluetooth')}>
+          Bluetooth
+        </button>
+        <button type="button" className="tab" aria-pressed={modo === 'wifi'} onClick={() => setModo('wifi')}>
+          Wi-Fi
+        </button>
+      </div>
+
+      {modo === 'bluetooth' ? (
+        suportaImpressaoBluetooth() ? (
+          <>
+            <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+              Toque no botão, escolha a impressora na lista que o Chrome mostrar e pronto — só precisa fazer isso uma vez.
+            </p>
+            <button type="button" className="btn btn-primary btn-block" onClick={parearBluetooth} disabled={ocupado}>
+              {ocupado ? 'Pareando…' : 'Parear impressora Bluetooth'}
+            </button>
+          </>
+        ) : (
+          <p className="danger-text" style={{ fontSize: 12.5, margin: 0 }}>
+            Este navegador não suporta Bluetooth pra impressão — use o Chrome ou o Edge (Android ou computador).
+          </p>
+        )
+      ) : (
+        <>
+          <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+            Impressora precisa suportar o protocolo <strong>ePOS-Print</strong> (padrão Epson) e estar na mesma rede
+            Wi-Fi deste aparelho. Como este site é HTTPS, o Chrome bloqueia por padrão chamadas pro IP da impressora
+            (http://) — pra liberar, abra <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code> nesse
+            aparelho, cole o endereço <code>http://{ip || 'IP_DA_IMPRESSORA'}</code>, ative e reinicie o Chrome.
+          </p>
+          <span className="label">IP da impressora</span>
+          <input value={ip} onChange={(e) => setIp(e.target.value)} placeholder="Ex: 192.168.0.50" />
+          {mensagem && <p className="success-text" style={{ fontSize: 12.5, margin: 0 }}>{mensagem}</p>}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={testarWifi} disabled={ocupado || !ip.trim()}>
+              {ocupado ? 'Testando…' : 'Testar'}
+            </button>
+            <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={salvarWifi} disabled={!ip.trim()}>
+              Salvar
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
