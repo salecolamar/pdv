@@ -11,6 +11,7 @@ import {
   Table2,
   UserCog,
   Users,
+  UtensilsCrossed,
   Wallet,
   X,
 } from 'lucide-react';
@@ -94,6 +95,12 @@ export default function Shell({ session }) {
     setSidebarAberta(false);
   }
 
+  async function acessarComoGarcom() {
+    const empresaId = perfil.empresas.id;
+    await supabase.auth.signOut();
+    window.location.href = `/garcom/${empresaId}`;
+  }
+
   return (
     <div className="app-shell">
       <div className={'sidebar-overlay' + (sidebarAberta ? ' is-open' : '')} onClick={() => setSidebarAberta(false)} />
@@ -119,6 +126,11 @@ export default function Shell({ session }) {
         </nav>
 
         <div className="sidebar__footer">
+          {perfil.role === 'admin' && (
+            <button type="button" className="sidebar__sair" onClick={acessarComoGarcom}>
+              <UtensilsCrossed size={16} /> Acessar como garçom
+            </button>
+          )}
           <button type="button" className="sidebar__sair" onClick={() => supabase.auth.signOut()}>
             <LogOut size={16} /> Sair
           </button>

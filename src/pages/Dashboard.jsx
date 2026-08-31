@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { UtensilsCrossed } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import { inicioDoDia, inicioDoMes } from '../utils/datas';
@@ -26,22 +25,10 @@ function rotuloBucket(idx) {
 export default function Dashboard() {
   const [resumo, setResumo] = useState(undefined); // undefined = carregando
   const [erro, setErro] = useState('');
-  const [empresaId, setEmpresaId] = useState(null);
 
   useEffect(() => {
     carregar();
-    supabase
-      .from('usuarios')
-      .select('empresa_id')
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => setEmpresaId(data?.empresa_id || null));
   }, []);
-
-  async function acessarComoGarcom() {
-    await supabase.auth.signOut();
-    window.location.href = `/garcom/${empresaId}`;
-  }
 
   async function carregar() {
     setResumo(undefined);
@@ -114,15 +101,6 @@ export default function Dashboard() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <button
-        type="button"
-        className="btn btn-secondary btn-block"
-        disabled={!empresaId}
-        onClick={acessarComoGarcom}
-      >
-        <UtensilsCrossed size={15} /> Acessar como garçom
-      </button>
-
       <div
         style={{
           display: 'grid',
