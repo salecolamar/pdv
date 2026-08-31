@@ -1,27 +1,31 @@
 :root {
-  --bg: #fbfaff;
+  /* Paleta alinhada com a logo da AppVia: azul elétrico (#2E9EF5)
+     transicionando pra violeta (#6C3CE0) na diagonal. */
+  --bg: #f9faff;
   --panel: #ffffff;
-  --panel-2: #f6f3fc;
-  --border: #e6e0f5;
-  --border-soft: #eeeaf9;
-  --text: #201331;
-  --text-dim: #77708f;
-  --primary: #7c3aed;
-  --primary-dark: #4c1d95;
-  --primary-soft: #f1eafd;
+  --panel-2: #f2f4fd;
+  --border: #dfe3f7;
+  --border-soft: #eaecfa;
+  --text: #171b2e;
+  --text-dim: #6c7290;
+  --primary: #4A5FE8;
+  --primary-blue: #2E9EF5;
+  --primary-violet: #6C3CE0;
+  --primary-dark: #3A2F9E;
+  --primary-soft: #ecefff;
   --primary-ink: #ffffff;
-  --info: #2563eb;
+  --info: #2E9EF5;
   --danger: #dc2626;
   --success: #15803d;
   --atencao: #d9a441;
-  --sidebar-bg: #4c1d95;
+  --sidebar-bg: linear-gradient(160deg, #2E9EF5 0%, #4A5FE8 45%, #6C3CE0 100%);
   --sidebar-text: #ffffff;
-  --sidebar-text-dim: rgba(255, 255, 255, 0.68);
-  --sidebar-active-bg: rgba(255, 255, 255, 0.16);
+  --sidebar-text-dim: rgba(255, 255, 255, 0.7);
+  --sidebar-active-bg: rgba(255, 255, 255, 0.18);
   --radius: 16px;
   --radius-sm: 11px;
-  --shadow-sm: 0 1px 2px rgba(76, 29, 149, 0.05);
-  --shadow-md: 0 6px 20px rgba(76, 29, 149, 0.08);
+  --shadow-sm: 0 1px 2px rgba(58, 47, 158, 0.05);
+  --shadow-md: 0 6px 20px rgba(58, 47, 158, 0.09);
 
   font: 15.5px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color-scheme: light;
@@ -116,12 +120,12 @@ button:focus-visible {
 }
 
 .btn-primary {
-  background: var(--primary);
+  background: linear-gradient(135deg, var(--primary-blue), var(--primary-violet));
   color: #fff;
-  box-shadow: 0 3px 10px rgba(124, 58, 237, 0.25);
+  box-shadow: 0 3px 10px rgba(74, 95, 232, 0.28);
 }
 
-.btn-primary:hover { background: var(--primary-dark); }
+.btn-primary:hover { filter: brightness(0.94); }
 
 .btn-secondary {
   background: var(--panel);
