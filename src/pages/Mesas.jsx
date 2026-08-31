@@ -236,6 +236,11 @@ function Comanda({ mesa, mesas, onVoltar }) {
     avisar('Comanda fechada. Escolha a forma de pagamento.', 'success');
   }
 
+  async function irParaPagamento() {
+    if (pedido.status === 'aberto') await fecharComanda();
+    setPagando(true);
+  }
+
   if (precisaCliente) {
     return <FormAbrirMesa mesa={mesa} onAbrir={abrirComCliente} onVoltar={onVoltar} />;
   }
@@ -447,14 +452,17 @@ function Comanda({ mesa, mesas, onVoltar }) {
           <button type="button" className="btn btn-primary btn-block" onClick={() => setLancando(true)}>
             Lançar itens
           </button>
+          <button type="button" className="btn btn-primary btn-block" onClick={irParaPagamento} disabled={rodadas.length === 0}>
+            Receber pagamento{restante > 0 ? ` (${money(restante)})` : ''}
+          </button>
           <button type="button" className="btn btn-secondary btn-block" onClick={fecharComanda} disabled={rodadas.length === 0}>
-            Fechar comanda
+            Fechar comanda (sem pagar agora)
           </button>
         </>
       )}
 
       {pedido.status === 'fechado' && (
-        <button type="button" className="btn btn-primary btn-block" onClick={() => setPagando(true)}>
+        <button type="button" className="btn btn-primary btn-block" onClick={irParaPagamento}>
           Receber pagamento{restante > 0 ? ` (${money(restante)})` : ''}
         </button>
       )}

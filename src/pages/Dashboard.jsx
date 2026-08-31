@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react';
+import { Banknote, CreditCard, Landmark, QrCode } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import { inicioDoDia, inicioDoMes } from '../utils/datas';
+
+const FORMAS_PAGAMENTO = [
+  { forma: 'dinheiro', label: 'Dinheiro', icon: Banknote },
+  { forma: 'pix', label: 'Pix', icon: QrCode },
+  { forma: 'debito', label: 'Débito', icon: Landmark },
+  { forma: 'credito', label: 'Crédito', icon: CreditCard },
+];
 
 function bucketsMeiaHora(vendas) {
   const agora = new Date();
@@ -37,16 +45,22 @@ export default function Dashboard() {
     const hoje = inicioDoDia().toISOString();
     const mes = inicioDoMes().toISOString();
 
-    const [vendasHojeResp, vendasMesResp, estoqueResp] = await Promise.all([
+    const [vendasHojeResp, vendasMesResp, estoqueResp, pagamentosResp] = await Promise.all([
       supabase.from('vendas').select('id, total, criado_em, operador_id, usuarios(nome)').eq('cancelada', false).gte('criado_em', hoje),
       supabase.from('vendas').select('total').eq('cancelada', false).gte('criado_em', mes),
       supabase.from('produtos').select('nome, estoque, estoque_minimo').eq('ativo', true).not('estoque', 'is', null).order('estoque', { ascending: true }).limit(5),
+      supabase.from('pagamentos').select('forma, valor, vendas!inner(criado_em, cancelada)').eq('vendas.cancelada', false).gte('vendas.criado_em', hoje),
     ]);
 
-    if (vendasHojeResp.error || vendasMesResp.error || estoqueResp.error) {
-      setErro((vendasHojeResp.error || vendasMesResp.error || estoqueResp.error).message);
+    if (vendasHojeResp.error || vendasMesResp.error || estoqueResp.error || pagamentosResp.error) {
+      setErro((vendasHojeResp.error || vendasMesResp.error || estoqueResp.error || pagamentosResp.error).message);
       setResumo(null);
       return;
+    }
+
+    const porFormaPagamento = {};
+    for (const p of pagamentosResp.data) {
+      porFormaPagamento[p.forma] = (porFormaPagamento[p.forma] || 0) + Number(p.valor);
     }
 
     const vendasHoje = vendasHojeResp.data;
@@ -93,7 +107,7 @@ export default function Dashboard() {
       }
     }
 
-    setResumo({ faturamentoHoje, faturamentoMes, numeroVendas, ticketMedio, maisVendidos, picoVendas, topGarcons, estoqueBaixo });
+    setResumo({ faturamentoHoje, faturamentoMes, numeroVendas, ticketMedio, maisVendidos, picoVendas, topGarcons, estoqueBaixo, porFormaPagamento });
   }
 
   if (resumo === undefined) return <p className="muted">Carregando…</p>;
@@ -112,6 +126,41 @@ export default function Dashboard() {
         <Cartao titulo="Faturamento do mês" valor={money(resumo.faturamentoMes)} />
         <Cartao titulo="Vendas hoje" valor={resumo.numeroVendas} />
         <Cartao titulo="Ticket médio" valor={money(resumo.ticketMedio)} />
+      </div>
+
+      <div className="card">
+        <div style={{ fontWeight: 700, marginBottom: 8 }}>Recebido hoje por forma de pagamento</div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+            gap: 10,
+          }}
+        >
+          {FORMAS_PAGAMENTO.map((f) => (
+            <div key={f.forma} className="card" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 12 }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  background: 'var(--panel-2)',
+                  color: 'var(--primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <f.icon size={18} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <p className="muted" style={{ fontSize: 11, margin: 0 }}>{f.label}</p>
+                <p className="tabular" style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>{money(resumo.porFormaPagamento[f.forma] || 0)}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="card">
