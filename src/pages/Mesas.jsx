@@ -274,9 +274,14 @@ function Comanda({ mesa, mesas, onVoltar }) {
     avisar('Comanda fechada. Escolha a forma de pagamento.', 'success');
   }
 
-  async function irParaPagamento() {
-    if (pedido.status === 'aberto') await fecharComanda();
+  function irParaPagamento() {
     setPagando(true);
+  }
+
+  async function reabrirComanda() {
+    await supabase.from('pedidos').update({ status: 'aberto', fechado_em: null }).eq('id', pedido.id);
+    setPedido((p) => ({ ...p, status: 'aberto' }));
+    avisar('Comanda reaberta.', 'success');
   }
 
   if (precisaCliente) {
@@ -522,9 +527,14 @@ function Comanda({ mesa, mesas, onVoltar }) {
       )}
 
       {pedido.status === 'fechado' && (
-        <button type="button" className="btn btn-primary btn-block" onClick={irParaPagamento}>
-          Receber pagamento{restante > 0 ? ` (${money(restante)})` : ''}
-        </button>
+        <>
+          <button type="button" className="btn btn-primary btn-block" onClick={irParaPagamento}>
+            Receber pagamento{restante > 0 ? ` (${money(restante)})` : ''}
+          </button>
+          <button type="button" className="btn btn-secondary btn-block" onClick={reabrirComanda}>
+            Reabrir comanda (lançar mais itens)
+          </button>
+        </>
       )}
 
       {pedido.status === 'pago' && (
