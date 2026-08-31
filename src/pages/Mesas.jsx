@@ -112,6 +112,7 @@ function MapaMesas({ mesas, ultimoPedidoPorMesa, agora, onAbrirMesa }) {
               <span className="table-chair table-chair--right" style={{ background: cor }} />
               <span className="table-top" style={{ background: cor }}>{numero}</span>
             </span>
+            <span className="mesa-card__nome" style={{ fontWeight: 700, fontSize: 13 }}>MESA {numero}</span>
             <span className="mesa-card__status" style={{ color: cor }}>{label}</span>
           </button>
         );
@@ -132,6 +133,17 @@ function Comanda({ mesa, mesas, onVoltar }) {
   const [transferindoItem, setTransferindoItem] = useState(null);
   const [pagamentoParcialAberto, setPagamentoParcialAberto] = useState(false);
   const [toast, setToast] = useState(null);
+  const [taxaPercentual, setTaxaPercentual] = useState(0);
+  const [taxaAtiva, setTaxaAtiva] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from('usuarios')
+      .select('empresas(taxa_servico_percentual)')
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => setTaxaPercentual(Number(data?.empresas?.taxa_servico_percentual) || 0));
+  }, []);
 
   useEffect(() => {
     verificarPedido();
@@ -287,8 +299,10 @@ function Comanda({ mesa, mesas, onVoltar }) {
     (s, r) => s + r.pedido_itens.filter((i) => !i.cancelado).reduce((si, i) => si + i.quantidade * i.preco_unitario, 0),
     0
   );
+  const taxaValor = taxaAtiva ? Math.round(total * (taxaPercentual / 100) * 100) / 100 : 0;
+  const totalComTaxa = total + taxaValor;
   const valorPago = pagamentosParciais.reduce((s, p) => s + Number(p.valor), 0);
-  const restante = Math.max(0, total - valorPago);
+  const restante = Math.max(0, totalComTaxa - valorPago);
   const mesasDestinoTransferirMesa = mesas.filter((m) => m.id !== mesa.id && m.status === 'livre');
   const mesasDestinoTransferirItem = mesas.filter((m) => m.id !== mesa.id);
 
@@ -299,6 +313,8 @@ function Comanda({ mesa, mesas, onVoltar }) {
         pedido={pedido}
         rodadas={rodadas}
         total={total}
+        taxaPercentual={taxaPercentual}
+        taxaAtiva={taxaAtiva}
         valorPago={valorPago}
         onVoltar={() => setVendoConta(false)}
       />
@@ -356,7 +372,11 @@ function Comanda({ mesa, mesas, onVoltar }) {
     return (
       <FinalizarPedido
         pedido={pedido}
-        total={restante}
+        total={total}
+        valorPago={valorPago}
+        taxaPercentual={taxaPercentual}
+        taxaAtiva={taxaAtiva}
+        onAlternarTaxa={() => setTaxaAtiva((a) => !a)}
         onVoltar={() => setPagando(false)}
         onConcluido={() => {
           setPagando(false);
@@ -432,9 +452,24 @@ function Comanda({ mesa, mesas, onVoltar }) {
       </div>
 
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div className="row" style={{ fontSize: 13 }}>
+          <span className="muted">Subtotal</span>
+          <span className="tabular">{money(total)}</span>
+        </div>
+        {taxaPercentual > 0 && (
+          <div className="row" style={{ fontSize: 13 }}>
+            <span className="muted">Taxa de serviço ({taxaPercentual}%){!taxaAtiva && ' — desativada'}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="tabular">{taxaAtiva ? money(taxaValor) : money(0)}</span>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setTaxaAtiva((a) => !a)}>
+                {taxaAtiva ? 'Desativar' : 'Ativar'}
+              </button>
+            </div>
+          </div>
+        )}
         <div className="row">
           <span className="muted">Total</span>
-          <span className="tabular" style={{ fontSize: 18, fontWeight: 800 }}>{money(total)}</span>
+          <span className="tabular" style={{ fontSize: 18, fontWeight: 800 }}>{money(totalComTaxa)}</span>
         </div>
         {valorPago > 0 && (
           <>
@@ -499,20 +534,10 @@ function Comanda({ mesa, mesas, onVoltar }) {
   );
 }
 
-function ContaMesa({ mesa, pedido, rodadas, total, valorPago, onVoltar }) {
+function ContaMesa({ mesa, pedido, rodadas, total, taxaPercentual, taxaAtiva, valorPago, onVoltar }) {
   const itens = rodadas.flatMap((r) => r.pedido_itens.filter((i) => !i.cancelado).map((i) => ({ ...i, rodada: r })));
-  const [taxaPercentual, setTaxaPercentual] = useState(0);
 
-  useEffect(() => {
-    supabase
-      .from('usuarios')
-      .select('empresas(taxa_servico_percentual)')
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => setTaxaPercentual(Number(data?.empresas?.taxa_servico_percentual) || 0));
-  }, []);
-
-  const taxaValor = Math.round(total * (taxaPercentual / 100) * 100) / 100;
+  const taxaValor = taxaAtiva ? Math.round(total * (taxaPercentual / 100) * 100) / 100 : 0;
   const totalComTaxa = total + taxaValor;
   const restanteComTaxa = Math.max(0, totalComTaxa - valorPago);
 
@@ -545,9 +570,9 @@ function ContaMesa({ mesa, pedido, rodadas, total, valorPago, onVoltar }) {
           <span className="muted">Subtotal</span>
           <span className="tabular">{money(total)}</span>
         </div>
-        {taxaValor > 0 && (
+        {taxaPercentual > 0 && (
           <div className="row" style={{ fontSize: 13 }}>
-            <span className="muted">Taxa de serviço ({taxaPercentual}%)</span>
+            <span className="muted">Taxa de serviço ({taxaPercentual}%){!taxaAtiva && ' — desativada'}</span>
             <span className="tabular">{money(taxaValor)}</span>
           </div>
         )}
@@ -870,34 +895,25 @@ function LancarItens({ pedido, onVoltar, onLancado }) {
   );
 }
 
-function FinalizarPedido({ pedido, total, onVoltar, onConcluido }) {
-  const [taxaPercentual, setTaxaPercentual] = useState(0);
-  const [taxaAtiva, setTaxaAtiva] = useState(true);
-  const [pagamentos, setPagamentos] = useState([{ forma: 'dinheiro', valor: total.toFixed(2) }]);
+function FinalizarPedido({ pedido, total, valorPago, taxaPercentual, taxaAtiva, onAlternarTaxa, onVoltar, onConcluido }) {
+  const [pagamentos, setPagamentos] = useState([{ forma: 'dinheiro', valor: '0.00' }]);
   const [desconto, setDesconto] = useState('0');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
-
-  useEffect(() => {
-    supabase
-      .from('usuarios')
-      .select('empresas(taxa_servico_percentual)')
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
-        const pct = Number(data?.empresas?.taxa_servico_percentual) || 0;
-        setTaxaPercentual(pct);
-        const taxa = Math.round(total * (pct / 100) * 100) / 100;
-        setPagamentos([{ forma: 'dinheiro', valor: (total + taxa).toFixed(2) }]);
-      });
-  }, []);
 
   const descontoNum = Number(desconto.replace(',', '.')) || 0;
   const totalComDesconto = Math.max(0, total - descontoNum);
   const taxaValor = taxaAtiva ? Math.round(totalComDesconto * (taxaPercentual / 100) * 100) / 100 : 0;
   const totalFinal = totalComDesconto + taxaValor;
+  const totalAPagarAgora = Math.max(0, totalFinal - valorPago);
+
+  useEffect(() => {
+    setPagamentos([{ forma: 'dinheiro', valor: totalAPagarAgora.toFixed(2) }]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const somaPagamentos = pagamentos.reduce((s, p) => s + (Number(p.valor.replace(',', '.')) || 0), 0);
-  const restante = totalFinal - somaPagamentos;
+  const restante = totalAPagarAgora - somaPagamentos;
 
   function atualizarPagamento(idx, campo, valor) {
     setPagamentos((atual) => atual.map((p, i) => (i === idx ? { ...p, [campo]: valor } : p)));
@@ -939,8 +955,9 @@ function FinalizarPedido({ pedido, total, onVoltar, onConcluido }) {
       </button>
 
       <div className="card" style={{ textAlign: 'center' }}>
-        <p className="muted" style={{ fontSize: 12 }}>Valor total</p>
-        <p className="tabular" style={{ fontSize: 28, fontWeight: 800 }}>{money(totalFinal)}</p>
+        <p className="muted" style={{ fontSize: 12 }}>{valorPago > 0 ? 'Valor a pagar agora' : 'Valor total'}</p>
+        <p className="tabular" style={{ fontSize: 28, fontWeight: 800 }}>{money(totalAPagarAgora)}</p>
+        {valorPago > 0 && <p className="muted" style={{ fontSize: 12 }}>Total {money(totalFinal)} · Já pago {money(valorPago)}</p>}
       </div>
 
       <div className="card">
@@ -954,7 +971,7 @@ function FinalizarPedido({ pedido, total, onVoltar, onConcluido }) {
             <span style={{ fontWeight: 600 }}>Taxa de serviço ({taxaPercentual}%)</span>
             <p className="muted tabular" style={{ fontSize: 12, margin: 0 }}>{taxaAtiva ? money(taxaValor) : 'Desativada'}</p>
           </div>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setTaxaAtiva((a) => !a)}>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={onAlternarTaxa}>
             {taxaAtiva ? 'Desativar' : 'Ativar'}
           </button>
         </div>
