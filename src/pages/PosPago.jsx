@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { supabase } from '../supabase';
+import { conectarMaquininha, dispositivoSalvo, estornarUltimaTransacao, pagarNaMaquininha, suportaPagamentoPagBank } from '../utils/pagbank';
 
 const STATUS_LABEL = { livre: 'Livre', ocupada: 'Ocupada', reservada: 'Reservada' };
 const STATUS_CHIP = { livre: 'chip-success', ocupada: 'chip-danger', reservada: 'chip-primary' };
@@ -150,6 +151,93 @@ export default function PosPago() {
           )}
         </div>
       )}
+
+      <TesteMaquininha />
+    </div>
+  );
+}
+
+function TesteMaquininha() {
+  const [dispositivo, setDispositivo] = useState(() => dispositivoSalvo());
+  const [valor, setValor] = useState('1.00');
+  const [status, setStatus] = useState('');
+  const [erro, setErro] = useState('');
+  const [ocupado, setOcupado] = useState(false);
+
+  const suportado = suportaPagamentoPagBank();
+
+  async function conectar() {
+    if (!dispositivo.trim()) return;
+    setOcupado(true);
+    setErro('');
+    setStatus('Conectando por Bluetooth...');
+    try {
+      const resultado = await conectarMaquininha(dispositivo.trim());
+      setStatus(resultado.sucesso ? 'Conectado!' : `Falha ao conectar (código ${resultado.codigo}).`);
+    } catch (e) {
+      setErro(e.message || String(e));
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function pagar() {
+    const valorNum = Number(valor.replace(',', '.'));
+    if (!(valorNum > 0)) return;
+    setOcupado(true);
+    setErro('');
+    setStatus('Aguardando o cartão na maquininha...');
+    try {
+      const resultado = await pagarNaMaquininha(valorNum, 'credito', 'TESTE');
+      setStatus(resultado.sucesso ? `Pagamento aprovado! ID ${resultado.transacaoId}` : `Recusado: ${resultado.mensagem}`);
+    } catch (e) {
+      setErro(e.message || String(e));
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function estornar() {
+    setOcupado(true);
+    setErro('');
+    setStatus('Estornando a última transação...');
+    try {
+      const resultado = await estornarUltimaTransacao();
+      setStatus(resultado.sucesso ? 'Estornado!' : `Falha: ${resultado.mensagem}`);
+    } catch (e) {
+      setErro(e.message || String(e));
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  return (
+    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ fontWeight: 700 }}>Testar maquininha PagBank (Bluetooth)</div>
+      {!suportado && (
+        <p className="danger-text" style={{ fontSize: 12.5, margin: 0 }}>
+          Isso só funciona dentro do app Android empacotado (Capacitor) — não funciona aqui no navegador.
+        </p>
+      )}
+      <span className="label">Código da maquininha (ex: PRO-12345678)</span>
+      <input value={dispositivo} onChange={(e) => setDispositivo(e.target.value)} placeholder="PRO-12345678" disabled={!suportado} />
+      <button type="button" className="btn btn-secondary btn-sm" onClick={conectar} disabled={!suportado || ocupado || !dispositivo.trim()}>
+        Conectar
+      </button>
+
+      <span className="label">Valor de teste (R$)</span>
+      <input value={valor} onChange={(e) => setValor(e.target.value)} inputMode="decimal" disabled={!suportado} />
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="button" className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={pagar} disabled={!suportado || ocupado}>
+          Cobrar no crédito
+        </button>
+        <button type="button" className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={estornar} disabled={!suportado || ocupado}>
+          Estornar última
+        </button>
+      </div>
+
+      {status && <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>{status}</p>}
+      {erro && <p className="danger-text" style={{ fontSize: 12.5, margin: 0 }}>{erro}</p>}
     </div>
   );
 }

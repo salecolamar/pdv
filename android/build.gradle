@@ -21,6 +21,9 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // Repositório Maven do PlugPag (PagBank) — biblioteca de integração
+        // Bluetooth com a Moderninha Pro/Wifi.
+        maven { url 'https://github.com/pagseguromaster/plugpag/raw/master/3.x/android' }
     }
 }
 
