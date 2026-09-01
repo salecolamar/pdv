@@ -1,10 +1,17 @@
-import { useEffect, useState } from 'react';
-import { Lock } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ShieldCheck, UtensilsCrossed } from 'lucide-react';
 import { supabase } from './supabase';
 import Shell from './Shell';
-import AcessoEmpresa from './pages/AcessoEmpresa';
+import AcessoEmpresa, { AcessoGarcom } from './pages/AcessoEmpresa';
 
 const ROTA_ACESSO_EMPRESA = window.location.pathname.match(/^\/garcom\/([0-9a-f-]{36})$/i);
+
+// Cliques na logo pra revelar o cadastro de estabelecimento — não é
+// segurança de verdade (roda no navegador do usuário), só evita que
+// alguém esbarre no formulário de criar empresa por acidente. Configurável
+// via variável de ambiente pra não deixar a senha só no código-fonte.
+const SENHA_CADASTRO = import.meta.env.VITE_SENHA_CADASTRO_EMPRESA || 'appvia2026';
+const CLIQUES_PARA_REVELAR = 6;
 
 export default function App() {
   const [session, setSession] = useState(undefined); // undefined = carregando, null = deslogado
@@ -25,7 +32,7 @@ export default function App() {
     return ROTA_ACESSO_EMPRESA ? <AcessoEmpresa empresaId={ROTA_ACESSO_EMPRESA[1]} /> : <Auth />;
   }
 
-  return <Shell session={session} />;
+  return <PosLogin session={session} />;
 }
 
 export function Centro({ children }) {
@@ -36,25 +43,212 @@ export function Centro({ children }) {
   );
 }
 
-function Auth() {
-  const [aba, setAba] = useState('entrar');
+// Assim que a sessão do admin/gerente é confirmada, oferece a mesma escolha
+// que já existe no link público /garcom/<empresa> (seção 18 do documento:
+// "escolher qual garçom" antes de operar) — útil quando o mesmo
+// tablet/computador é usado ora pelo dono, ora por um garçom. Um garçom que
+// já logou por PIN (role operador) não vê essa tela, vai direto pro PDV.
+function PosLogin({ session }) {
+  const [perfil, setPerfil] = useState(undefined);
+  const [modo, setModo] = useState(null); // null | 'admin' | 'garcom'
+  const chaveEscolha = `pdv_modo_${session.user.id}`;
+
+  useEffect(() => {
+    let cancelado = false;
+    supabase
+      .from('usuarios')
+      .select('id, nome, role, empresa_id')
+      .eq('id', session.user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelado) setPerfil(data || null);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [session.user.id]);
+
+  if (perfil === undefined) return <Centro>Carregando…</Centro>;
+
+  // Sem linha em `usuarios`, ou é garçom (já escolheu ao logar por PIN):
+  // segue direto, sem essa tela extra.
+  if (!perfil || perfil.role === 'operador') {
+    return <Shell session={session} />;
+  }
+
+  const escolhaSalva = modo || sessionStorage.getItem(chaveEscolha);
+
+  if (escolhaSalva === 'admin') {
+    return <Shell session={session} />;
+  }
+
+  if (escolhaSalva === 'garcom') {
+    return (
+      <AcessoGarcom
+        empresaId={perfil.empresa_id}
+        onVoltar={() => {
+          sessionStorage.removeItem(chaveEscolha);
+          setModo(null);
+        }}
+      />
+    );
+  }
+
   return (
     <Centro>
       <div className="card" style={{ width: 340, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ textAlign: 'center' }}>
-          <Lock size={24} color="var(--primary)" style={{ margin: '0 auto 8px' }} />
-          <h1 style={{ fontSize: 20 }}>PDV</h1>
-          <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>Sistema de vendas para bares, restaurantes e eventos.</p>
+          <LogoAppVia />
+          <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>Como você quer usar esse aparelho?</p>
         </div>
-        <div className="tab-row" style={{ justifyContent: 'center' }}>
-          <button type="button" className="tab" aria-pressed={aba === 'entrar'} onClick={() => setAba('entrar')}>
-            Entrar
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <button
+            type="button"
+            className="btn btn-primary btn-block"
+            onClick={() => {
+              sessionStorage.setItem(chaveEscolha, 'garcom');
+              setModo('garcom');
+            }}
+          >
+            <UtensilsCrossed size={16} /> Entrar como garçom
           </button>
-          <button type="button" className="tab" aria-pressed={aba === 'criar'} onClick={() => setAba('criar')}>
-            Criar empresa
+          <button
+            type="button"
+            className="btn btn-secondary btn-block"
+            onClick={() => {
+              sessionStorage.setItem(chaveEscolha, 'admin');
+              setModo('admin');
+            }}
+          >
+            <ShieldCheck size={16} /> Continuar como {perfil.nome}
           </button>
         </div>
-        {aba === 'entrar' ? <FormularioEntrar /> : <FormularioCriarEmpresa />}
+      </div>
+    </Centro>
+  );
+}
+
+function LogoAppVia({ onCliques }) {
+  return (
+    <button
+      type="button"
+      onClick={onCliques}
+      style={{
+        background: 'none',
+        border: 'none',
+        cursor: onCliques ? 'pointer' : 'default',
+        padding: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 6,
+        width: '100%',
+      }}
+    >
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="appviaGrad" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stopColor="#2E9EF5" />
+            <stop offset="1" stopColor="#6C3CE0" />
+          </linearGradient>
+        </defs>
+        <rect x="14" y="4" width="20" height="34" rx="6" stroke="url(#appviaGrad)" strokeWidth="2.4" />
+        <line x1="21" y1="10" x2="27" y2="10" stroke="url(#appviaGrad)" strokeWidth="2.4" strokeLinecap="round" />
+        <path d="M19 21l-4 4 4 4" stroke="url(#appviaGrad)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M29 21l4 4-4 4" stroke="url(#appviaGrad)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        <line x1="26" y1="19" x2="22" y2="31" stroke="url(#appviaGrad)" strokeWidth="2.2" strokeLinecap="round" />
+        <rect x="36" y="10" width="5" height="5" rx="1.2" fill="#6C3CE0" opacity="0.85" />
+        <rect x="40" y="17" width="4" height="4" rx="1" fill="#6C3CE0" opacity="0.55" />
+      </svg>
+      <span style={{ fontSize: 21, fontWeight: 800, letterSpacing: -0.3 }}>
+        <span style={{ color: 'var(--text)' }}>App</span>
+        <span
+          style={{
+            background: 'linear-gradient(135deg, #2E9EF5, #6C3CE0)',
+            WebkitBackgroundClip: 'text',
+            backgroundClip: 'text',
+            color: 'transparent',
+          }}
+        >
+          Via
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function Auth() {
+  const cliquesRef = useRef(0);
+  const timeoutRef = useRef(null);
+  const [revelado, setRevelado] = useState(false);
+  const [cadastrando, setCadastrando] = useState(false);
+  const [senha, setSenha] = useState('');
+  const [erroSenha, setErroSenha] = useState('');
+
+  function registrarClique() {
+    cliquesRef.current += 1;
+    clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      cliquesRef.current = 0;
+    }, 2500);
+    if (cliquesRef.current >= CLIQUES_PARA_REVELAR) {
+      cliquesRef.current = 0;
+      setRevelado(true);
+    }
+  }
+
+  function confirmarSenha(e) {
+    e.preventDefault();
+    if (senha === SENHA_CADASTRO) {
+      setCadastrando(true);
+      setErroSenha('');
+    } else {
+      setErroSenha('Senha incorreta.');
+      setSenha('');
+    }
+  }
+
+  if (cadastrando) {
+    return (
+      <Centro>
+        <div className="card" style={{ width: 340, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ textAlign: 'center' }}>
+            <h1 style={{ fontSize: 18 }}>Cadastrar estabelecimento</h1>
+          </div>
+          <FormularioCriarEmpresa />
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setCadastrando(false); setRevelado(false); setSenha(''); }}>
+            Voltar
+          </button>
+        </div>
+      </Centro>
+    );
+  }
+
+  return (
+    <Centro>
+      <div className="card" style={{ width: 340, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ textAlign: 'center' }}>
+          <LogoAppVia onCliques={registrarClique} />
+          <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>Sistema de vendas para bares, restaurantes e eventos.</p>
+        </div>
+
+        {revelado ? (
+          <form onSubmit={confirmarSenha} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span className="label">Senha de cadastro</span>
+            <input value={senha} onChange={(e) => setSenha(e.target.value)} type="password" placeholder="••••••••" autoFocus />
+            {erroSenha && <p className="danger-text" style={{ fontSize: 13, marginTop: 8 }}>{erroSenha}</p>}
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setRevelado(false); setSenha(''); setErroSenha(''); }}>
+                Cancelar
+              </button>
+              <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                Confirmar
+              </button>
+            </div>
+          </form>
+        ) : (
+          <FormularioEntrar />
+        )}
       </div>
     </Centro>
   );
@@ -176,4 +370,3 @@ function FormularioCriarEmpresa() {
     </form>
   );
 }
-

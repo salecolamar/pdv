@@ -53,7 +53,7 @@ function VoltarEscolha({ onVoltar, titulo }) {
   );
 }
 
-function AcessoGarcom({ empresaId, onVoltar }) {
+export function AcessoGarcom({ empresaId, onVoltar }) {
   const [garcons, setGarcons] = useState(undefined);
   const [selecionado, setSelecionado] = useState(null);
   const [pin, setPin] = useState('');
