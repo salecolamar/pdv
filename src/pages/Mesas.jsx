@@ -915,6 +915,40 @@ function FormAbrirMesa({ mesa, onAbrir, onVoltar }) {
   const [email, setEmail] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
+  const [buscandoCpf, setBuscandoCpf] = useState(false);
+  const [clienteEncontrado, setClienteEncontrado] = useState(false);
+
+  useEffect(() => {
+    const digitos = cpf.replace(/\D/g, '');
+    if (digitos.length !== 11) {
+      setClienteEncontrado(false);
+      return;
+    }
+    let cancelado = false;
+    setBuscandoCpf(true);
+    supabase
+      .from('clientes')
+      .select('nome, telefone, nascimento, email')
+      .eq('cpf', cpf)
+      .limit(1)
+      .then(({ data: linhas }) => {
+        if (cancelado) return;
+        setBuscandoCpf(false);
+        const data = linhas?.[0];
+        if (data) {
+          setClienteEncontrado(true);
+          setNome(data.nome || '');
+          setTelefone(data.telefone ? mascararTelefone(data.telefone) : '');
+          setNascimento(data.nascimento ? mascararDataBr(data.nascimento.split('-').reverse().join('')) : '');
+          setEmail(data.email || '');
+        } else {
+          setClienteEncontrado(false);
+        }
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [cpf]);
 
   async function abrir(e) {
     e.preventDefault();
@@ -957,6 +991,12 @@ function FormAbrirMesa({ mesa, onAbrir, onVoltar }) {
         <input value={telefone} onChange={(e) => setTelefone(mascararTelefone(e.target.value))} inputMode="numeric" placeholder="(11) 99999-9999" />
         <span className="label">CPF (opcional)</span>
         <input value={cpf} onChange={(e) => setCpf(mascararCpf(e.target.value))} inputMode="numeric" placeholder="000.000.000-00" />
+        {buscandoCpf && <p className="muted" style={{ fontSize: 12, margin: 0 }}>Buscando cliente…</p>}
+        {!buscandoCpf && clienteEncontrado && (
+          <p style={{ fontSize: 12, margin: 0, color: 'var(--success, #1a9d5c)', fontWeight: 600 }}>
+            Cliente encontrado — dados preenchidos automaticamente
+          </p>
+        )}
         <span className="label">Data de nascimento (opcional)</span>
         <input value={nascimento} onChange={(e) => setNascimento(mascararDataBr(e.target.value))} inputMode="numeric" placeholder="dd/mm/aaaa" />
         <span className="label">E-mail (opcional)</span>
