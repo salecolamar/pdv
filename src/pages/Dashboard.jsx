@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Banknote, CreditCard, Landmark, QrCode } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
-import { inicioDoDia, inicioDoMes } from '../utils/datas';
+import { inicioDoDia, inicioDoMes, subDias } from '../utils/datas';
 
 const FORMAS_PAGAMENTO = [
   { forma: 'dinheiro', label: 'Dinheiro', icon: Banknote },
@@ -168,6 +168,8 @@ export default function Dashboard() {
         <GraficoPico buckets={resumo.picoVendas} />
       </div>
 
+      <TendenciaFaturamento />
+
       <div
         style={{
           display: 'grid',
@@ -282,6 +284,104 @@ function Cartao({ titulo, valor, destaque }) {
     <div className="card">
       <p className="muted" style={{ fontSize: 12 }}>{titulo}</p>
       <p className="tabular" style={{ fontSize: destaque ? 24 : 20, fontWeight: 800, marginTop: 4 }}>{valor}</p>
+    </div>
+  );
+}
+
+function TendenciaFaturamento() {
+  const [dias, setDias] = useState(7);
+  const [pontos, setPontos] = useState(undefined);
+
+  useEffect(() => {
+    carregar();
+  }, [dias]);
+
+  async function carregar() {
+    setPontos(undefined);
+    const desde = inicioDoDia(subDias(new Date(), dias - 1));
+    const { data } = await supabase
+      .from('vendas')
+      .select('total, criado_em')
+      .eq('cancelada', false)
+      .gte('criado_em', desde.toISOString());
+
+    const mapa = new Map();
+    for (let i = 0; i < dias; i++) {
+      const d = subDias(new Date(), dias - 1 - i);
+      const chave = d.toISOString().slice(0, 10);
+      mapa.set(chave, 0);
+    }
+    for (const v of data || []) {
+      const chave = new Date(v.criado_em).toISOString().slice(0, 10);
+      if (mapa.has(chave)) mapa.set(chave, mapa.get(chave) + Number(v.total));
+    }
+    setPontos([...mapa.entries()].map(([data, total]) => ({ data, total })));
+  }
+
+  const total = (pontos || []).reduce((s, p) => s + p.total, 0);
+  const media = pontos?.length ? total / pontos.length : 0;
+
+  return (
+    <div className="card">
+      <div className="row" style={{ marginBottom: 8 }}>
+        <div style={{ fontWeight: 700 }}>Tendência de faturamento</div>
+        <div className="tab-row" style={{ width: 'auto' }}>
+          <button type="button" className="tab" aria-pressed={dias === 7} onClick={() => setDias(7)} style={{ padding: '5px 12px' }}>
+            7 dias
+          </button>
+          <button type="button" className="tab" aria-pressed={dias === 30} onClick={() => setDias(30)} style={{ padding: '5px 12px' }}>
+            30 dias
+          </button>
+        </div>
+      </div>
+
+      {pontos === undefined ? (
+        <p className="muted" style={{ fontSize: 13, margin: 0 }}>Carregando…</p>
+      ) : (
+        <>
+          <div className="row" style={{ marginBottom: 8 }}>
+            <span className="muted" style={{ fontSize: 12 }}>Total no período: <strong className="tabular" style={{ color: 'var(--text)' }}>{money(total)}</strong></span>
+            <span className="muted" style={{ fontSize: 12 }}>Média/dia: <strong className="tabular" style={{ color: 'var(--text)' }}>{money(media)}</strong></span>
+          </div>
+          <GraficoTendencia pontos={pontos} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function GraficoTendencia({ pontos }) {
+  const max = Math.max(1, ...pontos.map((p) => p.total));
+  const mostrarTodosRotulos = pontos.length <= 7;
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: pontos.length > 15 ? 2 : 6, height: 120, overflowX: 'auto', paddingBottom: 2 }}>
+      {pontos.map((p, idx) => {
+        const altura = Math.round((p.total / max) * 100);
+        const d = new Date(p.data + 'T00:00:00');
+        const rotulo = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        const mostrarRotulo = mostrarTodosRotulos || idx % 5 === 0 || idx === pontos.length - 1;
+        return (
+          <div
+            key={p.data}
+            title={`${rotulo} — ${money(p.total)}`}
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%', minWidth: 14, flex: '1 0 14px' }}
+          >
+            <div
+              style={{
+                width: '100%',
+                minWidth: 8,
+                height: `${Math.max(altura, p.total > 0 ? 4 : 1)}%`,
+                background: p.total > 0 ? 'var(--primary)' : 'var(--border)',
+                borderRadius: 3,
+              }}
+            />
+            {mostrarRotulo && (
+              <span className="muted" style={{ fontSize: 9, marginTop: 3, whiteSpace: 'nowrap' }}>{rotulo}</span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

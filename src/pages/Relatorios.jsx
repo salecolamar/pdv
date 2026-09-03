@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download, Printer } from 'lucide-react';
+import { Download, Printer, Search } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money, metodoLabel } from '../utils/format';
 import { inicioDoDia, inicioDoMes, subDias } from '../utils/datas';
@@ -35,6 +35,24 @@ function periodo(filtro, de, ate) {
 }
 
 export default function Relatorios() {
+  const [abaPrincipal, setAbaPrincipal] = useState('resumo');
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="tab-row">
+        <button type="button" className="tab" aria-pressed={abaPrincipal === 'resumo'} onClick={() => setAbaPrincipal('resumo')}>
+          Resumo
+        </button>
+        <button type="button" className="tab" aria-pressed={abaPrincipal === 'detalhado'} onClick={() => setAbaPrincipal('detalhado')}>
+          Detalhado
+        </button>
+      </div>
+      {abaPrincipal === 'resumo' ? <ResumoVendas /> : <RelatorioDetalhado />}
+    </div>
+  );
+}
+
+function ResumoVendas() {
   const [filtro, setFiltro] = useState('hoje');
   const [de, setDe] = useState('');
   const [ate, setAte] = useState('');
@@ -347,6 +365,295 @@ function Cartao({ titulo, valor, destaque }) {
     <div className="card">
       <p className="muted" style={{ fontSize: 12 }}>{titulo}</p>
       <p className="tabular" style={{ fontSize: destaque ? 24 : 20, fontWeight: 800, marginTop: 4 }}>{valor}</p>
+    </div>
+  );
+}
+
+const FORMAS_PAGAMENTO = ['dinheiro', 'pix', 'debito', 'credito', 'outro'];
+
+function RelatorioDetalhado() {
+  const [filtro, setFiltro] = useState('hoje');
+  const [de, setDe] = useState('');
+  const [ate, setAte] = useState('');
+  const [incluirCanceladas, setIncluirCanceladas] = useState(false);
+  const [linhas, setLinhas] = useState(undefined);
+  const [erro, setErro] = useState('');
+
+  const [operador, setOperador] = useState('');
+  const [categoria, setCategoria] = useState('');
+  const [tipo, setTipo] = useState('');
+  const [forma, setForma] = useState('');
+  const [produtoBusca, setProdutoBusca] = useState('');
+  const [valorMin, setValorMin] = useState('');
+  const [valorMax, setValorMax] = useState('');
+  const [todosProdutos, setTodosProdutos] = useState([]);
+
+  useEffect(() => {
+    supabase.from('produtos').select('nome').order('nome').then(({ data }) => setTodosProdutos(data || []));
+  }, []);
+
+  useEffect(() => {
+    carregar();
+  }, [filtro, de, ate, incluirCanceladas]);
+
+  async function carregar() {
+    const [inicio, fim] = periodo(filtro, de, ate);
+    if (filtro === 'personalizado' && (!inicio || !fim)) {
+      setLinhas(null);
+      return;
+    }
+    setLinhas(undefined);
+    setErro('');
+
+    let query = supabase
+      .from('vendas')
+      .select('id, criado_em, cancelada, operador_id, usuarios(nome)')
+      .gte('criado_em', inicio.toISOString())
+      .lte('criado_em', fim.toISOString());
+    if (!incluirCanceladas) query = query.eq('cancelada', false);
+    const { data: vendas, error: erroVendas } = await query.order('criado_em', { ascending: false });
+
+    if (erroVendas) {
+      setErro(erroVendas.message);
+      setLinhas(null);
+      return;
+    }
+    if (vendas.length === 0) {
+      setLinhas([]);
+      return;
+    }
+
+    const vendaIds = vendas.map((v) => v.id);
+    const [itensResp, pagamentosResp, pedidosResp] = await Promise.all([
+      supabase.from('venda_itens').select('venda_id, produto_id, nome_produto, quantidade, preco_unitario, produtos(categoria_id, categorias(nome))').in('venda_id', vendaIds),
+      supabase.from('pagamentos').select('venda_id, forma').in('venda_id', vendaIds),
+      supabase.from('pedidos').select('venda_id, mesas(nome)').in('venda_id', vendaIds),
+    ]);
+
+    const vendasMap = new Map(vendas.map((v) => [v.id, v]));
+    const formasPorVenda = new Map();
+    for (const p of pagamentosResp.data || []) {
+      const atual = formasPorVenda.get(p.venda_id) || new Set();
+      atual.add(p.forma);
+      formasPorVenda.set(p.venda_id, atual);
+    }
+    const mesaPorVenda = new Map();
+    for (const p of pedidosResp.data || []) {
+      if (p.mesas?.nome) mesaPorVenda.set(p.venda_id, p.mesas.nome);
+    }
+
+    const novasLinhas = (itensResp.data || []).map((i) => {
+      const venda = vendasMap.get(i.venda_id);
+      const mesaNome = mesaPorVenda.get(i.venda_id);
+      return {
+        vendaId: i.venda_id,
+        criadoEm: venda?.criado_em,
+        cancelada: venda?.cancelada,
+        operador: venda?.usuarios?.nome || 'Sem operador',
+        tipo: mesaNome ? 'Mesa' : 'Ficha',
+        mesa: mesaNome || '',
+        produto: i.nome_produto,
+        categoria: i.produtos?.categorias?.nome || 'Sem categoria',
+        quantidade: Number(i.quantidade),
+        precoUnitario: Number(i.preco_unitario),
+        total: Number(i.quantidade) * Number(i.preco_unitario),
+        formas: [...(formasPorVenda.get(i.venda_id) || [])].map(metodoLabel).join(', '),
+      };
+    });
+    setLinhas(novasLinhas);
+  }
+
+  const operadores = [...new Set((linhas || []).map((l) => l.operador))].sort();
+  const categorias = [...new Set((linhas || []).map((l) => l.categoria))].sort();
+
+  const linhasFiltradas = (linhas || []).filter((l) => {
+    if (operador && l.operador !== operador) return false;
+    if (categoria && l.categoria !== categoria) return false;
+    if (tipo && l.tipo !== tipo) return false;
+    if (forma && !l.formas.toLowerCase().includes(metodoLabel(forma).toLowerCase())) return false;
+    if (produtoBusca.trim() && !l.produto.toLowerCase().includes(produtoBusca.trim().toLowerCase())) return false;
+    if (valorMin && l.total < Number(valorMin.replace(',', '.'))) return false;
+    if (valorMax && l.total > Number(valorMax.replace(',', '.'))) return false;
+    return true;
+  });
+
+  const totalFiltrado = linhasFiltradas.reduce((s, l) => s + l.total, 0);
+  const vendasEnvolvidas = new Set(linhasFiltradas.map((l) => l.vendaId)).size;
+
+  function limparFiltros() {
+    setOperador('');
+    setCategoria('');
+    setTipo('');
+    setForma('');
+    setProdutoBusca('');
+    setValorMin('');
+    setValorMax('');
+  }
+
+  function exportarCsv() {
+    baixarCsv(
+      `relatorio-detalhado-${filtro}.csv`,
+      ['Data', 'Operador', 'Tipo', 'Mesa', 'Produto', 'Categoria', 'Quantidade', 'Valor unitário', 'Valor total', 'Forma(s) de pagamento', 'Cancelada'],
+      linhasFiltradas.map((l) => [
+        new Date(l.criadoEm).toLocaleString('pt-BR'),
+        l.operador,
+        l.tipo,
+        l.mesa,
+        l.produto,
+        l.categoria,
+        l.quantidade,
+        l.precoUnitario,
+        l.total,
+        l.formas,
+        l.cancelada ? 'Sim' : 'Não',
+      ])
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="tab-row">
+        {FILTROS.map(([id, label]) => (
+          <button key={id} type="button" className="tab" aria-pressed={filtro === id} onClick={() => setFiltro(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {filtro === 'personalizado' && (
+        <div className="card" style={{ display: 'flex', gap: 8 }}>
+          <div style={{ flex: 1 }}>
+            <span className="label">De</span>
+            <input type="date" value={de} onChange={(e) => setDe(e.target.value)} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <span className="label">Até</span>
+            <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} />
+          </div>
+        </div>
+      )}
+
+      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
+          <div>
+            <span className="label">Operador</span>
+            <select value={operador} onChange={(e) => setOperador(e.target.value)}>
+              <option value="">Todos</option>
+              {operadores.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+          <div>
+            <span className="label">Categoria</span>
+            <select value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+              <option value="">Todas</option>
+              {categorias.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <span className="label">Tipo</span>
+            <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
+              <option value="">Todos</option>
+              <option value="Mesa">Mesa</option>
+              <option value="Ficha">Ficha</option>
+            </select>
+          </div>
+          <div>
+            <span className="label">Forma de pagamento</span>
+            <select value={forma} onChange={(e) => setForma(e.target.value)}>
+              <option value="">Todas</option>
+              {FORMAS_PAGAMENTO.map((f) => <option key={f} value={f}>{metodoLabel(f)}</option>)}
+            </select>
+          </div>
+          <div>
+            <span className="label">Produto</span>
+            <div className="search-input-wrap">
+              <Search size={15} />
+              <input
+                value={produtoBusca}
+                onChange={(e) => setProdutoBusca(e.target.value)}
+                placeholder="Buscar produto..."
+                list="produtos-disponiveis"
+              />
+            </div>
+            <datalist id="produtos-disponiveis">
+              {todosProdutos.map((p) => <option key={p.nome} value={p.nome} />)}
+            </datalist>
+          </div>
+          <div>
+            <span className="label">Valor mín. (R$)</span>
+            <input value={valorMin} onChange={(e) => setValorMin(e.target.value)} inputMode="decimal" placeholder="0" />
+          </div>
+          <div>
+            <span className="label">Valor máx. (R$)</span>
+            <input value={valorMax} onChange={(e) => setValorMax(e.target.value)} inputMode="decimal" placeholder="Sem limite" />
+          </div>
+        </div>
+        <label className="row" style={{ fontSize: 13, cursor: 'pointer' }}>
+          <span>Incluir vendas canceladas</span>
+          <input type="checkbox" checked={incluirCanceladas} onChange={(e) => setIncluirCanceladas(e.target.checked)} />
+        </label>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={limparFiltros}>
+          Limpar filtros
+        </button>
+      </div>
+
+      {linhas === undefined ? (
+        <p className="muted">Carregando…</p>
+      ) : linhas === null ? (
+        erro ? (
+          <p className="danger-text">Falha ao carregar o relatório: {erro}</p>
+        ) : (
+          <p className="muted" style={{ fontSize: 13 }}>Escolha as datas de início e fim.</p>
+        )
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+            <Cartao titulo="Total filtrado" valor={money(totalFiltrado)} destaque />
+            <Cartao titulo="Linhas" valor={linhasFiltradas.length} />
+            <Cartao titulo="Vendas envolvidas" valor={vendasEnvolvidas} />
+          </div>
+
+          <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={exportarCsv} disabled={linhasFiltradas.length === 0}>
+            <Download size={14} /> Exportar CSV
+          </button>
+
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 720 }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border)' }}>
+                    {['Data', 'Operador', 'Tipo', 'Mesa', 'Produto', 'Categoria', 'Qtd', 'Unit.', 'Total', 'Pagamento'].map((h) => (
+                      <th key={h} className="muted" style={{ padding: '8px 10px', fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {linhasFiltradas.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} style={{ padding: 16, textAlign: 'center' }} className="muted">Nenhum resultado com esses filtros.</td>
+                    </tr>
+                  ) : (
+                    linhasFiltradas.map((l, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid var(--border-soft)', opacity: l.cancelada ? 0.5 : 1 }}>
+                        <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>{new Date(l.criadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+                        <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>{l.operador}</td>
+                        <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>{l.tipo}{l.cancelada ? ' (cancelada)' : ''}</td>
+                        <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>{l.mesa || '—'}</td>
+                        <td style={{ padding: '7px 10px' }}>{l.produto}</td>
+                        <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>{l.categoria}</td>
+                        <td className="tabular" style={{ padding: '7px 10px', textAlign: 'right' }}>{l.quantidade}</td>
+                        <td className="tabular" style={{ padding: '7px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>{money(l.precoUnitario)}</td>
+                        <td className="tabular" style={{ padding: '7px 10px', textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700 }}>{money(l.total)}</td>
+                        <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>{l.formas || '—'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
