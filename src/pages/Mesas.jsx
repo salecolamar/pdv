@@ -331,14 +331,17 @@ function Comanda({ mesa, mesas, onVoltar }) {
     onVoltar();
   }
 
-  async function transferirItemPara(itemId, mesaDestinoId) {
-    const { error } = await supabase.rpc('transferir_item_pedido', { p_item_id: itemId, p_mesa_destino_id: mesaDestinoId });
-    if (error) {
-      avisar(error.message.replace('P0001: ', ''), 'danger');
-      return;
+  async function transferirItemPara(itens, mesaDestinoId) {
+    for (const item of itens) {
+      const { error } = await supabase.rpc('transferir_item_pedido', { p_item_id: item.id, p_mesa_destino_id: mesaDestinoId });
+      if (error) {
+        avisar(error.message.replace('P0001: ', ''), 'danger');
+        return;
+      }
     }
     setTransferindoItem(null);
-    avisar('Item transferido.', 'success');
+    setItensSelecionados(new Set());
+    avisar(itens.length > 1 ? `${itens.length} itens transferidos.` : 'Item transferido.', 'success');
     carregarRodadas(pedido.id);
   }
 
@@ -442,10 +445,10 @@ function Comanda({ mesa, mesas, onVoltar }) {
   if (transferindoItem) {
     return (
       <TransferirItemForm
-        item={transferindoItem}
+        itens={transferindoItem}
         mesa={mesa}
         mesasDestino={mesasDestinoTransferirItem}
-        onConfirmar={(mesaDestinoId) => transferirItemPara(transferindoItem.id, mesaDestinoId)}
+        onConfirmar={(mesaDestinoId) => transferirItemPara(transferindoItem, mesaDestinoId)}
         onVoltar={() => setTransferindoItem(null)}
       />
     );
@@ -491,9 +494,7 @@ function Comanda({ mesa, mesas, onVoltar }) {
         }}
         onVoltar={() => setPagando(false)}
         onConcluido={() => {
-          setPagando(false);
-          setPedido((p) => ({ ...p, status: 'pago' }));
-          avisar('Comanda paga! Mesa liberada.', 'success');
+          onVoltar();
         }}
       />
     );
@@ -517,6 +518,20 @@ function Comanda({ mesa, mesas, onVoltar }) {
         {pedido.status === 'aberto' && (
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setJuntandoMesas(true)} disabled={mesasDestinoJuntar.length === 0}>
             <Users2 size={14} /> Juntar mesa
+          </button>
+        )}
+        {pedido.status === 'aberto' && itensSelecionados.size > 0 && (
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => {
+              const itens = rodadas
+                .flatMap((r) => r.pedido_itens)
+                .filter((i) => itensSelecionados.has(i.id) && !i.cancelado);
+              setTransferindoItem(itens);
+            }}
+          >
+            <ArrowRightLeft size={14} /> Transferir ({itensSelecionados.size})
           </button>
         )}
         {pedido.status === 'aberto' && itensSelecionados.size > 0 && (
@@ -599,7 +614,7 @@ function Comanda({ mesa, mesas, onVoltar }) {
                           <button
                             type="button"
                             title="Transferir item"
-                            onClick={() => setTransferindoItem(i)}
+                            onClick={() => setTransferindoItem([i])}
                             style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: 2 }}
                           >
                             <ArrowRightLeft size={13} />
@@ -826,17 +841,23 @@ function JuntarMesasForm({ mesasDestino, onConfirmar, onVoltar }) {
   );
 }
 
-function TransferirItemForm({ item, mesa, mesasDestino, onConfirmar, onVoltar }) {
+function TransferirItemForm({ itens, mesa, mesasDestino, onConfirmar, onVoltar }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onVoltar}>
         <X size={14} /> Voltar
       </button>
       <div>
-        <h1 style={{ fontSize: 18, fontWeight: 800 }}>Transferir item</h1>
-        <p className="muted" style={{ fontSize: 13 }}>
-          {item.quantidade}x {item.nome_produto} · de {mesa.nome} para qual mesa?
-        </p>
+        <h1 style={{ fontSize: 18, fontWeight: 800 }}>{itens.length > 1 ? `Transferir ${itens.length} itens` : 'Transferir item'}</h1>
+        <p className="muted" style={{ fontSize: 13 }}>de {mesa.nome} para qual mesa?</p>
+      </div>
+      <div className="list">
+        {itens.map((item) => (
+          <div key={item.id} className="card row" style={{ padding: '8px 12px', fontSize: 13 }}>
+            <span>{item.quantidade}x {item.nome_produto}</span>
+            <span className="tabular">{money(item.quantidade * item.preco_unitario)}</span>
+          </div>
+        ))}
       </div>
       {mesasDestino.length === 0 ? (
         <p className="muted" style={{ fontSize: 13 }}>Nenhuma outra mesa cadastrada.</p>
