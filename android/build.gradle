@@ -22,8 +22,10 @@ allprojects {
         google()
         mavenCentral()
         // Repositório Maven do PlugPag (PagBank) — biblioteca de integração
-        // Bluetooth com a Moderninha Pro/Wifi.
-        maven { url 'https://github.com/pagseguromaster/plugpag/raw/master/3.x/android' }
+        // Bluetooth com a Moderninha Pro/Wifi. A versão 4.x reconhece nomes
+        // de aparelho mais novos (ex: prefixo "P2_" da Moderninha Pro 2) —
+        // a 3.x só reconhecia PRO-/W-/W+-/PLUS-/MCHIP-.
+        maven { url 'https://github.com/pagseguromaster/plugpag/raw/master/4.x/android' }
     }
 }
 

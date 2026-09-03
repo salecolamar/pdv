@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { supabase } from '../supabase';
-import { conectarMaquininha, dispositivoSalvo, estornarUltimaTransacao, pagarNaMaquininha, suportaPagamentoPagBank } from '../utils/pagbank';
+import { conectarMaquininha, dispositivoSalvo, estornarUltimaTransacao, listarAparelhosPareados, pagarNaMaquininha, suportaPagamentoPagBank } from '../utils/pagbank';
 
 const STATUS_LABEL = { livre: 'Livre', ocupada: 'Ocupada', reservada: 'Reservada' };
 const STATUS_CHIP = { livre: 'chip-success', ocupada: 'chip-danger', reservada: 'chip-primary' };
@@ -163,8 +163,24 @@ function TesteMaquininha() {
   const [status, setStatus] = useState('');
   const [erro, setErro] = useState('');
   const [ocupado, setOcupado] = useState(false);
+  const [pareados, setPareados] = useState(null);
 
   const suportado = suportaPagamentoPagBank();
+
+  async function listarPareados() {
+    setOcupado(true);
+    setErro('');
+    setStatus('Buscando aparelhos pareados...');
+    try {
+      const lista = await listarAparelhosPareados();
+      setPareados(lista);
+      setStatus(lista.length ? '' : 'Nenhum aparelho pareado. Pareie a Moderninha no Bluetooth do celular primeiro.');
+    } catch (e) {
+      setErro(e.message || String(e));
+    } finally {
+      setOcupado(false);
+    }
+  }
 
   async function conectar() {
     if (!dispositivo.trim()) return;
@@ -219,8 +235,27 @@ function TesteMaquininha() {
           Isso só funciona dentro do app Android empacotado (Capacitor) — não funciona aqui no navegador.
         </p>
       )}
-      <span className="label">Código da maquininha (ex: PRO-12345678)</span>
-      <input value={dispositivo} onChange={(e) => setDispositivo(e.target.value)} placeholder="PRO-12345678" disabled={!suportado} />
+      <button type="button" className="btn btn-secondary btn-sm" onClick={listarPareados} disabled={!suportado || ocupado}>
+        Listar aparelhos pareados
+      </button>
+      {pareados && pareados.length > 0 && (
+        <div className="list">
+          {pareados.map((d) => (
+            <div
+              key={d.mac}
+              className="item"
+              style={{ cursor: 'pointer', alignItems: 'center' }}
+              onClick={() => setDispositivo(d.nome || d.mac)}
+            >
+              <span style={{ flex: 1 }}>{d.nome || '(sem nome)'}</span>
+              <span className="muted" style={{ fontSize: 12 }}>{d.mac}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <span className="label">Nome Bluetooth da maquininha (toque num item da lista acima, ou digite)</span>
+      <input value={dispositivo} onChange={(e) => setDispositivo(e.target.value)} placeholder="P2_XXXXXXXX" disabled={!suportado} />
       <button type="button" className="btn btn-secondary btn-sm" onClick={conectar} disabled={!suportado || ocupado || !dispositivo.trim()}>
         Conectar
       </button>

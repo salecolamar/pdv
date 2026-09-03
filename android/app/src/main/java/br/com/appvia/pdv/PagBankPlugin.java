@@ -1,15 +1,20 @@
 package br.com.appvia.pdv;
 
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
 import br.com.uol.pagseguro.plugpag.PlugPag;
-import br.com.uol.pagseguro.plugpag.PlugPagAppIdentification;
 import br.com.uol.pagseguro.plugpag.PlugPagDevice;
 import br.com.uol.pagseguro.plugpag.PlugPagPaymentData;
 import br.com.uol.pagseguro.plugpag.PlugPagTransactionResult;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
+import java.util.Set;
 
 /**
  * Ponte entre o app (JS/React) e a Moderninha Pro/Wifi via PlugPag —
@@ -19,16 +24,33 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  *
  * Referência oficial: manual "PlugPag Android Integradores" (PagBank),
  * seção Terminais (Moderninha Pro/Wifi).
+ *
+ * Android 12+ exige pedir BLUETOOTH_CONNECT/BLUETOOTH_SCAN em tempo de
+ * execução (declarar no Manifest não basta) — por isso o alias "bluetooth"
+ * abaixo, pedido antes de qualquer chamada ao PlugPag.
  */
-@CapacitorPlugin(name = "PagBank")
+@CapacitorPlugin(
+  name = "PagBank",
+  permissions = {
+    @Permission(
+      alias = "bluetooth",
+      strings = {
+        android.Manifest.permission.BLUETOOTH_CONNECT,
+        android.Manifest.permission.BLUETOOTH_SCAN
+      }
+    )
+  }
+)
 public class PagBankPlugin extends Plugin {
 
   private PlugPag plugPag;
 
   private PlugPag obterInstancia() {
     if (plugPag == null) {
-      PlugPagAppIdentification identificacao = new PlugPagAppIdentification("AppVia PDV", "1.0.0");
-      plugPag = new PlugPag(getContext(), identificacao);
+      // A partir da versão 4.x do PlugPag, o construtor não recebe mais a
+      // identificação do app (o sistema antigo de autenticação por app foi
+      // removido na 4.15.1) — é só new PlugPag(context).
+      plugPag = new PlugPag(getContext());
     }
     return plugPag;
   }
@@ -44,6 +66,65 @@ public class PagBankPlugin extends Plugin {
       return;
     }
 
+    if (getPermissionState("bluetooth") != com.getcapacitor.PermissionState.GRANTED) {
+      requestPermissionForAlias("bluetooth", call, "onBluetoothPermissionResult");
+      return;
+    }
+
+    conectar(call);
+  }
+
+  @PermissionCallback
+  private void onBluetoothPermissionResult(PluginCall call) {
+    if (getPermissionState("bluetooth") != com.getcapacitor.PermissionState.GRANTED) {
+      call.reject("Permissão de Bluetooth negada — sem ela não dá pra conectar na maquininha.");
+      return;
+    }
+    if ("listarPareados".equals(call.getMethodName())) {
+      listar(call);
+    } else {
+      conectar(call);
+    }
+  }
+
+  // Lista os aparelhos Bluetooth já pareados no celular (nome + MAC) — usado
+  // pra evitar que o usuário precise achar o MAC manualmente (o Android
+  // esconde isso nas configurações desde o Android 12).
+  @PluginMethod
+  public void listarPareados(PluginCall call) {
+    if (getPermissionState("bluetooth") != com.getcapacitor.PermissionState.GRANTED) {
+      requestPermissionForAlias("bluetooth", call, "onBluetoothPermissionResult");
+      return;
+    }
+    listar(call);
+  }
+
+  @SuppressWarnings("MissingPermission")
+  private void listar(PluginCall call) {
+    try {
+      BluetoothAdapter adaptador = BluetoothAdapter.getDefaultAdapter();
+      if (adaptador == null || !adaptador.isEnabled()) {
+        call.reject("Ative o Bluetooth do celular antes de listar os aparelhos pareados.");
+        return;
+      }
+      Set<BluetoothDevice> pareados = adaptador.getBondedDevices();
+      JSArray lista = new JSArray();
+      for (BluetoothDevice d : pareados) {
+        JSObject item = new JSObject();
+        item.put("nome", d.getName());
+        item.put("mac", d.getAddress());
+        lista.put(item);
+      }
+      JSObject resposta = new JSObject();
+      resposta.put("dispositivos", lista);
+      call.resolve(resposta);
+    } catch (Exception e) {
+      call.reject("Falha ao listar aparelhos pareados: " + e.getMessage(), e);
+    }
+  }
+
+  private void conectar(PluginCall call) {
+    String dispositivo = call.getString("dispositivo");
     new Thread(() -> {
       try {
         PlugPagDevice device = new PlugPagDevice(dispositivo);

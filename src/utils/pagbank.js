@@ -37,3 +37,10 @@ export async function pagarNaMaquininha(valor, tipo = 'credito', referencia = 'V
 export async function estornarUltimaTransacao() {
   return PagBank.cancel();
 }
+
+// Lista os aparelhos Bluetooth já pareados no celular ({ nome, mac }[]) —
+// evita ter que descobrir o MAC manualmente nas configurações do Android.
+export async function listarAparelhosPareados() {
+  const resultado = await PagBank.listarPareados();
+  return resultado.dispositivos || [];
+}

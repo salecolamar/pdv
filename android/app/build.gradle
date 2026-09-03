@@ -3,6 +3,10 @@ apply plugin: 'com.android.application'
 android {
     namespace = "br.com.appvia.pdv"
     compileSdk = rootProject.ext.compileSdkVersion
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
     defaultConfig {
         applicationId "br.com.appvia.pdv"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -35,7 +39,7 @@ dependencies {
     // Não precisa de homologação pra isso: é biblioteca pública, o app roda
     // no seu próprio celular/tablet e só "conversa" com a maquininha por
     // Bluetooth (diferente do SmartPOS, que roda o app DENTRO da máquina).
-    implementation 'br.com.uol.pagseguro:plugpag:3.1.2'
+    implementation 'br.com.uol.pagseguro:plugpag:4.15.1'
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
