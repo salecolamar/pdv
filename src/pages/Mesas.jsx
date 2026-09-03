@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
-import { ArrowRightLeft, Minus, Plus, Printer, Receipt, ShoppingCart, Trash2, Users2, Wallet, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowRightLeft, ChevronDown, Minus, Plus, Printer, Receipt, Search, ShoppingCart, Table2, Trash2, Users2, Wallet, X } from 'lucide-react';
 import { supabase } from '../supabase';
-import { money } from '../utils/format';
+import { money, mascararTelefone, mascararCpf, mascararDataBr, dataBrParaIso } from '../utils/format';
 import { precoEfetivo } from '../utils/promocoes';
+import Switch from '../components/Switch';
+import FormasPagamento from '../components/FormasPagamento';
 import Pdv from './Pdv';
 
 const STATUS_LABEL = { livre: 'Disponível', ocupada: 'Ocupada', reservada: 'Reservada' };
@@ -70,35 +72,48 @@ export default function Mesas() {
     );
   }
 
-  if (vendaAvulsa) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setVendaAvulsa(false)}>
-          <X size={14} /> Voltar ao mapa
-        </button>
-        <Pdv />
-      </div>
-    );
-  }
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <button type="button" className="btn btn-secondary btn-block" onClick={() => setVendaAvulsa(true)}>
-        <ShoppingCart size={15} /> Venda avulsa (sem mesa)
-      </button>
-      <MapaMesas mesas={mesas} ultimoPedidoPorMesa={ultimoPedidoPorMesa} grupoPorMesa={grupoPorMesa} agora={agora} onAbrirMesa={setMesaSelecionada} />
+      <div className="tab-row">
+        <button type="button" className="tab" aria-pressed={!vendaAvulsa} onClick={() => setVendaAvulsa(false)}>
+          <Table2 size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Mesa
+        </button>
+        <button type="button" className="tab" aria-pressed={vendaAvulsa} onClick={() => setVendaAvulsa(true)}>
+          <ShoppingCart size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Ficha
+        </button>
+      </div>
+
+      {vendaAvulsa ? (
+        <Pdv />
+      ) : (
+        <MapaMesas mesas={mesas} ultimoPedidoPorMesa={ultimoPedidoPorMesa} grupoPorMesa={grupoPorMesa} agora={agora} onAbrirMesa={setMesaSelecionada} />
+      )}
     </div>
   );
 }
 
 function corMesa(mesa, ultimoPedidoPorMesa, agora) {
-  if (mesa.status === 'livre') return { cor: 'var(--success)', label: 'Disponível' };
-  if (mesa.status === 'reservada') return { cor: 'var(--info)', label: 'Reservada' };
+  if (mesa.status === 'livre') return { cor: 'var(--success)', chip: 'chip-success', label: 'Disponível' };
+  if (mesa.status === 'reservada') return { cor: 'var(--info)', chip: 'chip-info', label: 'Reservada' };
   const ultimo = ultimoPedidoPorMesa.get(mesa.id);
   if (ultimo && agora - ultimo > LIMITE_SEM_PEDIDO_MS) {
-    return { cor: 'var(--atencao)', label: `Sem pedido há ${Math.floor((agora - ultimo) / 60000)}min` };
+    return { cor: 'var(--atencao)', chip: 'chip-atencao', label: `Sem pedido há ${Math.floor((agora - ultimo) / 60000)}min` };
   }
-  return { cor: 'var(--danger)', label: 'Ocupada' };
+  return { cor: 'var(--danger)', chip: 'chip-danger', label: 'Ocupada' };
+}
+
+function IconeMesa() {
+  return (
+    <svg viewBox="0 0 24 24" fill="#fff" width="100%" height="100%">
+      <rect x="2.3" y="4.6" width="3.2" height="8" rx="1.4" />
+      <rect x="18.5" y="4.6" width="3.2" height="8" rx="1.4" />
+      <path d="M2.6 12.4c.4 2.6 1.4 6.5 1.4 6.5h1.8s.7-4 .9-6.5z" />
+      <path d="M21.4 12.4c-.4 2.6-1.4 6.5-1.4 6.5h-1.8s-.7-4-.9-6.5z" />
+      <rect x="6.8" y="9.6" width="10.4" height="2.6" rx="1.3" />
+      <rect x="10.8" y="12.2" width="2.4" height="4.6" />
+      <rect x="8.6" y="16.8" width="6.8" height="1.6" rx="0.8" />
+    </svg>
+  );
 }
 
 function MapaMesas({ mesas, ultimoPedidoPorMesa, grupoPorMesa, agora, onAbrirMesa }) {
@@ -114,17 +129,21 @@ function MapaMesas({ mesas, ultimoPedidoPorMesa, grupoPorMesa, agora, onAbrirMes
         const numero = (m.nome.match(/\d+/) || [m.nome])[0];
         const grupo = grupoPorMesa.get(m.id);
         return (
-          <button key={m.id} type="button" className="mesa-card" disabled={m.status === 'reservada'} onClick={() => onAbrirMesa(m)}>
-            <span className="table-wrap">
-              <span className="table-chair table-chair--top" style={{ background: cor }} />
-              <span className="table-chair table-chair--bottom" style={{ background: cor }} />
-              <span className="table-chair table-chair--left" style={{ background: cor }} />
-              <span className="table-chair table-chair--right" style={{ background: cor }} />
-              <span className="table-top" style={{ background: cor }}>{numero}</span>
+          <button
+            key={m.id}
+            type="button"
+            className="mesa-card"
+            disabled={m.status === 'reservada'}
+            style={{ '--mesa-cor': cor }}
+            onClick={() => onAbrirMesa(m)}
+          >
+            <span className="mesa-card__numero">{numero}</span>
+            <span className="mesa-card__icon-wrap">
+              <IconeMesa />
             </span>
-            <span className="mesa-card__nome" style={{ fontWeight: 700, fontSize: 13 }}>MESA {numero}</span>
+            <span className="mesa-card__nome">MESA {numero}</span>
             {grupo && <span className="muted" style={{ fontSize: 10 }}>junto com {grupo.filter((n) => n !== m.nome).join(', ')}</span>}
-            <span className="mesa-card__status" style={{ color: cor }}>{label}</span>
+            <span className="mesa-card__status">{label}</span>
           </button>
         );
       })}
@@ -147,6 +166,40 @@ function Comanda({ mesa, mesas, onVoltar }) {
   const [toast, setToast] = useState(null);
   const [taxaPercentual, setTaxaPercentual] = useState(0);
   const [taxaAtiva, setTaxaAtiva] = useState(true);
+  const [colapsadas, setColapsadas] = useState(new Set());
+  const [itensSelecionados, setItensSelecionados] = useState(new Set());
+  const [confirmandoCancelamento, setConfirmandoCancelamento] = useState(false);
+  const [cancelando, setCancelando] = useState(false);
+
+  function alternarSelecaoItem(itemId) {
+    setItensSelecionados((atual) => {
+      const nova = new Set(atual);
+      if (nova.has(itemId)) nova.delete(itemId);
+      else nova.add(itemId);
+      return nova;
+    });
+  }
+
+  async function confirmarCancelamentoSelecionados() {
+    setCancelando(true);
+    for (const itemId of itensSelecionados) {
+      await supabase.rpc('cancelar_item_pedido', { p_item_id: itemId });
+    }
+    setCancelando(false);
+    setConfirmandoCancelamento(false);
+    setItensSelecionados(new Set());
+    avisar('Item(ns) cancelado(s).', 'success');
+    carregarRodadas(pedido.id);
+  }
+
+  function alternarColapso(rodadaId) {
+    setColapsadas((atual) => {
+      const nova = new Set(atual);
+      if (nova.has(rodadaId)) nova.delete(rodadaId);
+      else nova.add(rodadaId);
+      return nova;
+    });
+  }
 
   useEffect(() => {
     supabase
@@ -191,10 +244,10 @@ function Comanda({ mesa, mesas, onVoltar }) {
     setPrecisaCliente(true);
   }
 
-  async function abrirComCliente(nomeCliente, telefone) {
+  async function abrirComCliente(dadosCliente) {
     const { data: cliente, error: erroCliente } = await supabase
       .from('clientes')
-      .insert({ nome: nomeCliente, telefone: telefone || null })
+      .insert(dadosCliente)
       .select()
       .single();
     if (erroCliente) {
@@ -301,10 +354,10 @@ function Comanda({ mesa, mesas, onVoltar }) {
     return true;
   }
 
-  async function fecharComanda() {
+  async function fecharEReceberPagamento() {
     await supabase.from('pedidos').update({ status: 'fechado', fechado_em: new Date().toISOString() }).eq('id', pedido.id);
     setPedido((p) => ({ ...p, status: 'fechado' }));
-    avisar('Comanda fechada. Escolha a forma de pagamento.', 'success');
+    setPagando(true);
   }
 
   function irParaPagamento() {
@@ -345,7 +398,7 @@ function Comanda({ mesa, mesas, onVoltar }) {
   const mesasEnvolvidas = grupoMesasIds.map((id) => mesas.find((m) => m.id === id)).filter(Boolean);
   const tituloComanda = mesasEnvolvidas.length > 1
     ? mesasEnvolvidas.map((m) => `MESA ${(m.nome.match(/\d+/) || [m.nome])[0]}`).join(' + ')
-    : mesa.nome;
+    : `MESA ${(mesa.nome.match(/\d+/) || [mesa.nome])[0]}`;
   const mesasDestinoTransferirMesa = mesas.filter((m) => !grupoMesasIds.includes(m.id) && m.status === 'livre');
   const mesasDestinoTransferirItem = mesas.filter((m) => !grupoMesasIds.includes(m.id));
   const mesasDestinoJuntar = mesas.filter((m) => !grupoMesasIds.includes(m.id) && m.status === 'livre');
@@ -412,6 +465,7 @@ function Comanda({ mesa, mesas, onVoltar }) {
     return (
       <LancarItens
         pedido={pedido}
+        tituloComanda={tituloComanda}
         onVoltar={() => setLancando(false)}
         onLancado={() => {
           setLancando(false);
@@ -426,11 +480,15 @@ function Comanda({ mesa, mesas, onVoltar }) {
     return (
       <FinalizarPedido
         pedido={pedido}
+        rodadas={rodadas}
         total={total}
         valorPago={valorPago}
         taxaPercentual={taxaPercentual}
         taxaAtiva={taxaAtiva}
-        onAlternarTaxa={() => setTaxaAtiva((a) => !a)}
+        onAlternarTaxa={setTaxaAtiva}
+        onCancelarItem={async (itemId) => {
+          await cancelarItem(itemId);
+        }}
         onVoltar={() => setPagando(false)}
         onConcluido={() => {
           setPagando(false);
@@ -446,6 +504,33 @@ function Comanda({ mesa, mesas, onVoltar }) {
       <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onVoltar}>
         <X size={14} /> Voltar ao mapa
       </button>
+
+      <div className="tab-row">
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setVendoConta(true)}>
+          <Receipt size={14} /> Imprimir conta
+        </button>
+        {pedido.status === 'aberto' && (
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setTransferindoMesa(true)} disabled={rodadas.length === 0}>
+            <ArrowRightLeft size={14} /> Transferir mesa
+          </button>
+        )}
+        {pedido.status === 'aberto' && (
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setJuntandoMesas(true)} disabled={mesasDestinoJuntar.length === 0}>
+            <Users2 size={14} /> Juntar mesa
+          </button>
+        )}
+        {pedido.status === 'aberto' && itensSelecionados.size > 0 && (
+          <button type="button" className="btn btn-danger btn-sm" onClick={() => setConfirmandoCancelamento(true)}>
+            <Trash2 size={14} /> Cancelar ({itensSelecionados.size})
+          </button>
+        )}
+      </div>
+
+      {pedido.status === 'aberto' && (
+        <button type="button" className="btn btn-primary btn-block" onClick={() => setLancando(true)}>
+          Lançar itens
+        </button>
+      )}
 
       <div>
         <h1 style={{ fontSize: 18, fontWeight: 800 }}>{tituloComanda}</h1>
@@ -464,29 +549,53 @@ function Comanda({ mesa, mesas, onVoltar }) {
         )}
       </div>
 
+      {taxaPercentual > 0 && (
+        <div className="card row" style={{ padding: '8px 12px' }}>
+          <span className="muted" style={{ fontSize: 12.5 }}>Taxa de serviço ({taxaPercentual}%) {taxaAtiva ? money(taxaValor) : money(0)}</span>
+          <Switch checked={taxaAtiva} onChange={setTaxaAtiva} />
+        </div>
+      )}
+
       <div className="list">
         {rodadas.length === 0 ? (
           <p className="muted" style={{ fontSize: 13, margin: 0 }}>Nenhum item lançado ainda.</p>
         ) : (
           rodadas.map((r) => {
-            const hora = new Date(r.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            const dataHora = new Date(r.criado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const colapsada = colapsadas.has(r.id);
+            const subtotalRodada = r.pedido_itens.filter((i) => !i.cancelado).reduce((s, i) => s + i.quantidade * i.preco_unitario, 0);
             return (
-              <div key={r.id} className="card">
-                <div className="row" style={{ marginBottom: 6 }}>
+              <div key={r.id} className="card rodada-card">
+                <div className="rodada-card__header" onClick={() => alternarColapso(r.id)}>
+                  <ChevronDown size={16} className={'rodada-card__chevron' + (colapsada ? ' is-colapsado' : '')} />
+                  <div className="rodada-card__meta">
+                    <span className="rodada-card__operador">{r.usuarios?.nome || 'Operador'}</span>
+                    <span className="rodada-card__data">{dataHora}</span>
+                  </div>
                   <span className={'chip ' + (r.status === 'pronto' ? 'chip-success' : 'chip-primary')}>
                     {r.status === 'pronto' ? 'Pronto' : 'Na cozinha'}
                   </span>
-                  <span className="muted" style={{ fontSize: 12 }}>{r.usuarios?.nome || 'Operador'} · {hora}</span>
                 </div>
-                {r.pedido_itens.map((i) => (
-                  <div className="row" key={i.id} style={{ fontSize: 13, padding: '2px 0', opacity: i.cancelado ? 0.5 : 1 }}>
-                    <span style={{ textDecoration: i.cancelado ? 'line-through' : 'none' }}>
-                      {i.quantidade}x {i.nome_produto}{i.cancelado ? ' (cancelado)' : ''}
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
-                      {pedido.status === 'aberto' && !i.cancelado && (
-                        <>
+                {!colapsada && (
+                  <>
+                    {r.pedido_itens.map((i) => (
+                      <div className="rodada-item" key={i.id} style={{ opacity: i.cancelado ? 0.5 : 1 }}>
+                        {pedido.status === 'aberto' && !i.cancelado ? (
+                          <input
+                            type="checkbox"
+                            className="rodada-item__check"
+                            title="Selecionar pra cancelar"
+                            checked={itensSelecionados.has(i.id)}
+                            onChange={() => alternarSelecaoItem(i.id)}
+                          />
+                        ) : (
+                          <span style={{ width: 16 }} />
+                        )}
+                        <span className="rodada-item__nome" style={{ textDecoration: i.cancelado ? 'line-through' : 'none' }}>
+                          {i.quantidade}x {i.nome_produto}{i.cancelado ? ' (cancelado)' : ''}
+                        </span>
+                        <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
+                        {pedido.status === 'aberto' && !i.cancelado && (
                           <button
                             type="button"
                             title="Transferir item"
@@ -495,58 +604,27 @@ function Comanda({ mesa, mesas, onVoltar }) {
                           >
                             <ArrowRightLeft size={13} />
                           </button>
-                          <button
-                            type="button"
-                            title="Cancelar item"
-                            onClick={() => cancelarItem(i.id)}
-                            style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: 2 }}
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </>
-                      )}
+                        )}
+                      </div>
+                    ))}
+                    <div className="rodada-card__subtotal">
+                      <span>Valor total</span>
+                      <span className="tabular">{money(subtotalRodada)}</span>
                     </div>
-                  </div>
-                ))}
+                  </>
+                )}
               </div>
             );
           })
         )}
       </div>
 
-      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <div className="row" style={{ fontSize: 13 }}>
-          <span className="muted">Subtotal</span>
-          <span className="tabular">{money(total)}</span>
+      {valorPago > 0 && (
+        <div className="card row" style={{ fontSize: 13 }}>
+          <span className="muted">Valor já pago</span>
+          <span className="tabular success-text">{money(valorPago)}</span>
         </div>
-        {taxaPercentual > 0 && (
-          <div className="row" style={{ fontSize: 13 }}>
-            <span className="muted">Taxa de serviço ({taxaPercentual}%){!taxaAtiva && ' — desativada'}</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span className="tabular">{taxaAtiva ? money(taxaValor) : money(0)}</span>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setTaxaAtiva((a) => !a)}>
-                {taxaAtiva ? 'Desativar' : 'Ativar'}
-              </button>
-            </div>
-          </div>
-        )}
-        <div className="row">
-          <span className="muted">Total</span>
-          <span className="tabular" style={{ fontSize: 18, fontWeight: 800 }}>{money(totalComTaxa)}</span>
-        </div>
-        {valorPago > 0 && (
-          <>
-            <div className="row" style={{ fontSize: 13 }}>
-              <span className="muted">Valor pago</span>
-              <span className="tabular success-text">{money(valorPago)}</span>
-            </div>
-            <div className="row" style={{ fontSize: 13 }}>
-              <span className="muted">Valor a pagar</span>
-              <span className="tabular" style={{ fontWeight: 700 }}>{money(restante)}</span>
-            </div>
-          </>
-        )}
-      </div>
+      )}
 
       {toast && (
         <div className={'toast is-visible' + (toast.kind ? ' is-' + toast.kind : '')} key={toast.key}>
@@ -554,54 +632,62 @@ function Comanda({ mesa, mesas, onVoltar }) {
         </div>
       )}
 
-      <div className="tab-row">
-        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setVendoConta(true)}>
-          <Receipt size={14} /> Imprimir conta
+      {pedido.status !== 'pago' && restante > 0 && (
+        <button type="button" className="btn btn-secondary btn-block" onClick={() => setPagamentoParcialAberto(true)}>
+          <Wallet size={14} /> Pagamento parcial
         </button>
-        {pedido.status === 'aberto' && (
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setTransferindoMesa(true)} disabled={rodadas.length === 0}>
-            <ArrowRightLeft size={14} /> Transferir mesa
-          </button>
-        )}
-        {pedido.status === 'aberto' && (
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setJuntandoMesas(true)} disabled={mesasDestinoJuntar.length === 0}>
-            <Users2 size={14} /> Juntar mesa
-          </button>
-        )}
-        {pedido.status !== 'pago' && restante > 0 && (
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPagamentoParcialAberto(true)}>
-            <Wallet size={14} /> Pagamento parcial
-          </button>
-        )}
-      </div>
-
-      {pedido.status === 'aberto' && (
-        <>
-          <button type="button" className="btn btn-primary btn-block" onClick={() => setLancando(true)}>
-            Lançar itens
-          </button>
-          <button type="button" className="btn btn-primary btn-block" onClick={irParaPagamento} disabled={rodadas.length === 0}>
-            Receber pagamento{restante > 0 ? ` (${money(restante)})` : ''}
-          </button>
-          <button type="button" className="btn btn-secondary btn-block" onClick={fecharComanda} disabled={rodadas.length === 0}>
-            Fechar comanda (sem pagar agora)
-          </button>
-        </>
       )}
 
       {pedido.status === 'fechado' && (
-        <>
-          <button type="button" className="btn btn-primary btn-block" onClick={irParaPagamento}>
-            Receber pagamento{restante > 0 ? ` (${money(restante)})` : ''}
-          </button>
-          <button type="button" className="btn btn-secondary btn-block" onClick={reabrirComanda}>
-            Reabrir comanda (lançar mais itens)
-          </button>
-        </>
+        <button type="button" className="btn btn-secondary btn-block" onClick={reabrirComanda}>
+          Reabrir comanda (lançar mais itens)
+        </button>
       )}
 
       {pedido.status === 'pago' && (
         <p className="success-text" style={{ textAlign: 'center' }}>Comanda paga — mesa liberada para o próximo grupo.</p>
+      )}
+
+      {pedido.status !== 'pago' && (
+        <div className="comanda-bottombar">
+          <div className="comanda-bottombar__stats">
+            <div className="comanda-bottombar__stat">
+              <span className="comanda-bottombar__stat-label">Consumido</span>
+              <span className="comanda-bottombar__stat-value">{money(total)}</span>
+            </div>
+            <div className="comanda-bottombar__stat">
+              <span className="comanda-bottombar__stat-label">Valor a pagar</span>
+              <span className="comanda-bottombar__stat-value">{money(restante)}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="comanda-bottombar__btn"
+            disabled={rodadas.length === 0}
+            onClick={pedido.status === 'aberto' ? fecharEReceberPagamento : irParaPagamento}
+          >
+            Pagar
+          </button>
+        </div>
+      )}
+
+      {confirmandoCancelamento && (
+        <div className="modal-overlay" onClick={() => !cancelando && setConfirmandoCancelamento(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <h2>Cancelar {itensSelecionados.size} {itensSelecionados.size === 1 ? 'item' : 'itens'}?</h2>
+            <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+              O estoque volta a subir e o valor sai da comanda. Essa ação não pode ser desfeita.
+            </p>
+            <div className="modal-box__actions">
+              <button type="button" className="btn btn-secondary" disabled={cancelando} onClick={() => setConfirmandoCancelamento(false)}>
+                Voltar
+              </button>
+              <button type="button" className="btn btn-danger" disabled={cancelando} onClick={confirmarCancelamentoSelecionados}>
+                {cancelando ? 'Cancelando…' : 'Cancelar itens'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -824,6 +910,9 @@ function PagamentoParcialForm({ restante, onConfirmar, onVoltar }) {
 function FormAbrirMesa({ mesa, onAbrir, onVoltar }) {
   const [nome, setNome] = useState('');
   const [telefone, setTelefone] = useState('');
+  const [cpf, setCpf] = useState('');
+  const [nascimento, setNascimento] = useState('');
+  const [email, setEmail] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
 
@@ -834,8 +923,18 @@ function FormAbrirMesa({ mesa, onAbrir, onVoltar }) {
       setErro('Informe o nome do cliente.');
       return;
     }
+    if (nascimento && !dataBrParaIso(nascimento)) {
+      setErro('Data de nascimento inválida.');
+      return;
+    }
     setEnviando(true);
-    const ok = await onAbrir(nome.trim(), telefone.trim());
+    const ok = await onAbrir({
+      nome: nome.trim(),
+      telefone: telefone.trim() || null,
+      cpf: cpf.trim() || null,
+      nascimento: dataBrParaIso(nascimento),
+      email: email.trim() || null,
+    });
     setEnviando(false);
     if (!ok) setErro('Não foi possível abrir a mesa. Tente de novo.');
   }
@@ -855,7 +954,13 @@ function FormAbrirMesa({ mesa, onAbrir, onVoltar }) {
         <span className="label">Nome do cliente</span>
         <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Ana" autoFocus />
         <span className="label">Telefone (opcional)</span>
-        <input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="Ex: (11) 99999-9999" />
+        <input value={telefone} onChange={(e) => setTelefone(mascararTelefone(e.target.value))} inputMode="numeric" placeholder="(11) 99999-9999" />
+        <span className="label">CPF (opcional)</span>
+        <input value={cpf} onChange={(e) => setCpf(mascararCpf(e.target.value))} inputMode="numeric" placeholder="000.000.000-00" />
+        <span className="label">Data de nascimento (opcional)</span>
+        <input value={nascimento} onChange={(e) => setNascimento(mascararDataBr(e.target.value))} inputMode="numeric" placeholder="dd/mm/aaaa" />
+        <span className="label">E-mail (opcional)</span>
+        <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="nome@email.com" />
       </div>
 
       {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
@@ -871,50 +976,80 @@ const PLACEHOLDER_SVG = "<svg xmlns='http://www.w3.org/2000/svg' width='44' heig
 const PLACEHOLDER_FOTO = 'data:image/svg+xml;utf8,' + encodeURIComponent(PLACEHOLDER_SVG);
 const CATEGORIA_TODAS = 'Todos';
 
-function LancarItens({ pedido, onVoltar, onLancado }) {
+function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
   const [produtos, setProdutos] = useState(null);
   const [categorias, setCategorias] = useState([]);
   const [promocoes, setPromocoes] = useState([]);
   const [categoriaAtiva, setCategoriaAtiva] = useState(CATEGORIA_TODAS);
+  const [busca, setBusca] = useState('');
   const [carrinho, setCarrinho] = useState([]);
+  const [confirmandoPedido, setConfirmandoPedido] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
+  const toqueInicioX = useRef(null);
 
   useEffect(() => {
+    carregarProdutos();
     Promise.all([
-      supabase.from('produtos').select('*').eq('ativo', true).order('nome'),
       supabase.from('categorias').select('*').order('ordem').order('nome'),
       supabase.from('promocoes').select('*').eq('ativo', true),
-    ]).then(([prodResp, catResp, promoResp]) => {
-      setProdutos(prodResp.data || []);
+    ]).then(([catResp, promoResp]) => {
       setCategorias(catResp.data || []);
       setPromocoes(promoResp.data || []);
     });
+
+    // Estoque é compartilhado entre todos os garçons — qualquer venda em
+    // outro celular deve atualizar a quantidade aqui em tempo real.
+    const canal = supabase
+      .channel('estoque-produtos')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'produtos' }, carregarProdutos)
+      .subscribe();
+    return () => supabase.removeChannel(canal);
   }, []);
 
-  function adicionar(p) {
+  async function carregarProdutos() {
+    const { data } = await supabase.from('produtos').select('*').eq('ativo', true).order('nome');
+    setProdutos(data || []);
+  }
+
+  function adicionar(p, delta = 1) {
     setCarrinho((atual) => {
       const existente = atual.find((i) => i.produto_id === p.id);
+      const qtdAtual = existente?.quantidade || 0;
+      if (delta > 0 && p.estoque !== null && qtdAtual >= p.estoque) return atual;
       if (existente) {
-        return atual.map((i) => (i.produto_id === p.id ? { ...i, quantidade: i.quantidade + 1 } : i));
+        return atual.map((i) => (i.produto_id === p.id ? { ...i, quantidade: i.quantidade + delta } : i)).filter((i) => i.quantidade > 0);
       }
-      return [...atual, { produto_id: p.id, nome: p.nome, preco: precoEfetivo(p, promocoes), quantidade: 1 }];
+      if (delta <= 0) return atual;
+      return [...atual, { produto_id: p.id, nome: p.nome, preco: precoEfetivo(p, promocoes), quantidade: 1, estoque: p.estoque }];
     });
   }
 
-  function alterarQuantidade(produtoId, delta) {
-    setCarrinho((atual) =>
-      atual.map((i) => (i.produto_id === produtoId ? { ...i, quantidade: i.quantidade + delta } : i)).filter((i) => i.quantidade > 0)
-    );
+  function quantidadeNoCarrinho(produtoId) {
+    return carrinho.find((i) => i.produto_id === produtoId)?.quantidade || 0;
   }
 
   const categoriasComTodos = [CATEGORIA_TODAS, ...categorias.map((c) => c.nome)];
-  const produtosFiltrados =
-    produtos === null
-      ? []
-      : categoriaAtiva === CATEGORIA_TODAS
-        ? produtos
-        : produtos.filter((p) => categorias.find((c) => c.id === p.categoria_id)?.nome === categoriaAtiva);
+  const indiceCategoria = categoriasComTodos.indexOf(categoriaAtiva);
+
+  function trocarCategoria(direcao) {
+    const proximo = indiceCategoria + direcao;
+    if (proximo >= 0 && proximo < categoriasComTodos.length) setCategoriaAtiva(categoriasComTodos[proximo]);
+  }
+
+  function onTouchStart(e) {
+    toqueInicioX.current = e.touches[0].clientX;
+  }
+  function onTouchEnd(e) {
+    if (toqueInicioX.current === null) return;
+    const delta = e.changedTouches[0].clientX - toqueInicioX.current;
+    if (Math.abs(delta) > 60) trocarCategoria(delta < 0 ? 1 : -1);
+    toqueInicioX.current = null;
+  }
+
+  const produtosFiltrados = (produtos === null ? [] : produtos)
+    .filter((p) => categoriaAtiva === CATEGORIA_TODAS || categorias.find((c) => c.id === p.categoria_id)?.nome === categoriaAtiva)
+    .filter((p) => !busca.trim() || p.nome.toLowerCase().includes(busca.trim().toLowerCase()));
 
   const total = carrinho.reduce((s, i) => s + i.preco * i.quantidade, 0);
 
@@ -939,6 +1074,11 @@ function LancarItens({ pedido, onVoltar, onLancado }) {
         <X size={14} /> Voltar
       </button>
 
+      <div className="search-input-wrap">
+        <Search size={15} />
+        <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar produto..." />
+      </div>
+
       <div className="tab-row">
         {categoriasComTodos.map((c) => (
           <button key={c} type="button" className="tab" aria-pressed={categoriaAtiva === c} onClick={() => setCategoriaAtiva(c)}>
@@ -950,27 +1090,41 @@ function LancarItens({ pedido, onVoltar, onLancado }) {
       {produtos === null ? (
         <p className="muted">Carregando…</p>
       ) : produtosFiltrados.length === 0 ? (
-        <p className="muted" style={{ fontSize: 13 }}>Nenhum produto ativo nessa categoria.</p>
+        <p className="muted" style={{ fontSize: 13 }}>Nenhum produto encontrado.</p>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+        <div
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}
+        >
           {produtosFiltrados.map((p) => {
             const preco = precoEfetivo(p, promocoes);
             const emPromocao = preco < Number(p.preco);
+            const qtd = quantidadeNoCarrinho(p.id);
+            const esgotado = p.estoque !== null && p.estoque <= 0;
             return (
-              <button
-                key={p.id}
-                type="button"
-                className="card"
-                onClick={() => adicionar(p)}
-                style={{ textAlign: 'left', cursor: 'pointer' }}
-              >
+              <div key={p.id} className="card" style={{ opacity: esgotado ? 0.5 : 1 }}>
                 <img src={p.foto_url || PLACEHOLDER_FOTO} alt="" style={{ width: '100%', aspectRatio: '1', borderRadius: 8, objectFit: 'cover', background: 'var(--panel-2)', marginBottom: 6 }} />
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{p.nome}</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
                   <span className="tabular" style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 700 }}>{money(preco)}</span>
                   {emPromocao && <span className="tabular muted" style={{ fontSize: 11, textDecoration: 'line-through' }}>{money(p.preco)}</span>}
                 </div>
-              </button>
+                {p.estoque !== null && (
+                  <div className={'muted tabular'} style={{ fontSize: 11, marginTop: 2 }}>
+                    {esgotado ? 'Esgotado' : `Estoque: ${p.estoque}`}
+                  </div>
+                )}
+                <div className="stepper-mini" style={{ marginTop: 6, justifyContent: 'center', width: '100%' }}>
+                  <button type="button" className="stepper-mini-btn" disabled={qtd === 0} onClick={() => adicionar(p, -1)}>
+                    <Minus size={12} />
+                  </button>
+                  <span className="stepper-qty tabular">{qtd}</span>
+                  <button type="button" className="stepper-mini-btn" disabled={esgotado || (p.estoque !== null && qtd >= p.estoque)} onClick={() => adicionar(p, 1)}>
+                    <Plus size={12} />
+                  </button>
+                </div>
+              </div>
             );
           })}
         </div>
@@ -983,11 +1137,11 @@ function LancarItens({ pedido, onVoltar, onLancado }) {
               <div key={i.produto_id} className="item" style={{ alignItems: 'center' }}>
                 <span style={{ flex: 1 }}>{i.nome}</span>
                 <div className="stepper">
-                  <button type="button" className="stepper-btn" onClick={() => alterarQuantidade(i.produto_id, -1)}>
+                  <button type="button" className="stepper-btn" onClick={() => adicionar(produtos.find((p) => p.id === i.produto_id), -1)}>
                     <Minus size={12} />
                   </button>
                   <span className="stepper-qty tabular">{i.quantidade}</span>
-                  <button type="button" className="stepper-btn" onClick={() => alterarQuantidade(i.produto_id, 1)}>
+                  <button type="button" className="stepper-btn" onClick={() => adicionar(produtos.find((p) => p.id === i.produto_id), 1)}>
                     <Plus size={12} />
                   </button>
                 </div>
@@ -1000,25 +1154,96 @@ function LancarItens({ pedido, onVoltar, onLancado }) {
             <span className="tabular" style={{ fontWeight: 800, fontSize: 18 }}>{money(total)}</span>
           </div>
           {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
-          <button type="button" className="btn btn-primary btn-block" disabled={enviando} onClick={confirmar}>
-            {enviando ? 'Enviando…' : 'Enviar para a cozinha'}
+          <button type="button" className="btn btn-primary btn-block" disabled={enviando} onClick={() => setConfirmandoPedido(true)}>
+            Enviar para a cozinha
           </button>
+        </div>
+      )}
+
+      {confirmandoPedido && (
+        <div className="modal-overlay" onClick={() => !enviando && setConfirmandoPedido(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div style={{ textAlign: 'center' }}>
+              <span className="muted" style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.3 }}>Confirmar pedido pra</span>
+              <h2 style={{ fontSize: 26, fontWeight: 800, color: 'var(--primary)' }}>{tituloComanda}</h2>
+            </div>
+            <div className="list">
+              {carrinho.map((i) => (
+                <div key={i.produto_id} className="row" style={{ fontSize: 14, padding: '3px 0' }}>
+                  <span>{i.quantidade}x {i.nome}</span>
+                  <span className="tabular">{money(i.preco * i.quantidade)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="row" style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 10 }}>
+              <span style={{ fontWeight: 700 }}>Total da rodada</span>
+              <span className="tabular" style={{ fontWeight: 800, fontSize: 18 }}>{money(total)}</span>
+            </div>
+            {erro && <p className="danger-text" style={{ fontSize: 13, margin: 0 }}>{erro}</p>}
+            <div className="modal-box__actions">
+              <button type="button" className="btn btn-secondary" disabled={enviando} onClick={() => setConfirmandoPedido(false)}>
+                Voltar
+              </button>
+              <button type="button" className="btn btn-primary" disabled={enviando} onClick={confirmar}>
+                {enviando ? 'Enviando…' : 'Confirmar e enviar'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function FinalizarPedido({ pedido, total, valorPago, taxaPercentual, taxaAtiva, onAlternarTaxa, onVoltar, onConcluido }) {
+function FinalizarPedido({ pedido, rodadas, total, valorPago, taxaPercentual, taxaAtiva, onAlternarTaxa, onCancelarItem, onVoltar, onConcluido }) {
   // pagamentos[i].auto = true enquanto o valor ainda não foi editado à mão
   // pelo garçom — nesse caso ele sempre reflete o valor a pagar mais
   // recente (some com desconto/taxa/pagamento parcial na hora). Assim que
   // o garçom mexe no campo (ou divide o pagamento), vira manual.
   const [pagamentos, setPagamentos] = useState([{ forma: 'dinheiro', valor: '0.00', auto: true }]);
   const [desconto, setDesconto] = useState('0');
-  const [numPessoas, setNumPessoas] = useState('');
+  const [editandoDesconto, setEditandoDesconto] = useState(false);
+  const [dividirPor, setDividirPor] = useState(1);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
+  const [pontosCliente, setPontosCliente] = useState(0);
+  const [valorPorPonto, setValorPorPonto] = useState(0);
+  const [usarFidelidade, setUsarFidelidade] = useState(true);
+  const [fidelidadeCarregada, setFidelidadeCarregada] = useState(false);
+
+  useEffect(() => {
+    if (!pedido.cliente_id) {
+      setFidelidadeCarregada(true);
+      return;
+    }
+    Promise.all([
+      supabase.from('clientes').select('pontos_fidelidade').eq('id', pedido.cliente_id).maybeSingle(),
+      supabase.from('usuarios').select('empresas(fidelidade_valor_por_ponto)').limit(1).maybeSingle(),
+    ]).then(([clienteResp, empresaResp]) => {
+      setPontosCliente(Number(clienteResp.data?.pontos_fidelidade) || 0);
+      setValorPorPonto(Number(empresaResp.data?.empresas?.fidelidade_valor_por_ponto) || 0);
+      setFidelidadeCarregada(true);
+    });
+  }, [pedido.cliente_id]);
+
+  const valorMaximoFidelidade = pontosCliente * valorPorPonto;
+  const descontoFidelidadeDisponivel = Math.max(0, Math.min(valorMaximoFidelidade, total));
+  const temFidelidadeDisponivel = fidelidadeCarregada && pontosCliente > 0 && valorPorPonto > 0;
+
+  // Assim que os pontos carregam, já aplica o desconto de fidelidade
+  // automaticamente (o garçom pode desligar no switch se o cliente não
+  // quiser usar dessa vez).
+  useEffect(() => {
+    if (temFidelidadeDisponivel && usarFidelidade) {
+      setDesconto(descontoFidelidadeDisponivel.toFixed(2));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [temFidelidadeDisponivel]);
+
+  function alternarFidelidade(ligar) {
+    setUsarFidelidade(ligar);
+    setDesconto(ligar ? descontoFidelidadeDisponivel.toFixed(2) : '0');
+  }
 
   const descontoNum = Number(desconto.replace(',', '.')) || 0;
   const totalComDesconto = Math.max(0, total - descontoNum);
@@ -1042,15 +1267,21 @@ function FinalizarPedido({ pedido, total, valorPago, taxaPercentual, taxaAtiva, 
       ...atual.map((p) => (p.auto ? { ...p, valor: totalAPagarAgora.toFixed(2), auto: false } : p)),
       { forma: 'pix', valor: Math.max(0, restante).toFixed(2), auto: false },
     ]);
+    setDividirPor((n) => n + 1);
   }
 
   function removerPagamento(idx) {
     setPagamentos((atual) => atual.filter((_, i) => i !== idx));
+    setDividirPor((n) => Math.max(1, n - 1));
   }
 
-  function dividirEntrePessoas() {
-    const n = Number(numPessoas);
-    if (!(n > 1)) return;
+  function mudarDivisao(delta) {
+    const n = Math.max(1, dividirPor + delta);
+    setDividirPor(n);
+    if (n === 1) {
+      setPagamentos([{ forma: pagamentos[0]?.forma || 'dinheiro', valor: totalAPagarAgora.toFixed(2), auto: true }]);
+      return;
+    }
     const base = Math.floor((totalAPagarAgora / n) * 100) / 100;
     const ultimoValor = Math.round((totalAPagarAgora - base * (n - 1)) * 100) / 100;
     setPagamentos(
@@ -1075,11 +1306,23 @@ function FinalizarPedido({ pedido, total, valorPago, taxaPercentual, taxaAtiva, 
       p_desconto: descontoNum,
       p_taxa_servico: taxaValor,
     });
-    setEnviando(false);
     if (error) {
+      setEnviando(false);
       setErro(error.message.replace('P0001: ', ''));
       return;
     }
+
+    // Se algum desconto de fidelidade foi de fato aplicado, desconta os
+    // pontos usados do saldo do cliente (o novo saldo/pontos ganhos por
+    // essa venda são tratados à parte, pelo trigger no banco).
+    if (usarFidelidade && descontoNum > 0 && valorPorPonto > 0 && pedido.cliente_id) {
+      const pontosUsados = Math.min(pontosCliente, Math.round(descontoNum / valorPorPonto));
+      if (pontosUsados > 0) {
+        await supabase.rpc('resgatar_pontos_fidelidade', { p_cliente_id: pedido.cliente_id, p_pontos: pontosUsados });
+      }
+    }
+
+    setEnviando(false);
     onConcluido();
   }
 
@@ -1089,73 +1332,109 @@ function FinalizarPedido({ pedido, total, valorPago, taxaPercentual, taxaAtiva, 
         <X size={14} /> Voltar
       </button>
 
-      <div className="card" style={{ textAlign: 'center' }}>
-        <p className="muted" style={{ fontSize: 12 }}>{valorPago > 0 ? 'Valor a pagar agora' : 'Valor total'}</p>
-        <p className="tabular" style={{ fontSize: 28, fontWeight: 800 }}>{money(totalAPagarAgora)}</p>
-        {valorPago > 0 && <p className="muted" style={{ fontSize: 12 }}>Total {money(totalFinal)} · Já pago {money(valorPago)}</p>}
+      <div className="pay-stats-grid">
+        <div className="pay-stat">
+          <span className="pay-stat__label">Total</span>
+          <span className="pay-stat__value">{money(totalFinal)}</span>
+        </div>
+        <div className="pay-stat">
+          <span className="pay-stat__label">Restante</span>
+          <span className={'pay-stat__value' + (Math.abs(restante) > 0.01 ? ' is-danger' : ' is-success')}>{money(restante)}</span>
+        </div>
+        <div className="pay-stat">
+          <span className="pay-stat__label">Pago</span>
+          <span className="pay-stat__value">{money(valorPago)}</span>
+        </div>
+        <div className="pay-stat">
+          <span className="pay-stat__label">Desconto</span>
+          {editandoDesconto ? (
+            <input
+              autoFocus
+              className="pay-stat__value is-editable"
+              value={desconto}
+              onChange={(e) => setDesconto(e.target.value)}
+              onBlur={() => setEditandoDesconto(false)}
+              inputMode="decimal"
+            />
+          ) : (
+            <button type="button" className="pay-stat__value is-editable" style={{ textAlign: 'left', cursor: 'pointer' }} onClick={() => setEditandoDesconto(true)}>
+              {money(descontoNum)}
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="card">
-        <span className="label">Desconto (R$)</span>
-        <input value={desconto} onChange={(e) => setDesconto(e.target.value)} inputMode="decimal" />
-      </div>
-
-      {taxaPercentual > 0 && (
-        <div className="card row">
-          <div>
-            <span style={{ fontWeight: 600 }}>Taxa de serviço ({taxaPercentual}%)</span>
-            <p className="muted tabular" style={{ fontSize: 12, margin: 0 }}>{taxaAtiva ? money(taxaValor) : 'Desativada'}</p>
-          </div>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={onAlternarTaxa}>
-            {taxaAtiva ? 'Desativar' : 'Ativar'}
-          </button>
+      {temFidelidadeDisponivel && (
+        <div className="card row" style={{ padding: '8px 12px' }}>
+          <span style={{ fontSize: 12.5 }}>
+            <strong>★ {pontosCliente} pontos</strong>
+            <span className="muted"> — desconto de fidelidade disponível: {money(descontoFidelidadeDisponivel)}</span>
+          </span>
+          <Switch checked={usarFidelidade} onChange={alternarFidelidade} />
         </div>
       )}
 
-      <div className="card row">
-        <span className="label" style={{ margin: 0 }}>Dividir conta entre quantas pessoas?</span>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            value={numPessoas}
-            onChange={(e) => setNumPessoas(e.target.value.replace(/\D/g, ''))}
-            inputMode="numeric"
-            placeholder="Ex: 3"
-            style={{ width: 60, textAlign: 'center' }}
-          />
-          <button type="button" className="btn btn-secondary btn-sm" onClick={dividirEntrePessoas} disabled={!(Number(numPessoas) > 1)}>
-            Dividir
+      {rodadas && rodadas.some((r) => r.pedido_itens.some((i) => !i.cancelado)) && (
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span className="label">Itens lançados — marque pra cancelar algum lançado errado</span>
+          {rodadas.flatMap((r) => r.pedido_itens.filter((i) => !i.cancelado).map((i) => (
+            <label key={i.id} className="row" style={{ fontSize: 13, cursor: 'pointer' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="checkbox" onChange={() => onCancelarItem(i.id)} />
+                {i.quantidade}x {i.nome_produto}
+              </span>
+              <span className="tabular muted">{money(i.quantidade * i.preco_unitario)}</span>
+            </label>
+          )))}
+        </div>
+      )}
+
+      {taxaPercentual > 0 && (
+        <div className="card row" style={{ padding: '8px 12px' }}>
+          <span className="muted" style={{ fontSize: 12.5 }}>Taxa de serviço ({taxaPercentual}%) {taxaAtiva ? money(taxaValor) : money(0)}</span>
+          <Switch checked={taxaAtiva} onChange={onAlternarTaxa} />
+        </div>
+      )}
+
+      <div className="pay-divider-row">
+        <span style={{ fontWeight: 700, fontSize: 13 }}>Dividir por</span>
+        <div className="pay-divider-stepper">
+          <button type="button" className="pay-divider-btn" onClick={() => mudarDivisao(-1)} disabled={dividirPor <= 1}>
+            <Minus size={14} />
+          </button>
+          <span className="pay-divider-count">{dividirPor}</span>
+          <button type="button" className="pay-divider-btn" onClick={() => mudarDivisao(1)}>
+            <Plus size={14} />
           </button>
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {pagamentos.map((p, idx) => (
-          <div key={idx} className="card row">
-            {pagamentos.length > 1 && <span className="muted tabular" style={{ fontSize: 11 }}>{idx + 1}</span>}
-            <select value={p.forma} onChange={(e) => atualizarPagamento(idx, 'forma', e.target.value)} style={{ flex: 1 }}>
-              <option value="dinheiro">Dinheiro</option>
-              <option value="pix">Pix</option>
-              <option value="debito">Débito</option>
-              <option value="credito">Crédito</option>
-              <option value="outro">Outro</option>
-            </select>
-            <input value={valorEfetivo(p)} onChange={(e) => atualizarPagamento(idx, 'valor', e.target.value)} inputMode="decimal" style={{ width: 100, textAlign: 'right' }} />
-            {pagamentos.length > 1 && (
-              <button type="button" onClick={() => removerPagamento(idx)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}>
-                <Trash2 size={14} />
-              </button>
-            )}
+      {pagamentos.length === 1 ? (
+        <>
+          <div className="pay-big-value">
+            <div className="pay-big-value__amount tabular">{money(Number(valorEfetivo(pagamentos[0]).replace(',', '.')) || 0)}</div>
           </div>
-        ))}
-        <button type="button" className="btn btn-secondary btn-sm" onClick={adicionarPagamento}>
-          + Pagamento dividido
-        </button>
-      </div>
-
-      <div className="row" style={{ fontSize: 13 }}>
-        <span className="muted">Restante a pagar</span>
-        <span className={'tabular ' + (Math.abs(restante) > 0.01 ? 'danger-text' : 'success-text')}>{money(restante)}</span>
-      </div>
+          <FormasPagamento value={pagamentos[0].forma} onChange={(f) => atualizarPagamento(0, 'forma', f)} />
+        </>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {pagamentos.map((p, idx) => (
+            <div key={idx} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div className="row">
+                <span className="muted tabular" style={{ fontSize: 11 }}>Pessoa {idx + 1}</span>
+                <input value={valorEfetivo(p)} onChange={(e) => atualizarPagamento(idx, 'valor', e.target.value)} inputMode="decimal" style={{ width: 100, textAlign: 'right', marginLeft: 'auto' }} />
+                <button type="button" onClick={() => removerPagamento(idx)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+              <FormasPagamento value={p.forma} onChange={(f) => atualizarPagamento(idx, 'forma', f)} />
+            </div>
+          ))}
+          <button type="button" className="btn btn-secondary btn-sm" onClick={adicionarPagamento}>
+            + Adicionar pessoa
+          </button>
+        </div>
+      )}
 
       {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
 
