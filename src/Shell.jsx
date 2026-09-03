@@ -53,6 +53,10 @@ export default function Shell({ session }) {
   const [perfil, setPerfil] = useState(undefined); // undefined = carregando, null = sem linha em usuarios
   const [aba, setAba] = useState('dashboard');
   const [sidebarAberta, setSidebarAberta] = useState(false);
+  const [loginEm] = useState(() => {
+    const bruto = session.user.last_sign_in_at ? new Date(session.user.last_sign_in_at) : new Date();
+    return bruto.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  });
 
   useEffect(() => {
     let cancelado = false;
@@ -113,6 +117,7 @@ export default function Shell({ session }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="sidebar__brand-nome">{perfil.empresas.nome}</div>
             <div className="sidebar__brand-cargo">{perfil.nome} · {perfil.role}</div>
+            <div className="sidebar__brand-cargo" style={{ opacity: 0.75, fontSize: 11 }}>Login: {loginEm}</div>
           </div>
           <button type="button" className="sidebar-toggle" style={{ borderColor: 'rgba(255,255,255,0.3)', color: '#fff' }} onClick={() => setSidebarAberta(false)}>
             <X size={16} />
@@ -141,12 +146,14 @@ export default function Shell({ session }) {
       </aside>
 
       <div className="main-area">
-        <header className="topbar">
+        <header className="topbar" title={moduloAtivo?.label}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button type="button" className="sidebar-toggle" onClick={() => setSidebarAberta(true)}>
               <Menu size={18} />
             </button>
-            <h1 style={{ fontSize: 16 }}>{moduloAtivo?.label}</h1>
+            <span className="topbar__logo">
+              <img src="/brand/logo-three-solutions-full.png" alt="Three Solutions" />
+            </span>
           </div>
           {(perfil.role === 'admin' || perfil.role === 'gerente') && <Notificacoes />}
         </header>
