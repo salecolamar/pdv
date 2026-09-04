@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Printer, PrinterCheck, X } from 'lucide-react';
 import { supabase } from '../supabase';
+import { money } from '../utils/format';
 import {
   configurarImpressoraWifi,
   esquecerImpressora,
@@ -307,44 +308,63 @@ function TicketCozinha({ rodada, agora, acao, onAvancar }) {
   const criadoEm = new Date(rodada.criado_em);
   const minutos = Math.max(0, Math.floor((agora - criadoEm.getTime()) / 60000));
   const urgencia = rodada.status === 'pronto' ? 'pronto' : minutos >= 10 ? 'danger' : minutos >= 5 ? 'atencao' : 'normal';
-  const data = criadoEm.toLocaleDateString('pt-BR');
   const horario = criadoEm.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   const porCategoria = agruparPorCategoria(rodada.pedido_itens);
   const tituloMesa = tituloMesaDe(rodada);
+  const numeroMesa = rodada.pedidos?.mesas?.nome?.match(/\d+/)?.[0];
+  const totalRodada = rodada.pedido_itens
+    .filter((i) => !i.cancelado)
+    .reduce((s, i) => s + i.quantidade * i.preco_unitario, 0);
+  const statusLabel = rodada.status === 'pronto' ? 'Pronto' : minutos === 0 ? 'Agora' : `Há ${minutos} min`;
 
   return (
     <div className={'ticket-cozinha ticket-cozinha--' + urgencia}>
-      <div className="ticket-cozinha__topo">
-        <span className="ticket-cozinha__mesa">{tituloMesa}</span>
-        <span className="ticket-cozinha__tempo">{minutos === 0 ? 'agora' : `há ${minutos} min`}</span>
+      <div className="ticket-cozinha__header">
+        <span className="ticket-cozinha__badge">{numeroMesa || '•'}</span>
+        <div className="ticket-cozinha__header-info">
+          <span className="ticket-cozinha__mesa">{tituloMesa}</span>
+          <span className="ticket-cozinha__cliente">
+            {rodada.pedidos?.clientes?.nome || (rodada.usuarios?.nome ? `Op. ${rodada.usuarios.nome}` : 'Balcão')}
+          </span>
+        </div>
       </div>
-      <span className="muted" style={{ fontSize: 12, marginTop: -8 }}>
-        {data} {horario} · {rodada.usuarios?.nome || 'Operador'}{rodada.impresso ? ' · impresso' : ''}
-      </span>
-      {rodada.pedidos?.clientes?.nome && (
-        <span className="muted" style={{ fontSize: 13, marginTop: -6 }}>Cliente: {rodada.pedidos.clientes.nome}</span>
-      )}
-      <div className="ticket-cozinha__grupos">
-        {[...porCategoria.entries()].map(([categoria, itens]) => (
-          <div key={categoria} style={{ marginBottom: 8 }}>
-            <div className="muted" style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>
-              {categoria}
+
+      <div className="ticket-cozinha__status-pill">{statusLabel}</div>
+
+      <div className="ticket-cozinha__body">
+        <span className="muted" style={{ fontSize: 11.5 }}>
+          {horario} · {rodada.usuarios?.nome || 'Operador'}{rodada.impresso ? ' · impresso' : ''}
+        </span>
+
+        <div className="ticket-cozinha__grupos">
+          {[...porCategoria.entries()].map(([categoria, itens]) => (
+            <div key={categoria} className="ticket-cozinha__grupo">
+              <div className="ticket-cozinha__categoria">{categoria}</div>
+              <ul className="ticket-cozinha__itens">
+                {itens.map((i) => (
+                  <li key={i.id} style={{ opacity: i.cancelado ? 0.5 : 1, textDecoration: i.cancelado ? 'line-through' : 'none' }}>
+                    <span>
+                      <span className="ticket-cozinha__qtd">{i.quantidade}x</span> {i.nome_produto}
+                    </span>
+                    <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <ul className="ticket-cozinha__itens" style={{ marginBottom: 0 }}>
-              {itens.map((i) => (
-                <li key={i.id} style={{ opacity: i.cancelado ? 0.5 : 1, textDecoration: i.cancelado ? 'line-through' : 'none' }}>
-                  <span className="ticket-cozinha__qtd">{i.quantidade}x</span> {i.nome_produto}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+          ))}
+        </div>
+
+        <div className="ticket-cozinha__total">
+          <span>Valor</span>
+          <span className="tabular">{money(totalRodada)}</span>
+        </div>
+
+        {onAvancar && (
+          <button type="button" className="btn btn-primary btn-block ticket-cozinha__btn" onClick={onAvancar}>
+            {acao}
+          </button>
+        )}
       </div>
-      {onAvancar && (
-        <button type="button" className="btn btn-primary btn-block ticket-cozinha__btn" onClick={onAvancar}>
-          {acao}
-        </button>
-      )}
     </div>
   );
 }

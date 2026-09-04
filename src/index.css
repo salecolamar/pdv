@@ -597,27 +597,95 @@ button:focus-visible {
   .cozinha__colunas { grid-template-columns: 1fr; }
 }
 .ticket-cozinha {
+  --ticket-cor: var(--primary);
   background: var(--panel);
   border: 1px solid var(--border-soft);
-  border-left: 4px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 12px;
   box-shadow: var(--shadow-sm);
 }
-.ticket-cozinha--atencao { border-left-color: var(--atencao); }
-.ticket-cozinha--danger { border-left-color: var(--danger); }
-.ticket-cozinha--pronto { border-left-color: var(--success, #2f9e5f); opacity: 0.8; }
-.ticket-cozinha__topo { display: flex; align-items: baseline; justify-content: space-between; }
-.ticket-cozinha__mesa { font-size: 20px; font-weight: 800; }
-.ticket-cozinha__tempo { font-size: 13px; color: var(--text-dim); }
-.ticket-cozinha--atencao .ticket-cozinha__tempo { color: var(--atencao); font-weight: 700; }
-.ticket-cozinha--danger .ticket-cozinha__tempo { color: var(--danger); font-weight: 700; }
-.ticket-cozinha__itens { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 16px; }
-.ticket-cozinha__grupos { display: flex; flex-direction: column; gap: 4px; }
-.ticket-cozinha__qtd { font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; }
+.ticket-cozinha--atencao { --ticket-cor: var(--atencao); }
+.ticket-cozinha--danger { --ticket-cor: var(--danger); }
+.ticket-cozinha--pronto { --ticket-cor: var(--success, #2f9e5f); opacity: 0.85; }
+
+.ticket-cozinha__header {
+  background: var(--ticket-cor);
+  color: #fff;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ticket-cozinha__badge {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ticket-cor);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 14px;
+}
+.ticket-cozinha__header-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ticket-cozinha__mesa { font-size: 15px; font-weight: 800; letter-spacing: 0.2px; }
+.ticket-cozinha__cliente {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ticket-cozinha__status-pill {
+  margin: -1px 14px 0;
+  transform: translateY(-50%);
+  align-self: center;
+  background: var(--panel);
+  border: 1.5px solid var(--ticket-cor);
+  color: var(--ticket-cor);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 3px 14px;
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+}
+
+.ticket-cozinha__body {
+  padding: 8px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ticket-cozinha__grupos { display: flex; flex-direction: column; gap: 10px; }
+.ticket-cozinha__grupo { display: flex; flex-direction: column; gap: 4px; }
+.ticket-cozinha__categoria {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border-soft);
+  padding-bottom: 3px;
+}
+.ticket-cozinha__itens { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; font-size: 14.5px; }
+.ticket-cozinha__itens li { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ticket-cozinha__qtd { font-weight: 800; color: var(--ticket-cor); font-variant-numeric: tabular-nums; }
+.ticket-cozinha__total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 800;
+  font-size: 14px;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 8px;
+}
 .ticket-cozinha__btn { padding: 14px; font-size: 15px; }
 
 /* Exportar PDF (Relatórios): isola só o relatório na impressão, o resto
