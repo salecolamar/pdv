@@ -8,19 +8,22 @@ import { baixarCsv } from '../utils/exportar';
 const FILTROS = [
   ['hoje', 'Hoje'],
   ['ontem', 'Ontem'],
+  ['dia', 'Um dia específico'],
   ['7dias', 'Últimos 7 dias'],
   ['30dias', 'Últimos 30 dias'],
   ['mes', 'Este mês'],
   ['personalizado', 'Personalizado'],
 ];
 
-function periodo(filtro, de, ate) {
+function periodo(filtro, de, ate, dia) {
   const agora = new Date();
   switch (filtro) {
     case 'hoje':
       return [inicioDoDia(agora), agora];
     case 'ontem':
       return [inicioDoDia(subDias(agora, 1)), inicioDoDia(agora)];
+    case 'dia':
+      return dia ? [inicioDoDia(new Date(`${dia}T00:00:00`)), new Date(`${dia}T23:59:59.999`)] : [null, null];
     case '7dias':
       return [inicioDoDia(subDias(agora, 6)), agora];
     case '30dias':
@@ -46,8 +49,185 @@ export default function Relatorios() {
         <button type="button" className="tab" aria-pressed={abaPrincipal === 'detalhado'} onClick={() => setAbaPrincipal('detalhado')}>
           Detalhado
         </button>
+        <button type="button" className="tab" aria-pressed={abaPrincipal === 'cancelamentos'} onClick={() => setAbaPrincipal('cancelamentos')}>
+          Cancelamentos
+        </button>
       </div>
-      {abaPrincipal === 'resumo' ? <ResumoVendas /> : <RelatorioDetalhado />}
+      {abaPrincipal === 'resumo' ? <ResumoVendas /> : abaPrincipal === 'detalhado' ? <RelatorioDetalhado /> : <RelatorioCancelamentos />}
+    </div>
+  );
+}
+
+function RelatorioCancelamentos() {
+  const [filtro, setFiltro] = useState('hoje');
+  const [de, setDe] = useState('');
+  const [ate, setAte] = useState('');
+  const [dia, setDia] = useState(() => inicioDoDia().toISOString().slice(0, 10));
+  const [linhas, setLinhas] = useState(undefined);
+  const [erro, setErro] = useState('');
+
+  useEffect(() => {
+    carregar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtro, de, ate, dia]);
+
+  async function carregar() {
+    const [inicio, fim] = periodo(filtro, de, ate, dia);
+    if ((filtro === 'personalizado' || filtro === 'dia') && (!inicio || !fim)) {
+      setLinhas(null);
+      return;
+    }
+    setLinhas(undefined);
+    setErro('');
+
+    const { data: logs, error: erroLogs } = await supabase
+      .from('audit_logs')
+      .select('id, acao, detalhes, criado_em, usuarios(nome)')
+      .in('acao', ['cancelar_item_pedido', 'cancelar_venda'])
+      .gte('criado_em', inicio.toISOString())
+      .lte('criado_em', fim.toISOString())
+      .order('criado_em', { ascending: false });
+
+    if (erroLogs) {
+      setErro(erroLogs.message);
+      setLinhas(null);
+      return;
+    }
+
+    const idsVendaCancelada = (logs || [])
+      .filter((l) => l.acao === 'cancelar_venda')
+      .map((l) => l.detalhes?.venda_id)
+      .filter(Boolean);
+
+    let formasPorVenda = new Map();
+    if (idsVendaCancelada.length > 0) {
+      const { data: pagamentos } = await supabase.from('pagamentos').select('venda_id, forma').in('venda_id', idsVendaCancelada);
+      for (const p of pagamentos || []) {
+        const atual = formasPorVenda.get(p.venda_id) || new Set();
+        atual.add(p.forma);
+        formasPorVenda.set(p.venda_id, atual);
+      }
+    }
+
+    const novasLinhas = (logs || []).map((l) => {
+      const d = l.detalhes || {};
+      if (l.acao === 'cancelar_venda') {
+        const formas = [...(formasPorVenda.get(d.venda_id) || [])].map(metodoLabel).join(', ');
+        return {
+          id: l.id,
+          produto: 'Venda completa (todos os itens)',
+          motivo: d.motivo || '—',
+          pagamento: formas || 'Lançamento',
+          garcom: l.usuarios?.nome || 'Usuário removido',
+          criadoEm: l.criado_em,
+          valor: Number(d.total) || 0,
+        };
+      }
+      return {
+        id: l.id,
+        produto: d.nome_produto || '—',
+        motivo: d.motivo || '—',
+        pagamento: 'Lançamento',
+        garcom: l.usuarios?.nome || 'Usuário removido',
+        criadoEm: l.criado_em,
+        valor: Number(d.valor) || 0,
+      };
+    });
+    setLinhas(novasLinhas);
+  }
+
+  function exportarCsv() {
+    baixarCsv(
+      `cancelamentos-${filtro}.csv`,
+      ['Data', 'Produto', 'Observação', 'Pagamento', 'Garçom', 'Valor'],
+      linhas.map((l) => [new Date(l.criadoEm).toLocaleString('pt-BR'), l.produto, l.motivo, l.pagamento, l.garcom, l.valor])
+    );
+  }
+
+  const totalCancelado = (linhas || []).reduce((s, l) => s + l.valor, 0);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="tab-row">
+        {FILTROS.map(([id, label]) => (
+          <button key={id} type="button" className="tab" aria-pressed={filtro === id} onClick={() => setFiltro(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {filtro === 'dia' && (
+        <div className="card">
+          <span className="label">Escolha o dia</span>
+          <input type="date" value={dia} onChange={(e) => setDia(e.target.value)} />
+        </div>
+      )}
+
+      {filtro === 'personalizado' && (
+        <div className="card" style={{ display: 'flex', gap: 8 }}>
+          <div style={{ flex: 1 }}>
+            <span className="label">De</span>
+            <input type="date" value={de} onChange={(e) => setDe(e.target.value)} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <span className="label">Até</span>
+            <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} />
+          </div>
+        </div>
+      )}
+
+      {linhas === undefined ? (
+        <p className="muted">Carregando…</p>
+      ) : linhas === null ? (
+        erro ? (
+          <p className="danger-text">Falha ao carregar o relatório: {erro}</p>
+        ) : (
+          <p className="muted" style={{ fontSize: 13 }}>Escolha as datas de início e fim.</p>
+        )
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+            <Cartao titulo="Total cancelado" valor={money(totalCancelado)} destaque />
+            <Cartao titulo="Cancelamentos" valor={linhas.length} />
+          </div>
+
+          <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={exportarCsv} disabled={linhas.length === 0}>
+            <Download size={14} /> Exportar CSV
+          </button>
+
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 680 }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border)' }}>
+                    {['Data', 'Produto', 'Observação', 'Pagamento', 'Garçom', 'Valor'].map((h) => (
+                      <th key={h} className="muted" style={{ padding: '8px 10px', fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {linhas.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ padding: 16, textAlign: 'center' }} className="muted">Nenhum cancelamento no período.</td>
+                    </tr>
+                  ) : (
+                    linhas.map((l) => (
+                      <tr key={l.id} style={{ borderBottom: '1px solid var(--border-soft)' }}>
+                        <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>{new Date(l.criadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+                        <td style={{ padding: '7px 10px' }}>{l.produto}</td>
+                        <td style={{ padding: '7px 10px' }}>{l.motivo}</td>
+                        <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>{l.pagamento}</td>
+                        <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>{l.garcom}</td>
+                        <td className="tabular" style={{ padding: '7px 10px', textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700 }}>{money(l.valor)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -56,6 +236,7 @@ function ResumoVendas() {
   const [filtro, setFiltro] = useState('hoje');
   const [de, setDe] = useState('');
   const [ate, setAte] = useState('');
+  const [dia, setDia] = useState(() => inicioDoDia().toISOString().slice(0, 10));
   const [resumo, setResumo] = useState(undefined);
   const [erro, setErro] = useState('');
   const [cancelandoId, setCancelandoId] = useState(null);
@@ -63,11 +244,12 @@ function ResumoVendas() {
 
   useEffect(() => {
     carregar();
-  }, [filtro, de, ate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtro, de, ate, dia]);
 
   async function carregar() {
-    const [inicio, fim] = periodo(filtro, de, ate);
-    if (filtro === 'personalizado' && (!inicio || !fim)) {
+    const [inicio, fim] = periodo(filtro, de, ate, dia);
+    if ((filtro === 'personalizado' || filtro === 'dia') && (!inicio || !fim)) {
       setResumo(null);
       return;
     }
@@ -183,6 +365,13 @@ function ResumoVendas() {
           </button>
         ))}
       </div>
+
+      {filtro === 'dia' && (
+        <div className="card">
+          <span className="label">Escolha o dia</span>
+          <input type="date" value={dia} onChange={(e) => setDia(e.target.value)} />
+        </div>
+      )}
 
       {filtro === 'personalizado' && (
         <div className="card" style={{ display: 'flex', gap: 8 }}>
@@ -375,6 +564,7 @@ function RelatorioDetalhado() {
   const [filtro, setFiltro] = useState('hoje');
   const [de, setDe] = useState('');
   const [ate, setAte] = useState('');
+  const [dia, setDia] = useState(() => inicioDoDia().toISOString().slice(0, 10));
   const [incluirCanceladas, setIncluirCanceladas] = useState(false);
   const [linhas, setLinhas] = useState(undefined);
   const [erro, setErro] = useState('');
@@ -394,11 +584,12 @@ function RelatorioDetalhado() {
 
   useEffect(() => {
     carregar();
-  }, [filtro, de, ate, incluirCanceladas]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtro, de, ate, dia, incluirCanceladas]);
 
   async function carregar() {
-    const [inicio, fim] = periodo(filtro, de, ate);
-    if (filtro === 'personalizado' && (!inicio || !fim)) {
+    const [inicio, fim] = periodo(filtro, de, ate, dia);
+    if ((filtro === 'personalizado' || filtro === 'dia') && (!inicio || !fim)) {
       setLinhas(null);
       return;
     }
@@ -519,6 +710,13 @@ function RelatorioDetalhado() {
           </button>
         ))}
       </div>
+
+      {filtro === 'dia' && (
+        <div className="card">
+          <span className="label">Escolha o dia</span>
+          <input type="date" value={dia} onChange={(e) => setDia(e.target.value)} />
+        </div>
+      )}
 
       {filtro === 'personalizado' && (
         <div className="card" style={{ display: 'flex', gap: 8 }}>

@@ -8,6 +8,7 @@ const ACAO_LABEL = {
   desconto: 'Deu desconto',
   alterar_preco: 'Alterou preço',
   cancelar_venda: 'Cancelou venda',
+  cancelar_item_pedido: 'Cancelou item da comanda',
 };
 
 function resumoDetalhes(log) {
@@ -23,6 +24,8 @@ function resumoDetalhes(log) {
       return `"${d.produto}": ${money(d.preco_antigo)} → ${money(d.preco_novo)}`;
     case 'cancelar_venda':
       return `Total ${money(d.total)}${d.motivo ? ` · Motivo: ${d.motivo}` : ''}`;
+    case 'cancelar_item_pedido':
+      return `"${d.nome_produto}" · ${money(d.valor)}${d.motivo ? ` · Motivo: ${d.motivo}` : ''}`;
     default:
       return JSON.stringify(d);
   }
