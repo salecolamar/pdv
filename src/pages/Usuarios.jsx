@@ -348,6 +348,9 @@ function EditarUsuario({ usuario, onCancelar, onSalvo }) {
   );
 }
 
+const PRESET_GARCOM = { realizar_vendas: true };
+const PRESET_GERENTE = Object.fromEntries(PERMISSOES.map(([chave]) => [chave, true]));
+
 function ConvidarUsuario({ onVoltar, onConvidado }) {
   const [tipo, setTipo] = useState('garcom');
   const [nome, setNome] = useState('');
@@ -355,8 +358,19 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
   const [senha, setSenha] = useState('');
   const [pin, setPin] = useState('');
   const [confirmarPin, setConfirmarPin] = useState('');
+  const [permissoes, setPermissoes] = useState(PRESET_GARCOM);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
+
+  function escolherTipo(novoTipo) {
+    setTipo(novoTipo);
+    if (novoTipo === 'garcom') setPermissoes(PRESET_GARCOM);
+    else if (novoTipo === 'gerente') setPermissoes(PRESET_GERENTE);
+  }
+
+  function alternarPermissao(chave) {
+    setPermissoes((p) => ({ ...p, [chave]: !p[chave] }));
+  }
 
   async function convidar(e) {
     e.preventDefault();
@@ -376,7 +390,7 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
         setErro('Os PINs não são iguais.');
         return;
       }
-      corpo = { nome: nome.trim(), tipo: 'garcom', pin, cargo: tipo };
+      corpo = { nome: nome.trim(), tipo: 'garcom', pin, cargo: tipo, permissoes };
     } else {
       if (!email.trim() || senha.length < 6) {
         setErro('Preencha email e uma senha com pelo menos 6 caracteres.');
@@ -419,17 +433,17 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <EscolhaCard
           selecionado={tipo === 'garcom'}
-          onClick={() => setTipo('garcom')}
+          onClick={() => escolherTipo('garcom')}
           icon={UtensilsCrossed}
           titulo="Garçom"
           descricao="Nome + PIN — padrão, sem cancelar/dar desconto"
         />
         <EscolhaCard
           selecionado={tipo === 'gerente'}
-          onClick={() => setTipo('gerente')}
+          onClick={() => escolherTipo('gerente')}
           icon={UserCog}
           titulo="Gerente"
-          descricao="Nome + PIN — cancela, dá desconto e reimprime"
+          descricao="Nome + PIN — já sai com tudo liberado"
         />
         <EscolhaCard
           selecionado={tipo === 'admin'}
@@ -459,6 +473,15 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
             <p className="muted" style={{ fontSize: 12, margin: 0 }}>
               Entra pelo link da lista de garçons escolhendo o nome e digitando esse PIN — sem precisar de e-mail.
             </p>
+          </div>
+
+          <div>
+            <span className="label">
+              Permissões {tipo === 'garcom' ? '— comece em branco, marque o que quiser liberar a mais' : '— já vem tudo marcado, desmarque o que não quiser liberar'}
+            </span>
+            <div style={{ marginTop: 4 }}>
+              <ListaPermissoes permissoes={permissoes} onAlternar={alternarPermissao} />
+            </div>
           </div>
         </>
       ) : (

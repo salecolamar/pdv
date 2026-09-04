@@ -41,7 +41,7 @@ export default async function handler(req, res) {
   let email, senha, role, permissoes, loginTipo;
 
   if (tipo === 'garcom') {
-    const { pin, cargo } = req.body || {};
+    const { pin, cargo, permissoes: permissoesEnviadas } = req.body || {};
     if (!/^\d{6}$/.test(pin || '')) {
       res.status(400).json({ error: 'O PIN precisa ter exatamente 6 dígitos numéricos.' });
       return;
@@ -50,9 +50,11 @@ export default async function handler(req, res) {
     senha = pin;
     role = 'operador';
     permissoes =
-      cargo === 'gerente'
-        ? { realizar_vendas: true, cancelar_venda: true, dar_desconto: true, reimprimir: true }
-        : { realizar_vendas: true };
+      permissoesEnviadas && typeof permissoesEnviadas === 'object'
+        ? { realizar_vendas: true, ...permissoesEnviadas }
+        : cargo === 'gerente'
+          ? { realizar_vendas: true, cancelar_venda: true, dar_desconto: true, reimprimir: true }
+          : { realizar_vendas: true };
     loginTipo = 'pin';
   } else {
     ({ email, senha, role, permissoes } = req.body || {});
