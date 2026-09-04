@@ -21,7 +21,7 @@ import { supabase } from './supabase';
 import { Centro } from './App';
 import Dashboard from './pages/Dashboard';
 import Produtos from './pages/Produtos';
-import Mesas from './pages/Mesas';
+import Mesas, { HistoricoPDV } from './pages/Mesas';
 import Cozinha from './pages/Cozinha';
 import Clientes from './pages/Clientes';
 import Caixa from './pages/Caixa';
@@ -40,6 +40,7 @@ import Configuracoes from './pages/Configuracoes';
 const MODULOS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, papeis: ['admin', 'gerente'] },
   { id: 'pdv', label: 'PDV', icon: ShoppingCart, papeis: ['operador'] },
+  { id: 'historico', label: 'Histórico', icon: History, papeis: ['operador'] },
   { id: 'caixa', label: 'Caixa', icon: Wallet, papeis: ['admin', 'gerente'] },
   { id: 'produtos', label: 'Cardápio', icon: Package, papeis: ['admin', 'gerente'] },
   { id: 'pospago', label: 'Mapa de Mesas', icon: Table2, papeis: ['admin'] },
@@ -164,6 +165,7 @@ export default function Shell({ session }) {
         <main className="page-content">
           {abaAtiva === 'dashboard' && <Dashboard />}
           {abaAtiva === 'pdv' && <Mesas />}
+          {abaAtiva === 'historico' && <HistoricoPDV />}
           {abaAtiva === 'cozinha' && <Cozinha />}
           {abaAtiva === 'produtos' && <Produtos />}
           {abaAtiva === 'pospago' && <PosPago />}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRightLeft, ChevronDown, History, Minus, Package, Plus, Printer, Receipt, RefreshCw, Search, ShoppingCart, Table2, Trash2, Users2, Wallet, X } from 'lucide-react';
+import { ArrowRightLeft, ChevronDown, Minus, Package, Plus, Printer, Receipt, RefreshCw, Search, ShoppingCart, Table2, Trash2, Users2, Wallet, X } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money, mascararTelefone, mascararCpf, mascararDataBr, dataBrParaIso, metodoLabel } from '../utils/format';
 import { precoEfetivo } from '../utils/promocoes';
@@ -84,9 +84,6 @@ export default function Mesas() {
           <button type="button" className="tab" aria-pressed={abaPdv === 'ficha'} onClick={() => setAbaPdv('ficha')}>
             <ShoppingCart size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Ficha
           </button>
-          <button type="button" className="tab" aria-pressed={abaPdv === 'historico'} onClick={() => setAbaPdv('historico')}>
-            <History size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Histórico
-          </button>
         </div>
         <button type="button" className="btn btn-secondary btn-sm" onClick={carregar} title="Atualizar dados">
           <RefreshCw size={14} />
@@ -95,8 +92,6 @@ export default function Mesas() {
 
       {abaPdv === 'ficha' ? (
         <Pdv />
-      ) : abaPdv === 'historico' ? (
-        <HistoricoPDV />
       ) : (
         <MapaMesas mesas={mesas} ultimoPedidoPorMesa={ultimoPedidoPorMesa} grupoPorMesa={grupoPorMesa} agora={agora} onAbrirMesa={setMesaSelecionada} />
       )}
@@ -151,7 +146,7 @@ function VendasDoGarcom() {
   );
 }
 
-function HistoricoPDV() {
+export function HistoricoPDV() {
   const [vendas, setVendas] = useState(null);
   const [produtosAbertos, setProdutosAbertos] = useState(null);
   const [itensPorVenda, setItensPorVenda] = useState(new Map());
