@@ -119,13 +119,14 @@ function VendasDoGarcom() {
 
       const { data: vendas } = await supabase
         .from('vendas')
-        .select('total')
+        .select('total, taxa_servico')
         .eq('operador_id', user.id)
         .eq('cancelada', false)
         .gte('criado_em', inicioDoDia().toISOString());
       if (cancelado) return;
       const total = (vendas || []).reduce((s, v) => s + Number(v.total), 0);
-      setResumo({ total, quantidade: vendas?.length || 0 });
+      const taxaServico = (vendas || []).reduce((s, v) => s + Number(v.taxa_servico || 0), 0);
+      setResumo({ total, taxaServico, quantidade: vendas?.length || 0 });
     })();
     return () => {
       cancelado = true;
@@ -135,9 +136,17 @@ function VendasDoGarcom() {
   if (!resumo) return null;
 
   return (
-    <div className="card row" style={{ padding: '10px 14px', background: 'linear-gradient(135deg, var(--primary), #6C3CE0)', color: '#fff' }}>
-      <span style={{ fontSize: 13, fontWeight: 600 }}>Suas vendas hoje ({resumo.quantidade})</span>
-      <span className="tabular" style={{ fontSize: 18, fontWeight: 800 }}>{money(resumo.total)}</span>
+    <div className="card" style={{ padding: '10px 14px', background: 'linear-gradient(135deg, var(--primary), #6C3CE0)', color: '#fff' }}>
+      <div className="row">
+        <span style={{ fontSize: 13, fontWeight: 600 }}>Suas vendas hoje ({resumo.quantidade})</span>
+        <span className="tabular" style={{ fontSize: 18, fontWeight: 800 }}>{money(resumo.total)}</span>
+      </div>
+      {resumo.taxaServico > 0 && (
+        <div className="row" style={{ marginTop: 2 }}>
+          <span style={{ fontSize: 11.5, opacity: 0.85 }}>Taxa de serviço</span>
+          <span className="tabular" style={{ fontSize: 12.5, fontWeight: 700 }}>{money(resumo.taxaServico)}</span>
+        </div>
+      )}
     </div>
   );
 }
