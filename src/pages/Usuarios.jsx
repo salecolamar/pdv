@@ -355,14 +355,8 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
   const [senha, setSenha] = useState('');
   const [pin, setPin] = useState('');
   const [confirmarPin, setConfirmarPin] = useState('');
-  const [cargo, setCargo] = useState('garcom');
-  const [permissoes, setPermissoes] = useState({});
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
-
-  function alternar(chave) {
-    setPermissoes((p) => ({ ...p, [chave]: !p[chave] }));
-  }
 
   async function convidar(e) {
     e.preventDefault();
@@ -373,7 +367,7 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
     }
 
     let corpo;
-    if (tipo === 'garcom') {
+    if (tipo === 'garcom' || tipo === 'gerente') {
       if (!/^\d{6}$/.test(pin)) {
         setErro('O PIN precisa ter exatamente 6 dígitos.');
         return;
@@ -382,13 +376,13 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
         setErro('Os PINs não são iguais.');
         return;
       }
-      corpo = { nome: nome.trim(), tipo: 'garcom', pin, cargo };
+      corpo = { nome: nome.trim(), tipo: 'garcom', pin, cargo: tipo };
     } else {
       if (!email.trim() || senha.length < 6) {
         setErro('Preencha email e uma senha com pelo menos 6 caracteres.');
         return;
       }
-      corpo = { nome: nome.trim(), email: email.trim(), senha, role: tipo, permissoes: tipo === 'gerente' ? permissoes : {} };
+      corpo = { nome: nome.trim(), email: email.trim(), senha, role: 'admin' };
     }
 
     setEnviando(true);
@@ -428,14 +422,14 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
           onClick={() => setTipo('garcom')}
           icon={UtensilsCrossed}
           titulo="Garçom"
-          descricao="Nome + PIN — só as telas de venda"
+          descricao="Nome + PIN — padrão, sem cancelar/dar desconto"
         />
         <EscolhaCard
           selecionado={tipo === 'gerente'}
           onClick={() => setTipo('gerente')}
           icon={UserCog}
           titulo="Gerente"
-          descricao="E-mail — mesmas telas do garçom, com permissões extras"
+          descricao="Nome + PIN — cancela, dá desconto e reimprime"
         />
         <EscolhaCard
           selecionado={tipo === 'admin'}
@@ -446,31 +440,11 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
         />
       </div>
 
-      {tipo === 'garcom' ? (
+      {tipo === 'garcom' || tipo === 'gerente' ? (
         <>
           <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span className="label">Nome</span>
             <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: João" autoFocus />
-          </div>
-
-          <div>
-            <span className="label">Cargo</span>
-            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-              <EscolhaCard
-                selecionado={cargo === 'garcom'}
-                onClick={() => setCargo('garcom')}
-                icon={UtensilsCrossed}
-                titulo="Garçom"
-                descricao="Padrão — sem cancelar/dar desconto"
-              />
-              <EscolhaCard
-                selecionado={cargo === 'gerente'}
-                onClick={() => setCargo('gerente')}
-                icon={UserCog}
-                titulo="Gerente"
-                descricao="Cancela, dá desconto e reimprime"
-              />
-            </div>
           </div>
 
           <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -483,7 +457,7 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
               <PinInput value={confirmarPin} onChange={setConfirmarPin} />
             </div>
             <p className="muted" style={{ fontSize: 12, margin: 0 }}>
-              O garçom entra pelo link da lista de garçons escolhendo o nome e digitando esse PIN — sem precisar de e-mail.
+              Entra pelo link da lista de garçons escolhendo o nome e digitando esse PIN — sem precisar de e-mail.
             </p>
           </div>
         </>
@@ -497,24 +471,9 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
             <span className="label">Senha provisória</span>
             <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="••••••••" />
           </div>
-
-          {tipo === 'gerente' ? (
-            <>
-              <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
-                O gerente acessa as mesmas telas do garçom (PDV, Histórico, Painel de Pedidos, Reservas) — sem acesso ao painel de gestão. Escolha abaixo o que ele pode fazer a mais.
-              </p>
-              <div>
-                <span className="label">Permissões</span>
-                <div style={{ marginTop: 4 }}>
-                  <ListaPermissoes permissoes={permissoes} onAlternar={alternar} />
-                </div>
-              </div>
-            </>
-          ) : (
-            <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
-              Admin tem acesso total ao portal de gestão (Dashboard, Cardápio, Relatórios, Configurações, Usuários, etc).
-            </p>
-          )}
+          <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+            Admin tem acesso total ao portal de gestão (Dashboard, Cardápio, Relatórios, Configurações, Usuários, etc).
+          </p>
         </>
       )}
 
