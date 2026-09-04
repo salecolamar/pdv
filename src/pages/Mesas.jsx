@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRightLeft, ChevronDown, Minus, Package, Plus, Printer, Receipt, RefreshCw, Search, ShoppingCart, Table2, Trash2, Users2, Wallet, X } from 'lucide-react';
+import { ArrowRightLeft, Calendar, ChevronDown, CreditCard, Lock, Mail, Minus, Package, Phone, Plus, Printer, Receipt, RefreshCw, Search, ShieldCheck, ShoppingCart, Table2, Trash2, User, Users2, Wallet, X } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money, mascararTelefone, mascararCpf, mascararDataBr, dataBrParaIso, metodoLabel } from '../utils/format';
 import { precoEfetivo } from '../utils/promocoes';
 import { inicioDoDia } from '../utils/datas';
 import Switch from '../components/Switch';
 import FormasPagamento from '../components/FormasPagamento';
+import EscolhaCard from '../components/EscolhaCard';
 import Pdv from './Pdv';
 
 const STATUS_LABEL = { livre: 'Disponível', ocupada: 'Ocupada', reservada: 'Reservada' };
@@ -1031,11 +1032,16 @@ export function AutorizacaoGerente({ titulo, onAutorizado, onVoltar }) {
   }
 
   return (
-    <form onSubmit={confirmar} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <h2 style={{ margin: 0 }}>{titulo || 'Autorização necessária'}</h2>
-      <p className="muted" style={{ fontSize: 13, margin: 0 }}>
-        Essa ação exige autorização de um gerente ou admin. Escolha quem está autorizando e digite a senha (ou PIN) dele.
-      </p>
+    <form onSubmit={confirmar} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 12, background: 'var(--atencao)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Lock size={18} />
+        </div>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 16.5 }}>{titulo || 'Autorização necessária'}</h2>
+          <p className="muted" style={{ fontSize: 12, margin: 0 }}>Precisa de um gerente ou admin pra confirmar.</p>
+        </div>
+      </div>
 
       {autorizadores === null ? (
         <p className="muted" style={{ fontSize: 13 }}>Carregando…</p>
@@ -1044,11 +1050,18 @@ export function AutorizacaoGerente({ titulo, onAutorizado, onVoltar }) {
       ) : (
         <>
           <span className="label">Autorizado por</span>
-          <select value={usuarioId} onChange={(e) => setUsuarioId(e.target.value)}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {autorizadores.map((u) => (
-              <option key={u.id} value={u.id}>{u.nome}</option>
+              <EscolhaCard
+                key={u.id}
+                selecionado={usuarioId === u.id}
+                onClick={() => setUsuarioId(u.id)}
+                icon={u.role === 'admin' ? ShieldCheck : User}
+                titulo={u.nome}
+                descricao={u.role === 'admin' ? 'Admin' : u.role === 'gerente' ? 'Gerente' : 'Garçom gerente'}
+              />
             ))}
-          </select>
+          </div>
           <span className="label">Senha (ou PIN)</span>
           <input
             type="password"
@@ -1154,11 +1167,9 @@ function TransferirMesaForm({ mesa, mesasDestino, onConfirmar, onVoltar }) {
       {mesasDestino.length === 0 ? (
         <p className="muted" style={{ fontSize: 13 }}>Nenhuma mesa livre no momento.</p>
       ) : (
-        <div className="list">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
           {mesasDestino.map((m) => (
-            <button key={m.id} type="button" className="card item" style={{ textAlign: 'left', cursor: 'pointer' }} onClick={() => onConfirmar(m.id)}>
-              {m.nome}
-            </button>
+            <EscolhaCard key={m.id} selecionado={false} onClick={() => onConfirmar(m.id)} icon={Table2} titulo={m.nome} />
           ))}
         </div>
       )}
@@ -1185,18 +1196,16 @@ function JuntarMesasForm({ mesasDestino, onConfirmar, onVoltar }) {
       {mesasDestino.length === 0 ? (
         <p className="muted" style={{ fontSize: 13 }}>Nenhuma mesa livre no momento.</p>
       ) : (
-        <div className="list">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
           {mesasDestino.map((m) => (
-            <button
+            <EscolhaCard
               key={m.id}
-              type="button"
-              className="card item"
-              style={{ textAlign: 'left', cursor: 'pointer', borderColor: selecionadas.includes(m.id) ? 'var(--primary)' : undefined }}
+              selecionado={selecionadas.includes(m.id)}
               onClick={() => alternar(m.id)}
-            >
-              <span style={{ flex: 1 }}>{m.nome}</span>
-              {selecionadas.includes(m.id) && <span className="chip chip-primary">Selecionada</span>}
-            </button>
+              icon={Table2}
+              titulo={m.nome}
+              descricao={selecionadas.includes(m.id) ? 'Selecionada' : undefined}
+            />
           ))}
         </div>
       )}
@@ -1228,12 +1237,16 @@ function TransferirItemForm({ itens, mesa, mesasDestino, onConfirmar, onVoltar }
       {mesasDestino.length === 0 ? (
         <p className="muted" style={{ fontSize: 13 }}>Nenhuma outra mesa cadastrada.</p>
       ) : (
-        <div className="list">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
           {mesasDestino.map((m) => (
-            <button key={m.id} type="button" className="card item" style={{ textAlign: 'left', cursor: 'pointer' }} onClick={() => onConfirmar(m.id)}>
-              <span style={{ flex: 1 }}>{m.nome}</span>
-              <span className={'chip ' + (m.status === 'livre' ? 'chip-success' : 'chip-danger')}>{STATUS_LABEL[m.status] || m.status}</span>
-            </button>
+            <EscolhaCard
+              key={m.id}
+              selecionado={false}
+              onClick={() => onConfirmar(m.id)}
+              icon={Table2}
+              titulo={m.nome}
+              descricao={STATUS_LABEL[m.status] || m.status}
+            />
           ))}
         </div>
       )}
@@ -1328,6 +1341,15 @@ function PagamentoParcialForm({ restante, itensSelecionados, taxaPercentual = 0,
   );
 }
 
+function CampoComIcone({ icon: Icon, ...props }) {
+  return (
+    <div style={{ position: 'relative' }}>
+      <Icon size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
+      <input {...props} style={{ paddingLeft: 34, ...(props.style || {}) }} />
+    </div>
+  );
+}
+
 function FormAbrirMesa({ mesa, onAbrir, onVoltar }) {
   const [nome, setNome] = useState('');
   const [telefone, setTelefone] = useState('');
@@ -1400,18 +1422,23 @@ function FormAbrirMesa({ mesa, onAbrir, onVoltar }) {
         <X size={14} /> Voltar ao mapa
       </button>
 
-      <div>
-        <h1 style={{ fontSize: 18, fontWeight: 800 }}>{mesa.nome}</h1>
-        <p className="muted" style={{ fontSize: 13 }}>Antes de abrir, informe quem está sentando na mesa.</p>
+      <div className="row" style={{ gap: 10 }}>
+        <div style={{ width: 42, height: 42, borderRadius: 12, background: 'var(--primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Table2 size={20} />
+        </div>
+        <div>
+          <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{mesa.nome}</h1>
+          <p className="muted" style={{ fontSize: 13, margin: 0 }}>Antes de abrir, informe quem está sentando na mesa.</p>
+        </div>
       </div>
 
-      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <span className="label">Nome do cliente</span>
-        <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Ana" autoFocus />
+        <CampoComIcone icon={User} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Ana" autoFocus />
         <span className="label">Telefone (opcional)</span>
-        <input value={telefone} onChange={(e) => setTelefone(mascararTelefone(e.target.value))} inputMode="numeric" placeholder="(11) 99999-9999" />
+        <CampoComIcone icon={Phone} value={telefone} onChange={(e) => setTelefone(mascararTelefone(e.target.value))} inputMode="numeric" placeholder="(11) 99999-9999" />
         <span className="label">CPF (opcional)</span>
-        <input value={cpf} onChange={(e) => setCpf(mascararCpf(e.target.value))} inputMode="numeric" placeholder="000.000.000-00" />
+        <CampoComIcone icon={CreditCard} value={cpf} onChange={(e) => setCpf(mascararCpf(e.target.value))} inputMode="numeric" placeholder="000.000.000-00" />
         {buscandoCpf && <p className="muted" style={{ fontSize: 12, margin: 0 }}>Buscando cliente…</p>}
         {!buscandoCpf && clienteEncontrado && (
           <p style={{ fontSize: 12, margin: 0, color: 'var(--success, #1a9d5c)', fontWeight: 600 }}>
@@ -1419,9 +1446,9 @@ function FormAbrirMesa({ mesa, onAbrir, onVoltar }) {
           </p>
         )}
         <span className="label">Data de nascimento (opcional)</span>
-        <input value={nascimento} onChange={(e) => setNascimento(mascararDataBr(e.target.value))} inputMode="numeric" placeholder="dd/mm/aaaa" />
+        <CampoComIcone icon={Calendar} value={nascimento} onChange={(e) => setNascimento(mascararDataBr(e.target.value))} inputMode="numeric" placeholder="dd/mm/aaaa" />
         <span className="label">E-mail (opcional)</span>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="nome@email.com" />
+        <CampoComIcone icon={Mail} value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="nome@email.com" />
       </div>
 
       {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
