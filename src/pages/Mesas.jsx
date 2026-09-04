@@ -1126,6 +1126,9 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
   const [produtos, setProdutos] = useState(null);
   const [categorias, setCategorias] = useState([]);
   const [promocoes, setPromocoes] = useState([]);
+  const [cardapios, setCardapios] = useState([]);
+  const [cardapioAtivo, setCardapioAtivo] = useState('');
+  const [complementosPorProduto, setComplementosPorProduto] = useState(new Map());
   const [categoriaAtiva, setCategoriaAtiva] = useState(CATEGORIA_TODAS);
   const [busca, setBusca] = useState('');
   const [carrinho, setCarrinho] = useState([]);
@@ -1139,9 +1142,20 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
     Promise.all([
       supabase.from('categorias').select('*').order('ordem').order('nome'),
       supabase.from('promocoes').select('*').eq('ativo', true),
-    ]).then(([catResp, promoResp]) => {
+      supabase.from('cardapios').select('*, cardapio_produtos(produto_id)').eq('ativo', true).order('nome'),
+      supabase.from('produto_complementos_permitidos').select('produto_id, produtos:complemento_produto_id(id, nome, preco, preco_promocional)'),
+    ]).then(([catResp, promoResp, cardapiosResp, complResp]) => {
       setCategorias(catResp.data || []);
       setPromocoes(promoResp.data || []);
+      setCardapios(cardapiosResp.data || []);
+      const mapa = new Map();
+      for (const c of complResp.data || []) {
+        if (!c.produtos) continue;
+        const atual = mapa.get(c.produto_id) || [];
+        atual.push(c.produtos);
+        mapa.set(c.produto_id, atual);
+      }
+      setComplementosPorProduto(mapa);
     });
 
     // Estoque é compartilhado entre todos os garçons — qualquer venda em
@@ -1193,9 +1207,13 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
     toqueInicioX.current = null;
   }
 
+  const cardapioSelecionado = cardapios.find((c) => c.id === cardapioAtivo);
+  const idsCardapio = cardapioSelecionado ? new Set(cardapioSelecionado.cardapio_produtos.map((cp) => cp.produto_id)) : null;
+
   const produtosFiltrados = (produtos === null ? [] : produtos)
     .filter((p) => categoriaAtiva === CATEGORIA_TODAS || categorias.find((c) => c.id === p.categoria_id)?.nome === categoriaAtiva)
-    .filter((p) => !busca.trim() || p.nome.toLowerCase().includes(busca.trim().toLowerCase()));
+    .filter((p) => !busca.trim() || p.nome.toLowerCase().includes(busca.trim().toLowerCase()))
+    .filter((p) => !idsCardapio || idsCardapio.has(p.id));
 
   const total = carrinho.reduce((s, i) => s + i.preco * i.quantidade, 0);
 
@@ -1224,6 +1242,15 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
         <Search size={15} />
         <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar produto..." />
       </div>
+
+      {cardapios.length > 0 && (
+        <select value={cardapioAtivo} onChange={(e) => setCardapioAtivo(e.target.value)}>
+          <option value="">Cardápio: Todos os produtos</option>
+          {cardapios.map((c) => (
+            <option key={c.id} value={c.id}>Cardápio: {c.nome}</option>
+          ))}
+        </select>
+      )}
 
       <div className="tab-row">
         {categoriasComTodos.map((c) => (
@@ -1270,6 +1297,22 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
                     <Plus size={12} />
                   </button>
                 </div>
+                {qtd > 0 && (complementosPorProduto.get(p.id) || []).length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                    {(complementosPorProduto.get(p.id) || []).map((comp) => (
+                      <button
+                        key={comp.id}
+                        type="button"
+                        className="chip"
+                        style={{ cursor: 'pointer', fontSize: 10.5, border: '1px dashed var(--primary)' }}
+                        onClick={() => adicionar(produtos.find((prod) => prod.id === comp.id) || comp, 1)}
+                        title={`Adicionar ${comp.nome} (${money(precoEfetivo(comp, promocoes))})`}
+                      >
+                        + {comp.nome}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { Upload } from 'lucide-react';
+import { Copy, Upload } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import Promocoes from './Promocoes';
 import Estoque from './Estoque';
+import Cardapios from './Cardapios';
 
 const PLACEHOLDER_SVG = "<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44'><rect width='44' height='44' rx='10' fill='#f0eafa'/></svg>";
 const PLACEHOLDER_FOTO = 'data:image/svg+xml;utf8,' + encodeURIComponent(PLACEHOLDER_SVG);
@@ -26,10 +27,13 @@ export default function Produtos() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="tab-row">
         <button type="button" className="tab" aria-pressed={aba === 'produtos'} onClick={() => setAba('produtos')}>
-          Produtos
+          Cardápio
         </button>
         <button type="button" className="tab" aria-pressed={aba === 'categorias'} onClick={() => setAba('categorias')}>
           Categorias
+        </button>
+        <button type="button" className="tab" aria-pressed={aba === 'cardapios'} onClick={() => setAba('cardapios')}>
+          Cardápios
         </button>
         <button type="button" className="tab" aria-pressed={aba === 'promocoes'} onClick={() => setAba('promocoes')}>
           Promoções
@@ -40,6 +44,8 @@ export default function Produtos() {
       </div>
       {aba === 'categorias' ? (
         <Categorias categorias={categorias} onMudou={carregarCategorias} />
+      ) : aba === 'cardapios' ? (
+        <Cardapios />
       ) : aba === 'promocoes' ? (
         <Promocoes />
       ) : aba === 'estoque' ? (
@@ -102,6 +108,7 @@ function campoVazio(produto) {
   return {
     nome: produto?.nome || '',
     descricao: produto?.descricao || '',
+    observacoes: produto?.observacoes || '',
     preco: produto ? String(produto.preco) : '',
     preco_promocional: produto?.preco_promocional != null ? String(produto.preco_promocional) : '',
     categoria_id: produto?.categoria_id || '',
@@ -127,6 +134,7 @@ function validar(campos, avisar) {
   return {
     nome,
     descricao: campos.descricao.trim() || null,
+    observacoes: campos.observacoes.trim() || null,
     preco,
     preco_promocional: precoPromo,
     categoria_id: campos.categoria_id || null,
@@ -146,6 +154,8 @@ function CamposProduto({ campos, setCampos, categorias }) {
       <input value={campos.nome} onChange={(e) => setCampos({ ...campos, nome: e.target.value })} placeholder="Coca Cola Zero Lata" />
       <span className="label">Descrição (opcional)</span>
       <input value={campos.descricao} onChange={(e) => setCampos({ ...campos, descricao: e.target.value })} />
+      <span className="label">Observação (uso interno, não aparece pro cliente)</span>
+      <input value={campos.observacoes} onChange={(e) => setCampos({ ...campos, observacoes: e.target.value })} placeholder="Ex: sem estoque às segundas" />
       <div className="row" style={{ gap: 8 }}>
         <div style={{ flex: 1 }}>
           <span className="label">Preço (R$)</span>
@@ -198,6 +208,7 @@ function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
   const [importando, setImportando] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [campos, setCampos] = useState(campoVazio(null));
+  const [complementos, setComplementos] = useState([]);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
 
@@ -227,10 +238,29 @@ function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
     carregar();
   }
 
-  function editar(p) {
+  async function duplicar(p) {
+    const copia = { ...p };
+    delete copia.id;
+    delete copia.criado_em;
+    copia.nome = `${p.nome} (cópia)`;
+    const { error } = await supabase.from('produtos').insert(copia);
+    if (error) {
+      window.alert('Falha ao duplicar: ' + error.message);
+      return;
+    }
+    carregar();
+  }
+
+  async function editar(p) {
     setEditandoId(p.id);
     setCampos(campoVazio(p));
     setErro('');
+    const { data } = await supabase.from('produto_complementos_permitidos').select('complemento_produto_id').eq('produto_id', p.id);
+    setComplementos((data || []).map((c) => c.complemento_produto_id));
+  }
+
+  function alternarComplemento(produtoId) {
+    setComplementos((atual) => (atual.includes(produtoId) ? atual.filter((id) => id !== produtoId) : [...atual, produtoId]));
   }
 
   async function salvarEdicao(id) {
@@ -240,11 +270,16 @@ function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
     setSalvando(true);
     const original = produtos.find((p) => p.id === id);
     const { error } = await supabase.from('produtos').update(dados).eq('id', id);
-    setSalvando(false);
     if (error) {
+      setSalvando(false);
       setErro(error.message);
       return;
     }
+    await supabase.from('produto_complementos_permitidos').delete().eq('produto_id', id);
+    if (complementos.length > 0) {
+      await supabase.from('produto_complementos_permitidos').insert(complementos.map((complemento_produto_id) => ({ produto_id: id, complemento_produto_id })));
+    }
+    setSalvando(false);
     if (original && Number(original.preco) !== dados.preco) {
       const {
         data: { user },
@@ -310,62 +345,133 @@ function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
       ) : produtos.length === 0 ? (
         <p className="muted" style={{ fontSize: 13 }}>Nenhum produto cadastrado ainda.</p>
       ) : (
-        <div className="list">
-          {produtos.map((p) => {
-            if (editandoId === p.id) {
+        <ProdutosPorCategoria
+          produtos={produtos}
+          categorias={categorias}
+          editandoId={editandoId}
+          campos={campos}
+          setCampos={setCampos}
+          complementos={complementos}
+          onAlternarComplemento={alternarComplemento}
+          erro={erro}
+          salvando={salvando}
+          onCancelarEdicao={() => setEditandoId(null)}
+          onSalvarEdicao={salvarEdicao}
+          onAlternarAtivo={alternarAtivo}
+          onEditar={editar}
+          onDuplicar={duplicar}
+        />
+      )}
+    </div>
+  );
+}
+
+function ProdutosPorCategoria({
+  produtos,
+  categorias,
+  editandoId,
+  campos,
+  setCampos,
+  complementos,
+  onAlternarComplemento,
+  erro,
+  salvando,
+  onCancelarEdicao,
+  onSalvarEdicao,
+  onAlternarAtivo,
+  onEditar,
+  onDuplicar,
+}) {
+  const grupos = [...categorias.map((c) => ({ id: c.id, nome: c.nome })), { id: null, nome: 'Sem categoria' }]
+    .map((c) => ({ ...c, itens: produtos.filter((p) => (p.categoria_id || null) === c.id) }))
+    .filter((g) => g.itens.length > 0);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      {grupos.map((grupo) => (
+        <div key={grupo.id || 'sem-categoria'}>
+          <div style={{ fontWeight: 800, fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.4, color: 'var(--text-dim)', marginBottom: 8 }}>
+            {grupo.nome} <span className="muted" style={{ fontWeight: 400, textTransform: 'none' }}>({grupo.itens.length})</span>
+          </div>
+          <div className="list">
+            {grupo.itens.map((p) => {
+              if (editandoId === p.id) {
+                return (
+                  <div key={p.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <CamposProduto campos={campos} setCampos={setCampos} categorias={categorias} />
+                    <span className="label" style={{ marginTop: 6 }}>Complementos (produtos já cadastrados que podem ser acrescentados)</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxHeight: 140, overflowY: 'auto', padding: '4px 0' }}>
+                      {produtos.filter((op) => op.id !== p.id).map((op) => (
+                        <label
+                          key={op.id}
+                          className="chip"
+                          style={{
+                            cursor: 'pointer',
+                            border: complementos.includes(op.id) ? '1.5px solid var(--primary)' : '1px solid var(--border)',
+                            background: complementos.includes(op.id) ? 'var(--primary-soft, rgba(74,95,232,0.1))' : 'transparent',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={complementos.includes(op.id)}
+                            onChange={() => onAlternarComplemento(op.id)}
+                            style={{ marginRight: 4 }}
+                          />
+                          {op.nome}
+                        </label>
+                      ))}
+                    </div>
+                    {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={onCancelarEdicao}>
+                        Cancelar
+                      </button>
+                      <button type="button" className="btn btn-primary" style={{ flex: 1 }} disabled={salvando} onClick={() => onSalvarEdicao(p.id)}>
+                        {salvando ? 'Salvando…' : 'Salvar'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+              const semControle = p.estoque === null;
+              const baixo = !semControle && p.estoque_minimo != null && Number(p.estoque) <= Number(p.estoque_minimo);
               return (
-                <div key={p.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <CamposProduto campos={campos} setCampos={setCampos} categorias={categorias} />
-                  {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
-                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                    <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setEditandoId(null)}>
-                      Cancelar
-                    </button>
-                    <button type="button" className="btn btn-primary" style={{ flex: 1 }} disabled={salvando} onClick={() => salvarEdicao(p.id)}>
-                      {salvando ? 'Salvando…' : 'Salvar'}
-                    </button>
+                <div key={p.id} className="card row" style={{ opacity: p.ativo ? 1 : 0.5 }}>
+                  <img className="product-thumb" src={p.foto_url || PLACEHOLDER_FOTO} alt="" style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover', background: 'var(--panel-2)' }} />
+                  <div style={{ flex: 1, paddingRight: 8 }}>
+                    <div>{p.nome}</div>
+                    <div style={{ fontSize: 12, marginTop: 2, color: baixo ? 'var(--danger)' : 'var(--text-dim)' }}>
+                      {semControle ? 'Sem controle de estoque' : `Estoque: ${p.estoque}${baixo ? ' — repor logo' : ''}`}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div className="tabular" style={{ fontWeight: 600 }}>
+                      {p.preco_promocional ? (
+                        <>
+                          <span className="muted" style={{ textDecoration: 'line-through', fontSize: 12 }}>{money(p.preco)}</span> {money(p.preco_promocional)}
+                        </>
+                      ) : (
+                        money(p.preco)
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6, justifyContent: 'flex-end' }}>
+                      <button type="button" className="btn btn-secondary btn-sm" title="Duplicar" onClick={() => onDuplicar(p)}>
+                        <Copy size={13} />
+                      </button>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => onAlternarAtivo(p)}>
+                        {p.ativo ? 'Desativar' : 'Ativar'}
+                      </button>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => onEditar(p)}>
+                        Editar
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
-            }
-            const semControle = p.estoque === null;
-            const baixo = !semControle && p.estoque_minimo != null && Number(p.estoque) <= Number(p.estoque_minimo);
-            const categoria = categorias.find((c) => c.id === p.categoria_id);
-            return (
-              <div key={p.id} className="card row" style={{ opacity: p.ativo ? 1 : 0.5 }}>
-                <img className="product-thumb" src={p.foto_url || PLACEHOLDER_FOTO} alt="" style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover', background: 'var(--panel-2)' }} />
-                <div style={{ flex: 1, paddingRight: 8 }}>
-                  <div>
-                    {p.nome} {categoria && <span className="muted" style={{ fontSize: 11 }}>({categoria.nome})</span>}
-                  </div>
-                  <div style={{ fontSize: 12, marginTop: 2, color: baixo ? 'var(--danger)' : 'var(--text-dim)' }}>
-                    {semControle ? 'Sem controle de estoque' : `Estoque: ${p.estoque}${baixo ? ' — repor logo' : ''}`}
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div className="tabular" style={{ fontWeight: 600 }}>
-                    {p.preco_promocional ? (
-                      <>
-                        <span className="muted" style={{ textDecoration: 'line-through', fontSize: 12 }}>{money(p.preco)}</span> {money(p.preco_promocional)}
-                      </>
-                    ) : (
-                      money(p.preco)
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, marginTop: 6, justifyContent: 'flex-end' }}>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => alternarAtivo(p)}>
-                      {p.ativo ? 'Desativar' : 'Ativar'}
-                    </button>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => editar(p)}>
-                      Editar
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+            })}
+          </div>
         </div>
-      )}
+      ))}
     </div>
   );
 }
