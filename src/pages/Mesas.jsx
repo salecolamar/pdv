@@ -152,22 +152,11 @@ export function HistoricoPDV() {
   const [itensPorVenda, setItensPorVenda] = useState(new Map());
   const [cancelandoId, setCancelandoId] = useState(null);
   const [motivo, setMotivo] = useState('');
-  const [podeCancelar, setPodeCancelar] = useState(false);
+  const [autorizadoPor, setAutorizadoPor] = useState(null);
   const [erro, setErro] = useState('');
 
   useEffect(() => {
     carregar();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
-      supabase
-        .from('usuarios')
-        .select('role, permissoes')
-        .eq('id', user.id)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data) setPodeCancelar(data.role !== 'operador' || !!data.permissoes?.cancelar_venda);
-        });
-    });
   }, []);
 
   async function carregar() {
@@ -192,12 +181,14 @@ export function HistoricoPDV() {
   }
 
   async function confirmarCancelamento(id) {
-    const { error } = await supabase.rpc('cancelar_venda', { p_venda_id: id, p_motivo: motivo.trim() || null });
+    const motivoComAutorizacao = `${motivo.trim()} (autorizado por ${autorizadoPor.nome})`.trim();
+    const { error } = await supabase.rpc('cancelar_venda', { p_venda_id: id, p_motivo: motivoComAutorizacao });
     if (error) {
       setErro(error.message.replace('P0001: ', ''));
       return;
     }
     setCancelandoId(null);
+    setAutorizadoPor(null);
     setMotivo('');
     setErro('');
     carregar();
@@ -228,8 +219,8 @@ export function HistoricoPDV() {
               <button type="button" className="btn btn-secondary btn-sm" onClick={() => verProdutos(v.id)}>
                 <Package size={13} /> Produtos
               </button>
-              {podeCancelar && !v.cancelada && (
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setCancelandoId(v.id); setMotivo(''); setErro(''); }}>
+              {!v.cancelada && (
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setCancelandoId(v.id); setAutorizadoPor(null); setMotivo(''); setErro(''); }}>
                   Cancelar
                 </button>
               )}
@@ -244,8 +235,18 @@ export function HistoricoPDV() {
                 ))}
               </div>
             )}
-            {cancelandoId === v.id && (
+            {cancelandoId === v.id && !autorizadoPor && (
+              <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 6 }}>
+                <AutorizacaoGerente
+                  titulo="Autorizar cancelamento da venda"
+                  onAutorizado={(usuario) => setAutorizadoPor(usuario)}
+                  onVoltar={() => setCancelandoId(null)}
+                />
+              </div>
+            )}
+            {cancelandoId === v.id && autorizadoPor && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid var(--border-soft)', paddingTop: 6 }}>
+                <span className="muted" style={{ fontSize: 12.5 }}>Autorizado por <strong>{autorizadoPor.nome}</strong></span>
                 <span className="label">Motivo do cancelamento (opcional)</span>
                 <input value={motivo} onChange={(e) => setMotivo(e.target.value)} />
                 {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
@@ -345,6 +346,7 @@ function Comanda({ mesa, mesas, onVoltar }) {
   const [itensSelecionados, setItensSelecionados] = useState(new Set());
   const [confirmandoCancelamento, setConfirmandoCancelamento] = useState(false);
   const [motivoCancelamento, setMotivoCancelamento] = useState('');
+  const [autorizadoPor, setAutorizadoPor] = useState(null);
   const [permissoesAtual, setPermissoesAtual] = useState({ role: 'admin', permissoes: {} });
   const [cancelando, setCancelando] = useState(false);
 
@@ -667,6 +669,7 @@ function Comanda({ mesa, mesas, onVoltar }) {
       <PagamentoParcialForm
         restante={restante}
         itensSelecionados={itens}
+        taxaPercentual={taxaAtiva ? taxaPercentual : 0}
         onConfirmar={async (forma, valor) => {
           const ok = await registrarPagamentoParcial(forma, valor);
           if (ok) {
@@ -752,11 +755,13 @@ function Comanda({ mesa, mesas, onVoltar }) {
           >
             <ArrowRightLeft size={14} /> Transferir ({itensSelecionados.size})
           </button>
-          {podeCancelar && (
-            <button type="button" className="btn btn-danger btn-sm" onClick={() => setConfirmandoCancelamento(true)}>
-              <Trash2 size={14} /> Cancelar ({itensSelecionados.size})
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn btn-danger btn-sm"
+            onClick={() => { setAutorizadoPor(null); setMotivoCancelamento(''); setConfirmandoCancelamento(true); }}
+          >
+            <Trash2 size={14} /> Cancelar ({itensSelecionados.size})
+          </button>
         </div>
       )}
 
@@ -772,6 +777,11 @@ function Comanda({ mesa, mesas, onVoltar }) {
         {pedido.status === 'aberto' && (
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setJuntandoMesas(true)} disabled={mesasDestinoJuntar.length === 0}>
             <Users2 size={14} /> Juntar mesa
+          </button>
+        )}
+        {pedido.status !== 'pago' && restante > 0 && (
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPagamentoParcialAberto(true)}>
+            <Wallet size={14} /> Pagamento parcial
           </button>
         )}
       </div>
@@ -882,12 +892,6 @@ function Comanda({ mesa, mesas, onVoltar }) {
         </div>
       )}
 
-      {pedido.status !== 'pago' && restante > 0 && (
-        <button type="button" className="btn btn-secondary btn-block" onClick={() => setPagamentoParcialAberto(true)}>
-          <Wallet size={14} /> Pagamento parcial
-        </button>
-      )}
-
       {pedido.status === 'fechado' && (
         <button type="button" className="btn btn-secondary btn-block" onClick={reabrirComanda}>
           Reabrir comanda (lançar mais itens)
@@ -921,12 +925,24 @@ function Comanda({ mesa, mesas, onVoltar }) {
         </div>
       )}
 
-      {confirmandoCancelamento && (
+      {confirmandoCancelamento && !autorizadoPor && (
+        <div className="modal-overlay" onClick={() => !cancelando && setConfirmandoCancelamento(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <AutorizacaoGerente
+              titulo={`Autorizar cancelamento de ${itensSelecionados.size} ${itensSelecionados.size === 1 ? 'item' : 'itens'}`}
+              onAutorizado={(usuario) => setAutorizadoPor(usuario)}
+              onVoltar={() => setConfirmandoCancelamento(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {confirmandoCancelamento && autorizadoPor && (
         <div className="modal-overlay" onClick={() => !cancelando && setConfirmandoCancelamento(false)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <h2>Cancelar {itensSelecionados.size} {itensSelecionados.size === 1 ? 'item' : 'itens'}?</h2>
             <p className="muted" style={{ fontSize: 13, margin: 0 }}>
-              O estoque volta a subir e o valor sai da comanda. Essa ação não pode ser desfeita.
+              Autorizado por <strong>{autorizadoPor.nome}</strong>. O estoque volta a subir e o valor sai da comanda. Essa ação não pode ser desfeita.
             </p>
             <span className="label">Motivo do cancelamento (opcional)</span>
             <input
@@ -944,7 +960,7 @@ function Comanda({ mesa, mesas, onVoltar }) {
                 className="btn btn-danger"
                 disabled={cancelando}
                 onClick={() => {
-                  confirmarCancelamentoSelecionados(motivoCancelamento.trim());
+                  confirmarCancelamentoSelecionados(`${motivoCancelamento.trim()} (autorizado por ${autorizadoPor.nome})`.trim());
                   setMotivoCancelamento('');
                 }}
               >
@@ -955,6 +971,92 @@ function Comanda({ mesa, mesas, onVoltar }) {
         </div>
       )}
     </div>
+  );
+}
+
+export function AutorizacaoGerente({ titulo, onAutorizado, onVoltar }) {
+  const [autorizadores, setAutorizadores] = useState(null);
+  const [usuarioId, setUsuarioId] = useState('');
+  const [senha, setSenha] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  useEffect(() => {
+    supabase
+      .from('usuarios')
+      .select('id, nome, role, permissoes')
+      .eq('ativo', true)
+      .then(({ data }) => {
+        const elegiveis = (data || []).filter((u) => u.role === 'admin' || u.role === 'gerente' || u.permissoes?.cancelar_venda);
+        setAutorizadores(elegiveis);
+        if (elegiveis.length > 0) setUsuarioId(elegiveis[0].id);
+      });
+  }, []);
+
+  async function confirmar(e) {
+    e.preventDefault();
+    setErro('');
+    if (!usuarioId) {
+      setErro('Nenhum usuário disponível pra autorizar.');
+      return;
+    }
+    if (!senha) {
+      setErro('Digite a senha (ou PIN).');
+      return;
+    }
+    setEnviando(true);
+    const { error } = await supabase.rpc('verificar_autorizacao_cancelamento', { p_usuario_id: usuarioId, p_senha: senha });
+    setEnviando(false);
+    if (error) {
+      setErro(error.message.replace('P0001: ', ''));
+      setSenha('');
+      return;
+    }
+    const usuario = autorizadores.find((u) => u.id === usuarioId);
+    onAutorizado(usuario);
+  }
+
+  return (
+    <form onSubmit={confirmar} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <h2 style={{ margin: 0 }}>{titulo || 'Autorização necessária'}</h2>
+      <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+        Essa ação exige autorização de um gerente ou admin. Escolha quem está autorizando e digite a senha (ou PIN) dele.
+      </p>
+
+      {autorizadores === null ? (
+        <p className="muted" style={{ fontSize: 13 }}>Carregando…</p>
+      ) : autorizadores.length === 0 ? (
+        <p className="danger-text" style={{ fontSize: 13 }}>Nenhum usuário com permissão de cancelamento cadastrado.</p>
+      ) : (
+        <>
+          <span className="label">Autorizado por</span>
+          <select value={usuarioId} onChange={(e) => setUsuarioId(e.target.value)}>
+            {autorizadores.map((u) => (
+              <option key={u.id} value={u.id}>{u.nome}</option>
+            ))}
+          </select>
+          <span className="label">Senha (ou PIN)</span>
+          <input
+            type="password"
+            value={senha}
+            onChange={(e) => setSenha(e.target.value)}
+            placeholder="••••••"
+            autoFocus
+          />
+        </>
+      )}
+
+      {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
+
+      <div className="modal-box__actions">
+        <button type="button" className="btn btn-secondary" disabled={enviando} onClick={onVoltar}>
+          Voltar
+        </button>
+        <button type="submit" className="btn btn-primary" disabled={enviando || !autorizadores?.length}>
+          {enviando ? 'Verificando…' : 'Confirmar'}
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -1125,10 +1227,12 @@ function TransferirItemForm({ itens, mesa, mesasDestino, onConfirmar, onVoltar }
   );
 }
 
-function PagamentoParcialForm({ restante, itensSelecionados, onConfirmar, onVoltar }) {
-  const valorSugerido = itensSelecionados
+function PagamentoParcialForm({ restante, itensSelecionados, taxaPercentual = 0, onConfirmar, onVoltar }) {
+  const subtotalSelecionado = itensSelecionados
     ? itensSelecionados.reduce((s, i) => s + i.quantidade * i.preco_unitario, 0)
     : restante;
+  const taxaSelecionada = itensSelecionados && taxaPercentual > 0 ? Math.round(subtotalSelecionado * (taxaPercentual / 100) * 100) / 100 : 0;
+  const valorSugerido = Math.min(subtotalSelecionado + taxaSelecionada, restante);
   const [forma, setForma] = useState('dinheiro');
   const [valor, setValor] = useState(valorSugerido.toFixed(2));
   const [enviando, setEnviando] = useState(false);
@@ -1178,6 +1282,12 @@ function PagamentoParcialForm({ restante, itensSelecionados, onConfirmar, onVolt
               <span className="tabular">{money(item.quantidade * item.preco_unitario)}</span>
             </div>
           ))}
+          {taxaSelecionada > 0 && (
+            <div className="row" style={{ fontSize: 13, borderTop: '1px dashed var(--border)', paddingTop: 6 }}>
+              <span className="muted">Taxa de serviço ({taxaPercentual}%)</span>
+              <span className="tabular">{money(taxaSelecionada)}</span>
+            </div>
+          )}
         </div>
       )}
 
