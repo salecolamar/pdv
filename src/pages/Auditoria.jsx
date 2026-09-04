@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Ban, DoorClosed, DoorOpen, History, Percent, Tag, Wallet } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 
@@ -9,6 +10,15 @@ const ACAO_LABEL = {
   alterar_preco: 'Alterou preço',
   cancelar_venda: 'Cancelou venda',
   cancelar_item_pedido: 'Cancelou item da comanda',
+};
+
+const ACAO_ICONE = {
+  abrir_caixa: [DoorOpen, 'var(--success, #2f9e5f)'],
+  fechar_caixa: [DoorClosed, 'var(--text-dim)'],
+  desconto: [Percent, 'var(--atencao)'],
+  alterar_preco: [Tag, 'var(--primary)'],
+  cancelar_venda: [Ban, 'var(--danger)'],
+  cancelar_item_pedido: [Ban, 'var(--danger)'],
 };
 
 function resumoDetalhes(log) {
@@ -45,7 +55,12 @@ export default function Auditoria() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <p className="muted" style={{ fontSize: 13 }}>Últimas 100 ações sensíveis registradas no sistema.</p>
+      <div className="card row" style={{ padding: '10px 14px' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
+          <History size={15} style={{ color: 'var(--text-dim)' }} />
+          Últimas 100 ações sensíveis registradas no sistema.
+        </span>
+      </div>
 
       {logs === null ? (
         <p className="muted">Carregando…</p>
@@ -53,16 +68,29 @@ export default function Auditoria() {
         <p className="muted" style={{ fontSize: 13 }}>Nenhuma ação registrada ainda.</p>
       ) : (
         <div className="list">
-          {logs.map((log) => (
-            <div key={log.id} className="item" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
-              <div className="row" style={{ width: '100%' }}>
-                <span style={{ fontWeight: 600 }}>{ACAO_LABEL[log.acao] || log.acao}</span>
-                <span className="muted" style={{ fontSize: 11 }}>{new Date(log.criado_em).toLocaleString('pt-BR')}</span>
+          {logs.map((log) => {
+            const [Icon, cor] = ACAO_ICONE[log.acao] || [Wallet, 'var(--text-dim)'];
+            return (
+              <div key={log.id} className="card row" style={{ alignItems: 'flex-start', gap: 10 }}>
+                <div
+                  style={{
+                    width: 32, height: 32, borderRadius: 10, background: cor, color: '#fff', flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1,
+                  }}
+                >
+                  <Icon size={15} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <div className="row">
+                    <span style={{ fontWeight: 700, fontSize: 13.5 }}>{ACAO_LABEL[log.acao] || log.acao}</span>
+                    <span className="muted" style={{ fontSize: 11 }}>{new Date(log.criado_em).toLocaleString('pt-BR')}</span>
+                  </div>
+                  <span className="muted" style={{ fontSize: 12 }}>{resumoDetalhes(log)}</span>
+                  <span className="muted" style={{ fontSize: 11 }}>{log.usuarios?.nome || 'Usuário removido'}</span>
+                </div>
               </div>
-              <span className="muted" style={{ fontSize: 12 }}>{resumoDetalhes(log)}</span>
-              <span className="muted" style={{ fontSize: 11 }}>{log.usuarios?.nome || 'Usuário removido'}</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

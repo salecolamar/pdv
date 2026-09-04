@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Percent, Sparkles, Trash2 } from 'lucide-react';
 import { supabase } from '../supabase';
 
 const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -65,7 +65,7 @@ export default function Promocoes() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <button type="button" className="btn btn-primary btn-block" onClick={() => setCriando(true)}>
-        Nova promoção
+        <Sparkles size={16} /> Nova promoção
       </button>
 
       {promocoes === null ? (
@@ -75,11 +75,16 @@ export default function Promocoes() {
       ) : (
         <div className="list">
           {promocoes.map((promo) => (
-            <div key={promo.id} className="card">
+            <div key={promo.id} className="card" style={{ opacity: promo.ativo ? 1 : 0.55 }}>
               <div className="row">
-                <div>
-                  <div style={{ fontWeight: 600 }}>{promo.nome}</div>
-                  <div className="muted" style={{ fontSize: 12 }}>{nomeAlvo(promo)}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Percent size={15} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14.5 }}>{promo.nome}</div>
+                    <div className="muted" style={{ fontSize: 12 }}>{nomeAlvo(promo)}</div>
+                  </div>
                 </div>
                 <span className="chip chip-primary">
                   {promo.tipo === 'percentual' ? `-${promo.valor}%` : `-R$ ${Number(promo.valor).toFixed(2)}`}

@@ -3,6 +3,33 @@ import { Search, Star } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money, mascararTelefone, mascararCpf } from '../utils/format';
 
+function iniciais(nome) {
+  const partes = nome.trim().split(/\s+/);
+  return ((partes[0]?.[0] || '') + (partes[1]?.[0] || '')).toUpperCase();
+}
+
+function AvatarCliente({ nome }) {
+  return (
+    <div
+      style={{
+        width: 38,
+        height: 38,
+        borderRadius: '50%',
+        background: 'var(--primary)',
+        color: '#fff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontWeight: 800,
+        fontSize: 13.5,
+        flexShrink: 0,
+      }}
+    >
+      {iniciais(nome)}
+    </div>
+  );
+}
+
 function campoVazio(cliente) {
   return {
     nome: cliente?.nome || '',
@@ -88,12 +115,12 @@ export default function Clientes() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {!mostrarForm ? (
         <>
-          <div className="card row" style={{ padding: '10px 14px' }}>
-            <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
-              Programa de fidelidade: cada cliente ganha pontos (★) por R$ gasto em vendas vinculadas a ele. Resgate os pontos no cartão do cliente quando ele trocar por desconto/brinde no balcão.
+          <div className="card row" style={{ padding: '14px 16px', background: 'linear-gradient(135deg, var(--primary), #6C3CE0)', color: '#fff' }}>
+            <p style={{ fontSize: 12.5, margin: 0, opacity: 0.92 }}>
+              <strong>★ Programa de fidelidade:</strong> cada cliente ganha pontos por R$ gasto em vendas vinculadas a ele. Resgate os pontos no cartão do cliente quando ele trocar por desconto/brinde no balcão.
             </p>
-            <button type="button" className="btn btn-secondary btn-sm" style={{ flexShrink: 0 }} onClick={() => setEditandoRegra(true)}>
-              <Star size={14} /> Regra de fidelidade
+            <button type="button" className="btn btn-sm" style={{ flexShrink: 0, background: '#fff', color: 'var(--primary)', fontWeight: 700 }} onClick={() => setEditandoRegra(true)}>
+              <Star size={14} /> Regra
             </button>
           </div>
           {editandoRegra && empresaId && <RegraFidelidade empresaId={empresaId} onFechar={() => setEditandoRegra(false)} />}
@@ -207,9 +234,10 @@ function ClienteCard({ cliente, expandido, onExpandir, onEditar, onExcluir, onMu
 
   return (
     <div className="card">
-      <div className="row" style={{ cursor: 'pointer' }} onClick={onExpandir}>
-        <div>
-          <div style={{ fontWeight: 600 }}>{cliente.nome}</div>
+      <div className="row" style={{ cursor: 'pointer', gap: 10 }} onClick={onExpandir}>
+        <AvatarCliente nome={cliente.nome} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 14.5 }}>{cliente.nome}</div>
           <div className="muted" style={{ fontSize: 12 }}>{cliente.telefone || 'sem telefone'}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

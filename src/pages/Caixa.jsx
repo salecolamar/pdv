@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
+import { ArrowDownCircle, ArrowUpCircle, Banknote, Receipt, Wallet } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money, metodoLabel } from '../utils/format';
+import EscolhaCard from '../components/EscolhaCard';
 
 const TIPOS_MOVIMENTO = [
-  ['entrada', 'Entrada'],
-  ['sangria', 'Sangria'],
-  ['retirada', 'Retirada'],
-  ['despesa', 'Despesa'],
+  ['entrada', 'Entrada', ArrowDownCircle],
+  ['sangria', 'Sangria', Wallet],
+  ['retirada', 'Retirada', ArrowUpCircle],
+  ['despesa', 'Despesa', Receipt],
 ];
 
 export default function Caixa() {
@@ -217,10 +219,15 @@ function CaixaAberto({ caixa, onFechado }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div className="card">
-        <p className="muted" style={{ fontSize: 12 }}>Caixa aberto</p>
-        <p style={{ fontWeight: 700 }}>{caixa.usuarios?.nome || 'Operador'} · {new Date(caixa.aberto_em).toLocaleString('pt-BR')}</p>
-        <p className="tabular" style={{ marginTop: 4 }}>Valor inicial: {money(caixa.valor_inicial)}</p>
+      <div className="card" style={{ background: 'linear-gradient(135deg, var(--primary), #6C3CE0)', color: '#fff', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Wallet size={20} />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ fontSize: 11.5, margin: 0, opacity: 0.85 }}>Caixa aberto</p>
+          <p style={{ fontWeight: 700, margin: '2px 0 0', fontSize: 14 }}>{caixa.usuarios?.nome || 'Operador'} · {new Date(caixa.aberto_em).toLocaleString('pt-BR')}</p>
+          <p className="tabular" style={{ marginTop: 2, fontSize: 13 }}>Valor inicial: {money(caixa.valor_inicial)}</p>
+        </div>
       </div>
 
       {resumoPagamentos && (
@@ -245,7 +252,7 @@ function CaixaAberto({ caixa, onFechado }) {
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>{TIPOS_MOVIMENTO.find(([id]) => id === abrindoTipo)[1]}</div>
           <span className="label">Valor (R$)</span>
-          <input value={valor} onChange={(e) => setValor(e.target.value)} inputMode="decimal" />
+          <input value={valor} onChange={(e) => setValor(e.target.value)} inputMode="decimal" autoFocus />
           <span className="label">Motivo (opcional)</span>
           <input value={motivo} onChange={(e) => setMotivo(e.target.value)} />
           {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
@@ -259,12 +266,13 @@ function CaixaAberto({ caixa, onFechado }) {
           </div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-          {TIPOS_MOVIMENTO.map(([id, label]) => (
-            <button key={id} type="button" className="btn btn-secondary" onClick={() => { setAbrindoTipo(id); setErro(''); }}>
-              {label}
-            </button>
-          ))}
+        <div>
+          <span className="label">Movimentar caixa</span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginTop: 4 }}>
+            {TIPOS_MOVIMENTO.map(([id, label, Icon]) => (
+              <EscolhaCard key={id} selecionado={false} onClick={() => { setAbrindoTipo(id); setErro(''); }} icon={Icon} titulo={label} />
+            ))}
+          </div>
         </div>
       )}
 
@@ -318,16 +326,26 @@ function FecharCaixa({ caixa, resumoPagamentos, totalMovimentos, onVoltar, onFec
   }
 
   if (resultado) {
+    const bateu = Math.abs(resultado.diferenca) < 0.01;
+    const cor = bateu ? 'var(--success, #2f9e5f)' : resultado.diferenca > 0 ? 'var(--primary)' : 'var(--danger)';
     return (
-      <div className="card" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <p style={{ fontWeight: 700 }}>Caixa fechado</p>
-        <p className="muted" style={{ fontSize: 13 }}>Valor esperado</p>
-        <p className="tabular" style={{ fontSize: 20, fontWeight: 700 }}>{money(resultado.esperado)}</p>
+      <div className="card" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 4, padding: '28px 20px' }}>
+        <div
+          style={{
+            width: 56, height: 56, borderRadius: '50%', background: cor, color: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px',
+          }}
+        >
+          <Banknote size={26} />
+        </div>
+        <p style={{ fontWeight: 800, fontSize: 17 }}>Caixa fechado</p>
+        <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>Valor esperado</p>
+        <p className="tabular" style={{ fontSize: 22, fontWeight: 800 }}>{money(resultado.esperado)}</p>
         <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>Diferença</p>
-        <p className={'tabular ' + (Math.abs(resultado.diferenca) < 0.01 ? '' : resultado.diferenca > 0 ? 'success-text' : 'danger-text')} style={{ fontSize: 20, fontWeight: 700 }}>
+        <p className="tabular" style={{ fontSize: 22, fontWeight: 800, color: cor }}>
           {resultado.diferenca > 0 ? '+' : ''}{money(resultado.diferenca)}
         </p>
-        <button type="button" className="btn btn-primary btn-block" style={{ marginTop: 10 }} onClick={onFechado}>
+        <button type="button" className="btn btn-primary btn-block" style={{ marginTop: 16 }} onClick={onFechado}>
           Concluir
         </button>
       </div>

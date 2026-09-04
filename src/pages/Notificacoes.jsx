@@ -102,14 +102,20 @@ export default function Notificacoes() {
             gap: 6,
           }}
         >
-          <div style={{ fontWeight: 700, marginBottom: 2 }}>Notificações</div>
+          <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 2 }}>Notificações</div>
           {alertas.length === 0 ? (
             <p className="muted" style={{ fontSize: 13, margin: 0 }}>Nenhum alerta no momento.</p>
           ) : (
             alertas.map((a, idx) => (
-              <p key={idx} className={a.nivel === 'danger' ? 'danger-text' : ''} style={{ fontSize: 12.5, margin: 0, color: a.nivel === 'atencao' ? '#d9a441' : undefined }}>
-                {a.texto}
-              </p>
+              <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5 }}>
+                <span
+                  style={{
+                    width: 7, height: 7, borderRadius: '50%', flexShrink: 0, marginTop: 4,
+                    background: a.nivel === 'danger' ? 'var(--danger)' : 'var(--atencao)',
+                  }}
+                />
+                <span>{a.texto}</span>
+              </div>
             ))
           )}
         </div>

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import Switch from '../components/Switch';
+import EscolhaCard from '../components/EscolhaCard';
 
 const PERMISSOES = [
   ['realizar_vendas', 'Realizar vendas', ShoppingCart],
@@ -59,48 +60,6 @@ function Avatar({ nome, role, tamanho = 40 }) {
     >
       {iniciais(nome)}
     </div>
-  );
-}
-
-function EscolhaCard({ selecionado, onClick, icon: Icon, titulo, descricao }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        flex: 1,
-        textAlign: 'left',
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: 10,
-        padding: '12px 14px',
-        borderRadius: 14,
-        cursor: 'pointer',
-        border: selecionado ? '2px solid var(--primary)' : '1.5px solid var(--border)',
-        background: selecionado ? 'color-mix(in srgb, var(--primary) 10%, var(--panel))' : 'var(--panel)',
-        transition: 'border-color .15s, background .15s',
-      }}
-    >
-      <div
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: 10,
-          background: selecionado ? 'var(--primary)' : 'var(--panel-2)',
-          color: selecionado ? '#fff' : 'var(--text-dim)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-        }}
-      >
-        <Icon size={16} />
-      </div>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 13.5, color: selecionado ? 'var(--primary)' : 'var(--text)' }}>{titulo}</div>
-        {descricao && <div className="muted" style={{ fontSize: 11.5, marginTop: 1, lineHeight: 1.3 }}>{descricao}</div>}
-      </div>
-    </button>
   );
 }
 

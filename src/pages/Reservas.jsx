@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { CalendarClock, CalendarPlus, Check, Phone, Trash2 } from 'lucide-react';
 import { supabase } from '../supabase';
 
 export default function Reservas() {
@@ -54,7 +54,7 @@ export default function Reservas() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <button type="button" className="btn btn-primary btn-block" onClick={() => setCriando(true)}>
-        Nova reserva
+        <CalendarPlus size={16} /> Nova reserva
       </button>
 
       <div className="tab-row">
@@ -86,16 +86,21 @@ export default function Reservas() {
                     {r.status === 'pendente' ? (atrasada ? 'Atrasada' : 'Pendente') : r.status === 'concluida' ? 'Concluída' : 'Cancelada'}
                   </span>
                 </div>
-                <div className="muted" style={{ fontSize: 12.5 }}>
+                <div className="muted" style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                  <CalendarClock size={13} />
                   {horario.toLocaleDateString('pt-BR')} às {horario.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                   {mesasDaReserva.length > 0 ? ` · ${mesasDaReserva.join(', ')}` : ''}
-                  {r.telefone ? ` · ${r.telefone}` : ''}
+                  {r.telefone && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                      · <Phone size={12} /> {r.telefone}
+                    </span>
+                  )}
                 </div>
                 {r.observacao && <div className="muted" style={{ fontSize: 12.5 }}>{r.observacao}</div>}
                 {r.status === 'pendente' && (
                   <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => mudarStatus(r, 'concluida')}>
-                      Cliente chegou
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => mudarStatus(r, 'concluida')}>
+                      <Check size={14} /> Cliente chegou
                     </button>
                     <button
                       type="button"

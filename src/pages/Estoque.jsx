@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { History } from 'lucide-react';
 import { supabase } from '../supabase';
 
 export default function Estoque() {
@@ -98,7 +99,7 @@ export default function Estoque() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <button type="button" className="btn btn-secondary btn-block" onClick={abrirHistorico}>
-        Ver histórico de movimentações
+        <History size={15} /> Ver histórico de movimentações
       </button>
 
       {produtos === null ? (
@@ -116,12 +117,12 @@ export default function Estoque() {
               <div key={p.id} className="card">
                 <div className="row">
                   <div>
-                    <div style={{ fontWeight: 600 }}>{p.nome}</div>
-                    <div style={{ fontSize: 12, color: semEstoque ? 'var(--danger)' : baixo ? 'var(--danger)' : 'var(--text-dim)' }}>
-                      {semEstoque ? 'Sem estoque' : baixo ? 'Estoque baixo — repor logo' : 'Estoque ok'}
-                    </div>
+                    <div style={{ fontWeight: 700, fontSize: 14.5 }}>{p.nome}</div>
+                    <span className={'chip ' + (semEstoque || baixo ? 'chip-danger' : 'chip-success')} style={{ marginTop: 3 }}>
+                      {semEstoque ? 'Sem estoque' : baixo ? 'Estoque baixo' : 'Estoque ok'}
+                    </span>
                   </div>
-                  <span className="tabular" style={{ fontSize: 20, fontWeight: 800 }}>{p.estoque}</span>
+                  <span className="tabular" style={{ fontSize: 22, fontWeight: 800, color: semEstoque || baixo ? 'var(--danger)' : 'var(--text)' }}>{p.estoque}</span>
                 </div>
                 {movimentandoId === p.id ? (
                   <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
