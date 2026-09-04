@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'node:crypto';
 
-const PAPEIS_CONVIDAVEIS = ['gerente', 'operador'];
+const PAPEIS_CONVIDAVEIS = ['admin', 'gerente', 'operador'];
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -41,7 +41,7 @@ export default async function handler(req, res) {
   let email, senha, role, permissoes, loginTipo;
 
   if (tipo === 'garcom') {
-    const { pin } = req.body || {};
+    const { pin, cargo } = req.body || {};
     if (!/^\d{6}$/.test(pin || '')) {
       res.status(400).json({ error: 'O PIN precisa ter exatamente 6 dígitos numéricos.' });
       return;
@@ -49,7 +49,10 @@ export default async function handler(req, res) {
     email = `garcom-${randomUUID()}@garcons.pdv.internal`;
     senha = pin;
     role = 'operador';
-    permissoes = { realizar_vendas: true };
+    permissoes =
+      cargo === 'gerente'
+        ? { realizar_vendas: true, cancelar_venda: true, dar_desconto: true, reimprimir: true }
+        : { realizar_vendas: true };
     loginTipo = 'pin';
   } else {
     ({ email, senha, role, permissoes } = req.body || {});

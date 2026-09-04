@@ -8,6 +8,7 @@ import {
   LogOut,
   Menu,
   Package,
+  Settings,
   ShoppingCart,
   Table2,
   UserCog,
@@ -30,6 +31,7 @@ import Notificacoes from './pages/Notificacoes';
 import Auditoria from './pages/Auditoria';
 import PosPago from './pages/PosPago';
 import Reservas from './pages/Reservas';
+import Configuracoes from './pages/Configuracoes';
 
 // Cada módulo diz quais papéis podem vê-lo (seção 10 do documento):
 // garçom (operador, login por PIN) só vende e atende (PDV/Mesas/Cozinha/
@@ -47,6 +49,7 @@ const MODULOS = [
   { id: 'usuarios', label: 'Usuários', icon: UserCog, papeis: ['admin'] },
   { id: 'relatorios', label: 'Relatórios', icon: BarChart3, papeis: ['admin', 'gerente'] },
   { id: 'auditoria', label: 'Auditoria', icon: History, papeis: ['admin'] },
+  { id: 'configuracoes', label: 'Configurações', icon: Settings, papeis: ['admin'] },
 ];
 
 export default function Shell({ session }) {
@@ -170,6 +173,7 @@ export default function Shell({ session }) {
           {abaAtiva === 'relatorios' && <Relatorios />}
           {abaAtiva === 'usuarios' && <Usuarios />}
           {abaAtiva === 'auditoria' && <Auditoria />}
+          {abaAtiva === 'configuracoes' && <Configuracoes />}
         </main>
       </div>
     </div>

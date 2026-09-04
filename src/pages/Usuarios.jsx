@@ -4,9 +4,10 @@ import { supabase } from '../supabase';
 
 const PERMISSOES = [
   ['realizar_vendas', 'Realizar vendas'],
-  ['cancelar_venda', 'Cancelar venda'],
+  ['cancelar_venda', 'Cancelar venda ou item lançado errado'],
   ['alterar_precos', 'Alterar preços'],
   ['dar_desconto', 'Dar desconto'],
+  ['reimprimir', 'Reimprimir venda em Ficha'],
   ['visualizar_faturamento', 'Visualizar faturamento'],
   ['alterar_estoque', 'Alterar estoque'],
 ];
@@ -43,7 +44,6 @@ export default function Usuarios() {
       </button>
 
       {empresaId && <LinkAcesso empresaId={empresaId} />}
-      {empresaId && <TaxaServico empresaId={empresaId} />}
 
       {usuarios === null ? (
         <p className="muted">Carregando…</p>
@@ -104,54 +104,6 @@ function LinkAcesso({ empresaId }) {
   );
 }
 
-function TaxaServico({ empresaId }) {
-  const [percentual, setPercentual] = useState('');
-  const [carregado, setCarregado] = useState(false);
-  const [salvando, setSalvando] = useState(false);
-  const [salvo, setSalvo] = useState(false);
-
-  useEffect(() => {
-    supabase
-      .from('empresas')
-      .select('taxa_servico_percentual')
-      .eq('id', empresaId)
-      .maybeSingle()
-      .then(({ data }) => {
-        setPercentual(String(data?.taxa_servico_percentual ?? 10));
-        setCarregado(true);
-      });
-  }, [empresaId]);
-
-  async function salvar(e) {
-    e.preventDefault();
-    const valor = Number(percentual.replace(',', '.'));
-    if (!(valor >= 0)) return;
-    setSalvando(true);
-    await supabase.from('empresas').update({ taxa_servico_percentual: valor }).eq('id', empresaId);
-    setSalvando(false);
-    setSalvo(true);
-    setTimeout(() => setSalvo(false), 2000);
-  }
-
-  if (!carregado) return null;
-
-  return (
-    <form onSubmit={salvar} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ fontWeight: 700 }}>Taxa de serviço</div>
-      <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
-        Percentual sugerido na hora de fechar a conta (o garçom pode desativar por venda, na tela de pagamento). Deixe 0 pra não cobrar.
-      </p>
-      <div className="row" style={{ gap: 8 }}>
-        <input value={percentual} onChange={(e) => setPercentual(e.target.value.replace(/[^\d,.-]/g, ''))} inputMode="decimal" style={{ width: 90 }} />
-        <span className="muted">%</span>
-        <button type="submit" className="btn btn-primary btn-sm" disabled={salvando} style={{ marginLeft: 'auto' }}>
-          {salvando ? 'Salvando…' : salvo ? 'Salvo!' : 'Salvar'}
-        </button>
-      </div>
-    </form>
-  );
-}
-
 function EditarUsuario({ usuario, onCancelar, onSalvo }) {
   const [role, setRole] = useState(usuario.role);
   const [ativo, setAtivo] = useState(usuario.ativo);
@@ -191,6 +143,24 @@ function EditarUsuario({ usuario, onCancelar, onSalvo }) {
       </label>
       <span className="label" style={{ marginTop: 4 }}>Comissão sobre vendas (%)</span>
       <input value={comissao} onChange={(e) => setComissao(e.target.value.replace(/[^\d,.-]/g, ''))} inputMode="decimal" placeholder="Ex: 10" />
+      {role === 'operador' && (
+        <>
+          <span className="label" style={{ marginTop: 4 }}>Cargo (atalho rápido)</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={() => setPermissoes({ realizar_vendas: true })}>
+              Garçom (padrão)
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              style={{ flex: 1 }}
+              onClick={() => setPermissoes({ realizar_vendas: true, cancelar_venda: true, dar_desconto: true, reimprimir: true })}
+            >
+              Gerente
+            </button>
+          </div>
+        </>
+      )}
       <span className="label" style={{ marginTop: 4 }}>Permissões</span>
       {PERMISSOES.map(([chave, label]) => (
         <label key={chave} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
@@ -218,6 +188,8 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
   const [senha, setSenha] = useState('');
   const [pin, setPin] = useState('');
   const [confirmarPin, setConfirmarPin] = useState('');
+  const [cargo, setCargo] = useState('garcom');
+  const [roleEmail, setRoleEmail] = useState('gerente');
   const [permissoes, setPermissoes] = useState({});
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
@@ -244,13 +216,13 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
         setErro('Os PINs não são iguais.');
         return;
       }
-      corpo = { nome: nome.trim(), tipo: 'garcom', pin };
+      corpo = { nome: nome.trim(), tipo: 'garcom', pin, cargo };
     } else {
       if (!email.trim() || senha.length < 6) {
         setErro('Preencha email e uma senha com pelo menos 6 caracteres.');
         return;
       }
-      corpo = { nome: nome.trim(), email: email.trim(), senha, role: 'gerente', permissoes };
+      corpo = { nome: nome.trim(), email: email.trim(), senha, role: roleEmail, permissoes };
     }
 
     setEnviando(true);
@@ -282,7 +254,7 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
           Garçom (PIN)
         </button>
         <button type="button" className="tab" aria-pressed={tipo === 'gerente'} onClick={() => setTipo('gerente')}>
-          Gerente (e-mail)
+          Gerente/Admin (e-mail)
         </button>
       </div>
 
@@ -290,6 +262,11 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span className="label">Nome</span>
           <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: João" />
+          <span className="label">Cargo</span>
+          <select value={cargo} onChange={(e) => setCargo(e.target.value)}>
+            <option value="garcom">Garçom (padrão — sem cancelar/dar desconto)</option>
+            <option value="gerente">Gerente (pode cancelar, dar desconto e reimprimir)</option>
+          </select>
           <span className="label">PIN (6 dígitos)</span>
           <input value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" placeholder="000000" />
           <span className="label">Confirmar PIN</span>
@@ -303,20 +280,27 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
           <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span className="label">Nome</span>
             <input value={nome} onChange={(e) => setNome(e.target.value)} />
+            <span className="label">Papel</span>
+            <select value={roleEmail} onChange={(e) => setRoleEmail(e.target.value)}>
+              <option value="gerente">Gerente</option>
+              <option value="admin">Admin (acesso total ao portal)</option>
+            </select>
             <span className="label">Email</span>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             <span className="label">Senha provisória</span>
             <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} />
           </div>
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span className="label">Permissões</span>
-            {PERMISSOES.map(([chave, label]) => (
-              <label key={chave} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-                <input type="checkbox" checked={!!permissoes[chave]} onChange={() => alternar(chave)} />
-                {label}
-              </label>
-            ))}
-          </div>
+          {roleEmail !== 'admin' && (
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span className="label">Permissões</span>
+              {PERMISSOES.map(([chave, label]) => (
+                <label key={chave} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                  <input type="checkbox" checked={!!permissoes[chave]} onChange={() => alternar(chave)} />
+                  {label}
+                </label>
+              ))}
+            </div>
+          )}
         </>
       )}
       {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}

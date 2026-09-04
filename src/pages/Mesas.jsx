@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRightLeft, ChevronDown, Minus, Plus, Printer, Receipt, RefreshCw, Search, ShoppingCart, Table2, Trash2, Users2, Wallet, X } from 'lucide-react';
+import { ArrowRightLeft, ChevronDown, History, Minus, Package, Plus, Printer, Receipt, RefreshCw, Search, ShoppingCart, Table2, Trash2, Users2, Wallet, X } from 'lucide-react';
 import { supabase } from '../supabase';
-import { money, mascararTelefone, mascararCpf, mascararDataBr, dataBrParaIso } from '../utils/format';
+import { money, mascararTelefone, mascararCpf, mascararDataBr, dataBrParaIso, metodoLabel } from '../utils/format';
 import { precoEfetivo } from '../utils/promocoes';
+import { inicioDoDia } from '../utils/datas';
 import Switch from '../components/Switch';
 import FormasPagamento from '../components/FormasPagamento';
 import Pdv from './Pdv';
@@ -12,7 +13,7 @@ const LIMITE_SEM_PEDIDO_MS = 20 * 60 * 1000;
 
 export default function Mesas() {
   const [mesaSelecionada, setMesaSelecionada] = useState(null);
-  const [vendaAvulsa, setVendaAvulsa] = useState(false);
+  const [abaPdv, setAbaPdv] = useState('mesa');
   const [mesas, setMesas] = useState(null);
   const [ultimoPedidoPorMesa, setUltimoPedidoPorMesa] = useState(new Map());
   const [grupoPorMesa, setGrupoPorMesa] = useState(new Map());
@@ -74,13 +75,17 @@ export default function Mesas() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <VendasDoGarcom />
       <div className="row" style={{ gap: 8 }}>
         <div className="tab-row" style={{ flex: 1 }}>
-          <button type="button" className="tab" aria-pressed={!vendaAvulsa} onClick={() => setVendaAvulsa(false)}>
+          <button type="button" className="tab" aria-pressed={abaPdv === 'mesa'} onClick={() => setAbaPdv('mesa')}>
             <Table2 size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Mesa
           </button>
-          <button type="button" className="tab" aria-pressed={vendaAvulsa} onClick={() => setVendaAvulsa(true)}>
+          <button type="button" className="tab" aria-pressed={abaPdv === 'ficha'} onClick={() => setAbaPdv('ficha')}>
             <ShoppingCart size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Ficha
+          </button>
+          <button type="button" className="tab" aria-pressed={abaPdv === 'historico'} onClick={() => setAbaPdv('historico')}>
+            <History size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Histórico
           </button>
         </div>
         <button type="button" className="btn btn-secondary btn-sm" onClick={carregar} title="Atualizar dados">
@@ -88,11 +93,171 @@ export default function Mesas() {
         </button>
       </div>
 
-      {vendaAvulsa ? (
+      {abaPdv === 'ficha' ? (
         <Pdv />
+      ) : abaPdv === 'historico' ? (
+        <HistoricoPDV />
       ) : (
         <MapaMesas mesas={mesas} ultimoPedidoPorMesa={ultimoPedidoPorMesa} grupoPorMesa={grupoPorMesa} agora={agora} onAbrirMesa={setMesaSelecionada} />
       )}
+    </div>
+  );
+}
+
+function VendasDoGarcom() {
+  const [resumo, setResumo] = useState(null);
+
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: perfil } = await supabase.from('usuarios').select('role, ocultar_vendas, empresas(mostrar_vendas_garcom)').eq('id', user.id).maybeSingle();
+      if (cancelado || !perfil || perfil.role !== 'operador' || perfil.ocultar_vendas || !perfil.empresas?.mostrar_vendas_garcom) return;
+
+      const { data: vendas } = await supabase
+        .from('vendas')
+        .select('total')
+        .eq('operador_id', user.id)
+        .eq('cancelada', false)
+        .gte('criado_em', inicioDoDia().toISOString());
+      if (cancelado) return;
+      const total = (vendas || []).reduce((s, v) => s + Number(v.total), 0);
+      setResumo({ total, quantidade: vendas?.length || 0 });
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  if (!resumo) return null;
+
+  return (
+    <div className="card row" style={{ padding: '10px 14px', background: 'linear-gradient(135deg, var(--primary), #6C3CE0)', color: '#fff' }}>
+      <span style={{ fontSize: 13, fontWeight: 600 }}>Suas vendas hoje ({resumo.quantidade})</span>
+      <span className="tabular" style={{ fontSize: 18, fontWeight: 800 }}>{money(resumo.total)}</span>
+    </div>
+  );
+}
+
+function HistoricoPDV() {
+  const [vendas, setVendas] = useState(null);
+  const [produtosAbertos, setProdutosAbertos] = useState(null);
+  const [itensPorVenda, setItensPorVenda] = useState(new Map());
+  const [cancelandoId, setCancelandoId] = useState(null);
+  const [motivo, setMotivo] = useState('');
+  const [podeCancelar, setPodeCancelar] = useState(false);
+  const [erro, setErro] = useState('');
+
+  useEffect(() => {
+    carregar();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase
+        .from('usuarios')
+        .select('role, permissoes')
+        .eq('id', user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) setPodeCancelar(data.role !== 'operador' || !!data.permissoes?.cancelar_venda);
+        });
+    });
+  }, []);
+
+  async function carregar() {
+    const { data } = await supabase
+      .from('vendas')
+      .select('id, total, criado_em, cancelada, clientes(nome), usuarios(nome), pedidos(mesas(nome)), pagamentos(forma)')
+      .gte('criado_em', inicioDoDia().toISOString())
+      .order('criado_em', { ascending: false });
+    setVendas(data || []);
+  }
+
+  async function verProdutos(vendaId) {
+    if (produtosAbertos === vendaId) {
+      setProdutosAbertos(null);
+      return;
+    }
+    setProdutosAbertos(vendaId);
+    if (!itensPorVenda.has(vendaId)) {
+      const { data } = await supabase.from('venda_itens').select('nome_produto, quantidade, preco_unitario').eq('venda_id', vendaId);
+      setItensPorVenda((atual) => new Map(atual).set(vendaId, data || []));
+    }
+  }
+
+  async function confirmarCancelamento(id) {
+    const { error } = await supabase.rpc('cancelar_venda', { p_venda_id: id, p_motivo: motivo.trim() || null });
+    if (error) {
+      setErro(error.message.replace('P0001: ', ''));
+      return;
+    }
+    setCancelandoId(null);
+    setMotivo('');
+    setErro('');
+    carregar();
+  }
+
+  if (vendas === null) return <p className="muted">Carregando…</p>;
+  if (vendas.length === 0) return <p className="muted" style={{ fontSize: 13 }}>Nenhuma movimentação de pagamento hoje ainda.</p>;
+
+  return (
+    <div className="list">
+      {vendas.map((v) => {
+        const mesaNome = v.pedidos?.[0]?.mesas?.nome;
+        const formas = [...new Set((v.pagamentos || []).map((p) => metodoLabel(p.forma)))].join(', ');
+        return (
+          <div key={v.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 6, opacity: v.cancelada ? 0.5 : 1 }}>
+            <div className="row">
+              <span>
+                <span className={'chip ' + (mesaNome ? 'chip-primary' : 'chip-info')} style={{ marginRight: 6 }}>{mesaNome ? `MESA ${mesaNome.match(/\d+/)?.[0] || mesaNome}` : 'FICHA'}</span>
+                {v.clientes?.nome || 'Sem cliente'}
+                {v.cancelada && <span className="danger-text" style={{ fontSize: 11, marginLeft: 6 }}>(cancelada)</span>}
+              </span>
+              <span className="tabular" style={{ fontWeight: 700 }}>{money(v.total)}</span>
+            </div>
+            <div className="muted" style={{ fontSize: 12 }}>
+              {new Date(v.criado_em).toLocaleString('pt-BR')} · {v.usuarios?.nome || 'Sem operador'} · {formas || '—'}
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => verProdutos(v.id)}>
+                <Package size={13} /> Produtos
+              </button>
+              {podeCancelar && !v.cancelada && (
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setCancelandoId(v.id); setMotivo(''); setErro(''); }}>
+                  Cancelar
+                </button>
+              )}
+            </div>
+            {produtosAbertos === v.id && (
+              <div className="list" style={{ marginTop: 4, borderTop: '1px solid var(--border-soft)', paddingTop: 6 }}>
+                {(itensPorVenda.get(v.id) || []).map((i, idx) => (
+                  <div key={idx} className="row" style={{ fontSize: 12.5 }}>
+                    <span>{i.quantidade}x {i.nome_produto}</span>
+                    <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {cancelandoId === v.id && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid var(--border-soft)', paddingTop: 6 }}>
+                <span className="label">Motivo do cancelamento (opcional)</span>
+                <input value={motivo} onChange={(e) => setMotivo(e.target.value)} />
+                {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={() => setCancelandoId(null)}>
+                    Voltar
+                  </button>
+                  <button type="button" className="btn btn-danger btn-sm" style={{ flex: 1 }} onClick={() => confirmarCancelamento(v.id)}>
+                    Confirmar cancelamento
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -176,6 +341,7 @@ function Comanda({ mesa, mesas, onVoltar }) {
   const [itensSelecionados, setItensSelecionados] = useState(new Set());
   const [confirmandoCancelamento, setConfirmandoCancelamento] = useState(false);
   const [motivoCancelamento, setMotivoCancelamento] = useState('');
+  const [permissoesAtual, setPermissoesAtual] = useState({ role: 'admin', permissoes: {} });
   const [cancelando, setCancelando] = useState(false);
 
   function alternarSelecaoItem(itemId) {
@@ -220,6 +386,23 @@ function Comanda({ mesa, mesas, onVoltar }) {
   useEffect(() => {
     verificarPedido();
   }, []);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase
+        .from('usuarios')
+        .select('role, permissoes')
+        .eq('id', user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) setPermissoesAtual({ role: data.role, permissoes: data.permissoes || {} });
+        });
+    });
+  }, []);
+
+  const podeCancelar = permissoesAtual.role !== 'operador' || !!permissoesAtual.permissoes.cancelar_venda;
+  const podeDarDesconto = permissoesAtual.role !== 'operador' || !!permissoesAtual.permissoes.dar_desconto;
 
   useEffect(() => {
     if (!toast) return;
@@ -518,6 +701,8 @@ function Comanda({ mesa, mesas, onVoltar }) {
         taxaPercentual={taxaPercentual}
         taxaAtiva={taxaAtiva}
         onAlternarTaxa={setTaxaAtiva}
+        podeCancelar={podeCancelar}
+        podeDarDesconto={podeDarDesconto}
         onCancelarItem={async (itemId) => {
           await cancelarItem(itemId);
         }}
@@ -563,9 +748,11 @@ function Comanda({ mesa, mesas, onVoltar }) {
           >
             <ArrowRightLeft size={14} /> Transferir ({itensSelecionados.size})
           </button>
-          <button type="button" className="btn btn-danger btn-sm" onClick={() => setConfirmandoCancelamento(true)}>
-            <Trash2 size={14} /> Cancelar ({itensSelecionados.size})
-          </button>
+          {podeCancelar && (
+            <button type="button" className="btn btn-danger btn-sm" onClick={() => setConfirmandoCancelamento(true)}>
+              <Trash2 size={14} /> Cancelar ({itensSelecionados.size})
+            </button>
+          )}
         </div>
       )}
 
@@ -1384,7 +1571,7 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
   );
 }
 
-function FinalizarPedido({ pedido, rodadas, total, valorPago, taxaPercentual, taxaAtiva, onAlternarTaxa, onCancelarItem, onVoltar, onConcluido }) {
+function FinalizarPedido({ pedido, rodadas, total, valorPago, taxaPercentual, taxaAtiva, onAlternarTaxa, podeCancelar = true, podeDarDesconto = true, onCancelarItem, onVoltar, onConcluido }) {
   // pagamentos[i].auto = true enquanto o valor ainda não foi editado à mão
   // pelo garçom — nesse caso ele sempre reflete o valor a pagar mais
   // recente (some com desconto/taxa/pagamento parcial na hora). Assim que
@@ -1536,7 +1723,9 @@ function FinalizarPedido({ pedido, rodadas, total, valorPago, taxaPercentual, ta
         </div>
         <div className="pay-stat">
           <span className="pay-stat__label">Desconto</span>
-          {editandoDesconto ? (
+          {!podeDarDesconto ? (
+            <span className="pay-stat__value">{money(descontoNum)}</span>
+          ) : editandoDesconto ? (
             <input
               autoFocus
               className="pay-stat__value is-editable"
@@ -1563,7 +1752,7 @@ function FinalizarPedido({ pedido, rodadas, total, valorPago, taxaPercentual, ta
         </div>
       )}
 
-      {rodadas && rodadas.some((r) => r.pedido_itens.some((i) => !i.cancelado)) && (
+      {podeCancelar && rodadas && rodadas.some((r) => r.pedido_itens.some((i) => !i.cancelado)) && (
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span className="label">Itens lançados — marque pra cancelar algum lançado errado</span>
           {rodadas.flatMap((r) => r.pedido_itens.filter((i) => !i.cancelado).map((i) => (
