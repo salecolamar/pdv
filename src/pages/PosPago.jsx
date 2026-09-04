@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Pencil, Plus, Table2, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '../supabase';
+import IconeMesa from '../components/IconeMesa';
 import { conectarMaquininha, dispositivoSalvo, estornarUltimaTransacao, listarAparelhosPareados, pagarNaMaquininha, suportaPagamentoPagBank } from '../utils/pagbank';
 
 const STATUS_LABEL = { livre: 'Livre', ocupada: 'Ocupada', reservada: 'Reservada' };
@@ -97,7 +98,7 @@ export default function PosPago() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="card row" style={{ padding: '14px 16px', background: 'linear-gradient(135deg, var(--primary), #6C3CE0)', color: '#fff' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5 }}>
-          <Table2 size={18} />
+          <IconeMesa size={18} />
           Cadastre aqui as mesas que o garçom vai usar no mapa de mesas do PDV.
         </span>
       </div>
@@ -141,7 +142,7 @@ export default function PosPago() {
                     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                   }}
                 >
-                  <Table2 size={16} />
+                  <IconeMesa size={16} />
                 </div>
                 <span style={{ flex: 1, fontWeight: 700, fontSize: 14.5 }}>{m.nome}</span>
                 <span className={'chip ' + (STATUS_CHIP[m.status] || 'chip-danger')}>{STATUS_LABEL[m.status] || m.status}</span>

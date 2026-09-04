@@ -10,7 +10,6 @@ import {
   Package,
   Settings,
   ShoppingCart,
-  Table2,
   UserCog,
   Users,
   UtensilsCrossed,
@@ -19,6 +18,7 @@ import {
 } from 'lucide-react';
 import { supabase } from './supabase';
 import { Centro } from './App';
+import IconeMesa from './components/IconeMesa';
 import Dashboard from './pages/Dashboard';
 import Produtos from './pages/Produtos';
 import Mesas, { HistoricoPDV } from './pages/Mesas';
@@ -44,7 +44,7 @@ const MODULOS = [
   { id: 'historico', label: 'Histórico', icon: History, papeis: ['operador', 'gerente'] },
   { id: 'caixa', label: 'Caixa', icon: Wallet, papeis: ['admin'] },
   { id: 'produtos', label: 'Cardápio', icon: Package, papeis: ['admin'] },
-  { id: 'pospago', label: 'Mapa de Mesas', icon: Table2, papeis: ['admin'] },
+  { id: 'pospago', label: 'Mapa de Mesas', icon: IconeMesa, papeis: ['admin'] },
   { id: 'cozinha', label: 'Painel de Pedidos', icon: ChefHat, papeis: ['admin', 'gerente', 'operador'] },
   { id: 'reservas', label: 'Reservas', icon: CalendarClock, papeis: ['admin', 'gerente', 'operador'] },
   { id: 'clientes', label: 'Clientes', icon: Users, papeis: ['admin'] },

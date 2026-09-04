@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRightLeft, Calendar, ChevronDown, CreditCard, Lock, Mail, Minus, Package, Phone, Plus, Printer, Receipt, RefreshCw, Search, ShieldCheck, ShoppingCart, Table2, Trash2, User, Users2, Wallet, X } from 'lucide-react';
+import { ArrowRightLeft, Calendar, ChevronDown, CreditCard, Lock, Mail, Minus, Package, Phone, Plus, Printer, Receipt, RefreshCw, Search, ShieldCheck, ShoppingCart, Trash2, User, Users2, Wallet, X } from 'lucide-react';
+import IconeMesaGenerico from '../components/IconeMesa';
 import { supabase } from '../supabase';
 import { money, mascararTelefone, mascararCpf, mascararDataBr, dataBrParaIso, metodoLabel } from '../utils/format';
 import { precoEfetivo } from '../utils/promocoes';
@@ -81,7 +82,7 @@ export default function Mesas() {
       <div className="row" style={{ gap: 8 }}>
         <div className="tab-row" style={{ flex: 1 }}>
           <button type="button" className="tab" aria-pressed={abaPdv === 'mesa'} onClick={() => setAbaPdv('mesa')}>
-            <Table2 size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Mesa
+            <IconeMesaGenerico size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Mesa
           </button>
           <button type="button" className="tab" aria-pressed={abaPdv === 'ficha'} onClick={() => setAbaPdv('ficha')}>
             <ShoppingCart size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Ficha
@@ -1169,7 +1170,7 @@ function TransferirMesaForm({ mesa, mesasDestino, onConfirmar, onVoltar }) {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
           {mesasDestino.map((m) => (
-            <EscolhaCard key={m.id} selecionado={false} onClick={() => onConfirmar(m.id)} icon={Table2} titulo={m.nome} />
+            <EscolhaCard key={m.id} selecionado={false} onClick={() => onConfirmar(m.id)} icon={IconeMesaGenerico} titulo={m.nome} />
           ))}
         </div>
       )}
@@ -1202,7 +1203,7 @@ function JuntarMesasForm({ mesasDestino, onConfirmar, onVoltar }) {
               key={m.id}
               selecionado={selecionadas.includes(m.id)}
               onClick={() => alternar(m.id)}
-              icon={Table2}
+              icon={IconeMesaGenerico}
               titulo={m.nome}
               descricao={selecionadas.includes(m.id) ? 'Selecionada' : undefined}
             />
@@ -1243,7 +1244,7 @@ function TransferirItemForm({ itens, mesa, mesasDestino, onConfirmar, onVoltar }
               key={m.id}
               selecionado={false}
               onClick={() => onConfirmar(m.id)}
-              icon={Table2}
+              icon={IconeMesaGenerico}
               titulo={m.nome}
               descricao={STATUS_LABEL[m.status] || m.status}
             />
@@ -1424,7 +1425,7 @@ function FormAbrirMesa({ mesa, onAbrir, onVoltar }) {
 
       <div className="row" style={{ gap: 10 }}>
         <div style={{ width: 42, height: 42, borderRadius: 12, background: 'var(--primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Table2 size={20} />
+          <IconeMesaGenerico size={20} />
         </div>
         <div>
           <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{mesa.nome}</h1>
