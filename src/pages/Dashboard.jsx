@@ -30,30 +30,56 @@ function rotuloBucket(idx) {
   return `${h}:${m}`;
 }
 
+function inicioDoDiaEm(dataStr) {
+  const d = new Date(dataStr + 'T00:00:00');
+  return d;
+}
+
+function fimDoDiaEm(dataStr) {
+  const d = new Date(dataStr + 'T23:59:59.999');
+  return d;
+}
+
 export default function Dashboard() {
   const [resumo, setResumo] = useState(undefined); // undefined = carregando
   const [erro, setErro] = useState('');
+  const [dataFiltro, setDataFiltro] = useState(() => inicioDoDia().toISOString().slice(0, 10));
 
   useEffect(() => {
     carregar();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataFiltro]);
 
   async function carregar() {
     setResumo(undefined);
     setErro('');
 
-    const hoje = inicioDoDia().toISOString();
+    const inicioPeriodo = inicioDoDiaEm(dataFiltro).toISOString();
+    const fimPeriodo = fimDoDiaEm(dataFiltro).toISOString();
     const mes = inicioDoMes().toISOString();
+    const ehHoje = dataFiltro === inicioDoDia().toISOString().slice(0, 10);
 
-    const [vendasHojeResp, vendasMesResp, estoqueResp, pagamentosResp] = await Promise.all([
-      supabase.from('vendas').select('id, total, criado_em, operador_id, usuarios(nome)').eq('cancelada', false).gte('criado_em', hoje),
+    const [vendasPeriodoResp, vendasMesResp, estoqueResp, pagamentosResp, pedidosResp, caixaAbertoResp] = await Promise.all([
+      supabase
+        .from('vendas')
+        .select('id, total, desconto, taxa_servico, criado_em, operador_id, caixa_id, usuarios(nome)')
+        .eq('cancelada', false)
+        .gte('criado_em', inicioPeriodo)
+        .lte('criado_em', fimPeriodo),
       supabase.from('vendas').select('total').eq('cancelada', false).gte('criado_em', mes),
       supabase.from('produtos').select('nome, estoque, estoque_minimo').eq('ativo', true).not('estoque', 'is', null).order('estoque', { ascending: true }).limit(5),
-      supabase.from('pagamentos').select('forma, valor, vendas!inner(criado_em, cancelada)').eq('vendas.cancelada', false).gte('vendas.criado_em', hoje),
+      supabase
+        .from('pagamentos')
+        .select('forma, valor, vendas!inner(criado_em, cancelada)')
+        .eq('vendas.cancelada', false)
+        .gte('vendas.criado_em', inicioPeriodo)
+        .lte('vendas.criado_em', fimPeriodo),
+      supabase.from('pedidos').select('venda_id').not('venda_id', 'is', null),
+      supabase.from('caixas').select('id').is('fechado_em', null).order('aberto_em', { ascending: false }).limit(1).maybeSingle(),
     ]);
 
-    if (vendasHojeResp.error || vendasMesResp.error || estoqueResp.error || pagamentosResp.error) {
-      setErro((vendasHojeResp.error || vendasMesResp.error || estoqueResp.error || pagamentosResp.error).message);
+    if (vendasPeriodoResp.error || vendasMesResp.error || estoqueResp.error || pagamentosResp.error) {
+      setErro((vendasPeriodoResp.error || vendasMesResp.error || estoqueResp.error || pagamentosResp.error).message);
       setResumo(null);
       return;
     }
@@ -63,16 +89,23 @@ export default function Dashboard() {
       porFormaPagamento[p.forma] = (porFormaPagamento[p.forma] || 0) + Number(p.valor);
     }
 
-    const vendasHoje = vendasHojeResp.data;
-    const faturamentoHoje = vendasHoje.reduce((s, v) => s + Number(v.total), 0);
-    const numeroVendas = vendasHoje.length;
+    const vendasPeriodo = vendasPeriodoResp.data;
+    const faturamentoHoje = vendasPeriodo.reduce((s, v) => s + Number(v.total), 0);
+    const numeroVendas = vendasPeriodo.length;
     const ticketMedio = numeroVendas ? faturamentoHoje / numeroVendas : 0;
     const faturamentoMes = vendasMesResp.data.reduce((s, v) => s + Number(v.total), 0);
+    const taxaServicoTotal = vendasPeriodo.reduce((s, v) => s + Number(v.taxa_servico || 0), 0);
+    const descontoTotal = vendasPeriodo.reduce((s, v) => s + Number(v.desconto || 0), 0);
 
-    const picoVendas = bucketsMeiaHora(vendasHoje);
+    const idsComMesa = new Set((pedidosResp.data || []).map((p) => p.venda_id));
+    const vendasFicha = vendasPeriodo.filter((v) => !idsComMesa.has(v.id));
+    const faturamentoFicha = vendasFicha.reduce((s, v) => s + Number(v.total), 0);
+    const ticketMedioFicha = vendasFicha.length ? faturamentoFicha / vendasFicha.length : 0;
+
+    const picoVendas = bucketsMeiaHora(vendasPeriodo);
 
     const mapaGarcons = new Map();
-    for (const v of vendasHoje) {
+    for (const v of vendasPeriodo) {
       const nome = v.usuarios?.nome || 'Sem operador';
       const atual = mapaGarcons.get(nome) || { quantidade: 0, total: 0 };
       atual.quantidade += 1;
@@ -84,14 +117,30 @@ export default function Dashboard() {
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
 
+    const caixaAbertoId = caixaAbertoResp.data?.id || null;
+    let topGarcomTaxa = [];
+    if (caixaAbertoId) {
+      const mapaTaxa = new Map();
+      for (const v of vendasPeriodo) {
+        if (v.caixa_id !== caixaAbertoId) continue;
+        const nome = v.usuarios?.nome || 'Sem operador';
+        mapaTaxa.set(nome, (mapaTaxa.get(nome) || 0) + Number(v.taxa_servico || 0));
+      }
+      topGarcomTaxa = [...mapaTaxa.entries()]
+        .map(([nome, total]) => ({ nome, total }))
+        .filter((g) => g.total > 0)
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5);
+    }
+
     const estoqueBaixo = estoqueResp.data.filter((p) => p.estoque_minimo == null || Number(p.estoque) <= Number(p.estoque_minimo));
 
     let maisVendidos = [];
-    if (vendasHoje.length > 0) {
+    if (vendasPeriodo.length > 0) {
       const { data: itens, error: erroItens } = await supabase
         .from('venda_itens')
         .select('nome_produto, quantidade, preco_unitario')
-        .in('venda_id', vendasHoje.map((v) => v.id));
+        .in('venda_id', vendasPeriodo.map((v) => v.id));
       if (!erroItens && itens) {
         const mapa = new Map();
         for (const i of itens) {
@@ -107,7 +156,25 @@ export default function Dashboard() {
       }
     }
 
-    setResumo({ faturamentoHoje, faturamentoMes, numeroVendas, ticketMedio, maisVendidos, picoVendas, topGarcons, estoqueBaixo, porFormaPagamento });
+    setResumo({
+      ehHoje,
+      faturamentoHoje,
+      faturamentoMes,
+      numeroVendas,
+      ticketMedio,
+      taxaServicoTotal,
+      descontoTotal,
+      faturamentoFicha,
+      numeroVendasFicha: vendasFicha.length,
+      ticketMedioFicha,
+      maisVendidos,
+      picoVendas,
+      topGarcons,
+      topGarcomTaxa,
+      caixaAbertoId,
+      estoqueBaixo,
+      porFormaPagamento,
+    });
   }
 
   if (resumo === undefined) return <p className="muted">Carregando…</p>;
@@ -115,6 +182,16 @@ export default function Dashboard() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="card row" style={{ padding: '10px 14px' }}>
+        <span className="label" style={{ margin: 0 }}>Data</span>
+        <input type="date" value={dataFiltro} onChange={(e) => setDataFiltro(e.target.value)} style={{ width: 160 }} />
+        {!resumo.ehHoje && (
+          <button type="button" className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setDataFiltro(inicioDoDia().toISOString().slice(0, 10))}>
+            Voltar pra hoje
+          </button>
+        )}
+      </div>
+
       <div
         style={{
           display: 'grid',
@@ -122,14 +199,31 @@ export default function Dashboard() {
           gap: 12,
         }}
       >
-        <Cartao titulo="Faturamento hoje" valor={money(resumo.faturamentoHoje)} destaque />
+        <Cartao titulo={resumo.ehHoje ? 'Faturamento hoje' : 'Faturamento no dia'} valor={money(resumo.faturamentoHoje)} destaque />
         <Cartao titulo="Faturamento do mês" valor={money(resumo.faturamentoMes)} />
-        <Cartao titulo="Vendas hoje" valor={resumo.numeroVendas} />
+        <Cartao titulo={resumo.ehHoje ? 'Vendas hoje' : 'Vendas no dia'} valor={resumo.numeroVendas} />
         <Cartao titulo="Ticket médio" valor={money(resumo.ticketMedio)} />
+        <Cartao titulo="Taxa de serviço" valor={money(resumo.taxaServicoTotal)} />
+        <Cartao titulo="Descontos concedidos" valor={money(resumo.descontoTotal)} />
       </div>
 
       <div className="card">
-        <div style={{ fontWeight: 700, marginBottom: 8 }}>Recebido hoje por forma de pagamento</div>
+        <div style={{ fontWeight: 700, marginBottom: 8 }}>Vendas por Ficha (balcão, sem mesa)</div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+            gap: 10,
+          }}
+        >
+          <Cartao titulo="Faturamento Ficha" valor={money(resumo.faturamentoFicha)} />
+          <Cartao titulo="Vendas Ficha" valor={resumo.numeroVendasFicha} />
+          <Cartao titulo="Ticket médio Ficha" valor={money(resumo.ticketMedioFicha)} />
+        </div>
+      </div>
+
+      <div className="card">
+        <div style={{ fontWeight: 700, marginBottom: 8 }}>Recebido no dia por forma de pagamento</div>
         <div
           style={{
             display: 'grid',
@@ -194,7 +288,7 @@ export default function Dashboard() {
         <Ranking
           titulo="Top garçom"
           itens={resumo.topGarcons}
-          vazio="Nenhuma venda registrada hoje ainda."
+          vazio="Nenhuma venda registrada no período."
           renderLinha={(g) => (
             <>
               <span>
@@ -204,6 +298,20 @@ export default function Dashboard() {
             </>
           )}
         />
+
+        {resumo.caixaAbertoId && (
+          <Ranking
+            titulo="Taxa de serviço por garçom (caixa aberto)"
+            itens={resumo.topGarcomTaxa}
+            vazio="Nenhuma taxa de serviço registrada nesse caixa ainda."
+            renderLinha={(g) => (
+              <>
+                <span>{g.nome}</span>
+                <span className="tabular">{money(g.total)}</span>
+              </>
+            )}
+          />
+        )}
 
         <Ranking
           titulo="Estoque quase acabando"
