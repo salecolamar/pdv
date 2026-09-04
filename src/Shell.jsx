@@ -34,21 +34,22 @@ import Reservas from './pages/Reservas';
 import Configuracoes from './pages/Configuracoes';
 
 // Cada módulo diz quais papéis podem vê-lo (seção 10 do documento):
-// garçom (operador, login por PIN) só vende e atende (PDV/Mesas/Cozinha/
-// Clientes); admin e gerente enxergam toda a gestão, menos as telas de
-// venda em si — quem vende é o garçom.
+// garçom (operador, login por PIN) e gerente (login por e-mail) só
+// vendem e atendem — PDV/Histórico/Cozinha/Reservas, com o gerente
+// tendo as permissões extras decididas em Usuários. Só admin enxerga o
+// painel de gestão (Dashboard/Caixa/Cardápio/Clientes/Relatórios/etc).
 const MODULOS = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, papeis: ['admin', 'gerente'] },
-  { id: 'pdv', label: 'PDV', icon: ShoppingCart, papeis: ['operador'] },
-  { id: 'historico', label: 'Histórico', icon: History, papeis: ['operador'] },
-  { id: 'caixa', label: 'Caixa', icon: Wallet, papeis: ['admin', 'gerente'] },
-  { id: 'produtos', label: 'Cardápio', icon: Package, papeis: ['admin', 'gerente'] },
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, papeis: ['admin'] },
+  { id: 'pdv', label: 'PDV', icon: ShoppingCart, papeis: ['operador', 'gerente'] },
+  { id: 'historico', label: 'Histórico', icon: History, papeis: ['operador', 'gerente'] },
+  { id: 'caixa', label: 'Caixa', icon: Wallet, papeis: ['admin'] },
+  { id: 'produtos', label: 'Cardápio', icon: Package, papeis: ['admin'] },
   { id: 'pospago', label: 'Mapa de Mesas', icon: Table2, papeis: ['admin'] },
   { id: 'cozinha', label: 'Painel de Pedidos', icon: ChefHat, papeis: ['admin', 'gerente', 'operador'] },
   { id: 'reservas', label: 'Reservas', icon: CalendarClock, papeis: ['admin', 'gerente', 'operador'] },
-  { id: 'clientes', label: 'Clientes', icon: Users, papeis: ['admin', 'gerente'] },
+  { id: 'clientes', label: 'Clientes', icon: Users, papeis: ['admin'] },
   { id: 'usuarios', label: 'Usuários', icon: UserCog, papeis: ['admin'] },
-  { id: 'relatorios', label: 'Relatórios', icon: BarChart3, papeis: ['admin', 'gerente'] },
+  { id: 'relatorios', label: 'Relatórios', icon: BarChart3, papeis: ['admin'] },
   { id: 'auditoria', label: 'Auditoria', icon: History, papeis: ['admin'] },
   { id: 'configuracoes', label: 'Configurações', icon: Settings, papeis: ['admin'] },
 ];

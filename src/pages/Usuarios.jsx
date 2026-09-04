@@ -291,8 +291,8 @@ function EditarUsuario({ usuario, onCancelar, onSalvo }) {
       <div>
         <span className="label">Papel</span>
         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-          <EscolhaCard selecionado={role === 'gerente'} onClick={() => setRole('gerente')} icon={UserCog} titulo="Gerente" descricao="Acessa o portal de gestão" />
-          <EscolhaCard selecionado={role === 'operador'} onClick={() => setRole('operador')} icon={UtensilsCrossed} titulo="Operador" descricao="Vende pelo PDV" />
+          <EscolhaCard selecionado={role === 'gerente'} onClick={() => setRole('gerente')} icon={UserCog} titulo="Gerente" descricao="E-mail, telas do garçom + permissões extras" />
+          <EscolhaCard selecionado={role === 'operador'} onClick={() => setRole('operador')} icon={UtensilsCrossed} titulo="Operador" descricao="PIN, vende pelo PDV" />
         </div>
       </div>
 
@@ -306,7 +306,7 @@ function EditarUsuario({ usuario, onCancelar, onSalvo }) {
         <input value={comissao} onChange={(e) => setComissao(e.target.value.replace(/[^\d,.-]/g, ''))} inputMode="decimal" placeholder="Ex: 10" />
       </div>
 
-      {role === 'operador' && (
+      {(role === 'operador' || role === 'gerente') && (
         <div>
           <span className="label">Cargo (atalho rápido)</span>
           <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
@@ -356,7 +356,6 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
   const [pin, setPin] = useState('');
   const [confirmarPin, setConfirmarPin] = useState('');
   const [cargo, setCargo] = useState('garcom');
-  const [roleEmail, setRoleEmail] = useState('gerente');
   const [permissoes, setPermissoes] = useState({});
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
@@ -389,7 +388,7 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
         setErro('Preencha email e uma senha com pelo menos 6 caracteres.');
         return;
       }
-      corpo = { nome: nome.trim(), email: email.trim(), senha, role: roleEmail, permissoes };
+      corpo = { nome: nome.trim(), email: email.trim(), senha, role: tipo, permissoes: tipo === 'gerente' ? permissoes : {} };
     }
 
     setEnviando(true);
@@ -423,20 +422,27 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
         <p className="muted" style={{ fontSize: 13, marginTop: 2 }}>Escolha como essa pessoa vai entrar no sistema.</p>
       </div>
 
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <EscolhaCard
           selecionado={tipo === 'garcom'}
           onClick={() => setTipo('garcom')}
           icon={UtensilsCrossed}
           titulo="Garçom"
-          descricao="Entra com nome + PIN de 6 dígitos"
+          descricao="Nome + PIN — só as telas de venda"
         />
         <EscolhaCard
           selecionado={tipo === 'gerente'}
           onClick={() => setTipo('gerente')}
+          icon={UserCog}
+          titulo="Gerente"
+          descricao="E-mail — mesmas telas do garçom, com permissões extras"
+        />
+        <EscolhaCard
+          selecionado={tipo === 'admin'}
+          onClick={() => setTipo('admin')}
           icon={ShieldCheck}
-          titulo="Gerente / Admin"
-          descricao="Entra com e-mail + senha"
+          titulo="Admin"
+          descricao="E-mail — acesso total ao portal de gestão"
         />
       </div>
 
@@ -486,30 +492,28 @@ function ConvidarUsuario({ onVoltar, onConvidado }) {
           <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span className="label">Nome</span>
             <input value={nome} onChange={(e) => setNome(e.target.value)} autoFocus />
-          </div>
-
-          <div>
-            <span className="label">Papel</span>
-            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-              <EscolhaCard selecionado={roleEmail === 'gerente'} onClick={() => setRoleEmail('gerente')} icon={UserCog} titulo="Gerente" descricao="Permissões configuráveis" />
-              <EscolhaCard selecionado={roleEmail === 'admin'} onClick={() => setRoleEmail('admin')} icon={ShieldCheck} titulo="Admin" descricao="Acesso total ao portal" />
-            </div>
-          </div>
-
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span className="label">Email</span>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@empresa.com" />
             <span className="label">Senha provisória</span>
             <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="••••••••" />
           </div>
 
-          {roleEmail !== 'admin' && (
-            <div>
-              <span className="label">Permissões</span>
-              <div style={{ marginTop: 4 }}>
-                <ListaPermissoes permissoes={permissoes} onAlternar={alternar} />
+          {tipo === 'gerente' ? (
+            <>
+              <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+                O gerente acessa as mesmas telas do garçom (PDV, Histórico, Painel de Pedidos, Reservas) — sem acesso ao painel de gestão. Escolha abaixo o que ele pode fazer a mais.
+              </p>
+              <div>
+                <span className="label">Permissões</span>
+                <div style={{ marginTop: 4 }}>
+                  <ListaPermissoes permissoes={permissoes} onAlternar={alternar} />
+                </div>
               </div>
-            </div>
+            </>
+          ) : (
+            <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+              Admin tem acesso total ao portal de gestão (Dashboard, Cardápio, Relatórios, Configurações, Usuários, etc).
+            </p>
           )}
         </>
       )}

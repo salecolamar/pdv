@@ -70,9 +70,10 @@ function PosLogin({ session }) {
 
   if (perfil === undefined) return <Centro>Carregando…</Centro>;
 
-  // Sem linha em `usuarios`, ou é garçom (já escolheu ao logar por PIN):
+  // Sem linha em `usuarios`, é garçom (já escolheu ao logar por PIN), ou
+  // gerente (só tem um jeito de usar o app — direto pro PDV, sem escolha):
   // segue direto, sem essa tela extra.
-  if (!perfil || perfil.role === 'operador') {
+  if (!perfil || perfil.role === 'operador' || perfil.role === 'gerente') {
     return <Shell session={session} />;
   }
 
