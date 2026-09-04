@@ -27,7 +27,7 @@ export default function Pdv() {
     // outro celular deve atualizar a quantidade aqui em tempo real.
     const canal = supabase
       .channel('estoque-produtos-pdv')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'produtos' }, carregarProdutos)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'produtos' }, carregarProdutos)
       .subscribe();
     return () => supabase.removeChannel(canal);
   }, []);

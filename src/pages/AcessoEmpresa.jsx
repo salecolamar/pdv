@@ -114,19 +114,19 @@ export function AcessoGarcom({ empresaId, onVoltar }) {
         ) : garcons.length === 0 ? (
           <p className="muted" style={{ textAlign: 'center', fontSize: 13 }}>Nenhum garçom cadastrado ainda. Peça pro admin cadastrar em Usuários.</p>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+          <select
+            defaultValue=""
+            onChange={(e) => {
+              const g = garcons.find((x) => x.id === e.target.value);
+              if (g) { setSelecionado(g); setPin(''); setErro(''); }
+            }}
+            style={{ fontSize: 16, padding: '14px 12px', textAlign: 'center' }}
+          >
+            <option value="" disabled>Selecione seu nome…</option>
             {garcons.map((g) => (
-              <button
-                key={g.id}
-                type="button"
-                className="card"
-                onClick={() => { setSelecionado(g); setPin(''); setErro(''); }}
-                style={{ textAlign: 'center', cursor: 'pointer', padding: '18px 10px', fontWeight: 700 }}
-              >
-                {g.nome}
-              </button>
+              <option key={g.id} value={g.id}>{g.nome}</option>
             ))}
-          </div>
+          </select>
         )}
       </div>
     </Centro>

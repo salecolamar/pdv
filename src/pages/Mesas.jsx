@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRightLeft, ChevronDown, Minus, Plus, Printer, Receipt, Search, ShoppingCart, Table2, Trash2, Users2, Wallet, X } from 'lucide-react';
+import { ArrowRightLeft, ChevronDown, Minus, Plus, Printer, Receipt, RefreshCw, Search, ShoppingCart, Table2, Trash2, Users2, Wallet, X } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money, mascararTelefone, mascararCpf, mascararDataBr, dataBrParaIso } from '../utils/format';
 import { precoEfetivo } from '../utils/promocoes';
@@ -74,12 +74,17 @@ export default function Mesas() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div className="tab-row">
-        <button type="button" className="tab" aria-pressed={!vendaAvulsa} onClick={() => setVendaAvulsa(false)}>
-          <Table2 size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Mesa
-        </button>
-        <button type="button" className="tab" aria-pressed={vendaAvulsa} onClick={() => setVendaAvulsa(true)}>
-          <ShoppingCart size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Ficha
+      <div className="row" style={{ gap: 8 }}>
+        <div className="tab-row" style={{ flex: 1 }}>
+          <button type="button" className="tab" aria-pressed={!vendaAvulsa} onClick={() => setVendaAvulsa(false)}>
+            <Table2 size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Mesa
+          </button>
+          <button type="button" className="tab" aria-pressed={vendaAvulsa} onClick={() => setVendaAvulsa(true)}>
+            <ShoppingCart size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Ficha
+          </button>
+        </div>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={carregar} title="Atualizar dados">
+          <RefreshCw size={14} />
         </button>
       </div>
 
@@ -163,12 +168,14 @@ function Comanda({ mesa, mesas, onVoltar }) {
   const [juntandoMesas, setJuntandoMesas] = useState(false);
   const [transferindoItem, setTransferindoItem] = useState(null);
   const [pagamentoParcialAberto, setPagamentoParcialAberto] = useState(false);
+  const [pagandoSelecionados, setPagandoSelecionados] = useState(false);
   const [toast, setToast] = useState(null);
   const [taxaPercentual, setTaxaPercentual] = useState(0);
   const [taxaAtiva, setTaxaAtiva] = useState(true);
   const [colapsadas, setColapsadas] = useState(new Set());
   const [itensSelecionados, setItensSelecionados] = useState(new Set());
   const [confirmandoCancelamento, setConfirmandoCancelamento] = useState(false);
+  const [motivoCancelamento, setMotivoCancelamento] = useState('');
   const [cancelando, setCancelando] = useState(false);
 
   function alternarSelecaoItem(itemId) {
@@ -180,10 +187,10 @@ function Comanda({ mesa, mesas, onVoltar }) {
     });
   }
 
-  async function confirmarCancelamentoSelecionados() {
+  async function confirmarCancelamentoSelecionados(motivo) {
     setCancelando(true);
     for (const itemId of itensSelecionados) {
-      await supabase.rpc('cancelar_item_pedido', { p_item_id: itemId });
+      await supabase.rpc('cancelar_item_pedido', { p_item_id: itemId, p_motivo: motivo || null });
     }
     setCancelando(false);
     setConfirmandoCancelamento(false);
@@ -291,7 +298,8 @@ function Comanda({ mesa, mesas, onVoltar }) {
 
   async function cancelarItem(itemId) {
     if (!window.confirm('Cancelar esse item da comanda? O estoque volta a subir.')) return;
-    const { error } = await supabase.rpc('cancelar_item_pedido', { p_item_id: itemId });
+    const motivo = window.prompt('Motivo do cancelamento (opcional):') || null;
+    const { error } = await supabase.rpc('cancelar_item_pedido', { p_item_id: itemId, p_motivo: motivo });
     if (error) {
       avisar(error.message.replace('P0001: ', ''), 'danger');
       return;
@@ -464,6 +472,27 @@ function Comanda({ mesa, mesas, onVoltar }) {
     );
   }
 
+  if (pagandoSelecionados) {
+    const itens = rodadas
+      .flatMap((r) => r.pedido_itens)
+      .filter((i) => itensSelecionados.has(i.id) && !i.cancelado);
+    return (
+      <PagamentoParcialForm
+        restante={restante}
+        itensSelecionados={itens}
+        onConfirmar={async (forma, valor) => {
+          const ok = await registrarPagamentoParcial(forma, valor);
+          if (ok) {
+            setPagandoSelecionados(false);
+            setItensSelecionados(new Set());
+          }
+          return ok;
+        }}
+        onVoltar={() => setPagandoSelecionados(false)}
+      />
+    );
+  }
+
   if (lancando) {
     return (
       <LancarItens
@@ -502,9 +531,43 @@ function Comanda({ mesa, mesas, onVoltar }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onVoltar}>
-        <X size={14} /> Voltar ao mapa
-      </button>
+      <div className="row" style={{ gap: 8 }}>
+        <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onVoltar}>
+          <X size={14} /> Voltar ao mapa
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          style={{ marginLeft: 'auto' }}
+          title="Atualizar dados (preços, itens, mesa)"
+          onClick={() => { verificarPedido(); carregarRodadas(pedido.id); carregarPagamentosParciais(pedido.id); }}
+        >
+          <RefreshCw size={14} />
+        </button>
+      </div>
+
+      {pedido.status === 'aberto' && itensSelecionados.size > 0 && (
+        <div className="tab-row" style={{ background: 'var(--panel-2)', borderRadius: 12, padding: 6 }}>
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setPagandoSelecionados(true)}>
+            <Wallet size={14} /> Pagar selecionados ({itensSelecionados.size})
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => {
+              const itens = rodadas
+                .flatMap((r) => r.pedido_itens)
+                .filter((i) => itensSelecionados.has(i.id) && !i.cancelado);
+              setTransferindoItem(itens);
+            }}
+          >
+            <ArrowRightLeft size={14} /> Transferir ({itensSelecionados.size})
+          </button>
+          <button type="button" className="btn btn-danger btn-sm" onClick={() => setConfirmandoCancelamento(true)}>
+            <Trash2 size={14} /> Cancelar ({itensSelecionados.size})
+          </button>
+        </div>
+      )}
 
       <div className="tab-row">
         <button type="button" className="btn btn-secondary btn-sm" onClick={() => setVendoConta(true)}>
@@ -518,25 +581,6 @@ function Comanda({ mesa, mesas, onVoltar }) {
         {pedido.status === 'aberto' && (
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setJuntandoMesas(true)} disabled={mesasDestinoJuntar.length === 0}>
             <Users2 size={14} /> Juntar mesa
-          </button>
-        )}
-        {pedido.status === 'aberto' && itensSelecionados.size > 0 && (
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => {
-              const itens = rodadas
-                .flatMap((r) => r.pedido_itens)
-                .filter((i) => itensSelecionados.has(i.id) && !i.cancelado);
-              setTransferindoItem(itens);
-            }}
-          >
-            <ArrowRightLeft size={14} /> Transferir ({itensSelecionados.size})
-          </button>
-        )}
-        {pedido.status === 'aberto' && itensSelecionados.size > 0 && (
-          <button type="button" className="btn btn-danger btn-sm" onClick={() => setConfirmandoCancelamento(true)}>
-            <Trash2 size={14} /> Cancelar ({itensSelecionados.size})
           </button>
         )}
       </div>
@@ -693,11 +737,26 @@ function Comanda({ mesa, mesas, onVoltar }) {
             <p className="muted" style={{ fontSize: 13, margin: 0 }}>
               O estoque volta a subir e o valor sai da comanda. Essa ação não pode ser desfeita.
             </p>
+            <span className="label">Motivo do cancelamento (opcional)</span>
+            <input
+              value={motivoCancelamento}
+              onChange={(e) => setMotivoCancelamento(e.target.value)}
+              placeholder="Ex: pedido errado, cliente desistiu…"
+              autoFocus
+            />
             <div className="modal-box__actions">
               <button type="button" className="btn btn-secondary" disabled={cancelando} onClick={() => setConfirmandoCancelamento(false)}>
                 Voltar
               </button>
-              <button type="button" className="btn btn-danger" disabled={cancelando} onClick={confirmarCancelamentoSelecionados}>
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={cancelando}
+                onClick={() => {
+                  confirmarCancelamentoSelecionados(motivoCancelamento.trim());
+                  setMotivoCancelamento('');
+                }}
+              >
                 {cancelando ? 'Cancelando…' : 'Cancelar itens'}
               </button>
             </div>
@@ -875,14 +934,17 @@ function TransferirItemForm({ itens, mesa, mesasDestino, onConfirmar, onVoltar }
   );
 }
 
-function PagamentoParcialForm({ restante, onConfirmar, onVoltar }) {
+function PagamentoParcialForm({ restante, itensSelecionados, onConfirmar, onVoltar }) {
+  const valorSugerido = itensSelecionados
+    ? itensSelecionados.reduce((s, i) => s + i.quantidade * i.preco_unitario, 0)
+    : restante;
   const [forma, setForma] = useState('dinheiro');
-  const [valor, setValor] = useState(restante.toFixed(2));
+  const [valor, setValor] = useState(valorSugerido.toFixed(2));
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
+  const travado = !!itensSelecionados;
 
-  async function confirmar(e) {
-    e.preventDefault();
+  async function confirmar() {
     setErro('');
     const num = Number(valor.replace(',', '.'));
     if (!(num > 0)) {
@@ -900,31 +962,54 @@ function PagamentoParcialForm({ restante, onConfirmar, onVoltar }) {
   }
 
   return (
-    <form onSubmit={confirmar} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onVoltar}>
         <X size={14} /> Voltar
       </button>
-      <div>
-        <h1 style={{ fontSize: 18, fontWeight: 800 }}>Pagamento parcial</h1>
-        <p className="muted" style={{ fontSize: 13 }}>Restante da comanda: {money(restante)}</p>
+
+      <div className="pay-stats-grid">
+        <div className="pay-stat">
+          <span className="pay-stat__label">Restante da comanda</span>
+          <span className="pay-stat__value">{money(restante)}</span>
+        </div>
+        <div className="pay-stat">
+          <span className="pay-stat__label">{travado ? 'Itens selecionados' : 'Pagamento parcial'}</span>
+          <span className="pay-stat__value">{money(valorSugerido)}</span>
+        </div>
       </div>
-      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <span className="label">Forma de pagamento</span>
-        <select value={forma} onChange={(e) => setForma(e.target.value)}>
-          <option value="dinheiro">Dinheiro</option>
-          <option value="pix">Pix</option>
-          <option value="debito">Débito</option>
-          <option value="credito">Crédito</option>
-          <option value="outro">Outro</option>
-        </select>
-        <span className="label">Valor (R$)</span>
-        <input value={valor} onChange={(e) => setValor(e.target.value)} inputMode="decimal" />
+
+      {itensSelecionados && (
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span className="label">Itens a pagar</span>
+          {itensSelecionados.map((item) => (
+            <div key={item.id} className="row" style={{ fontSize: 13 }}>
+              <span>{item.quantidade}x {item.nome_produto}</span>
+              <span className="tabular">{money(item.quantidade * item.preco_unitario)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="pay-big-value">
+        {travado ? (
+          <div className="pay-big-value__amount tabular">{money(Number(valor.replace(',', '.')) || 0)}</div>
+        ) : (
+          <input
+            className="pay-big-value__amount tabular"
+            style={{ border: 'none', background: 'none', width: '100%', textAlign: 'center' }}
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+            inputMode="decimal"
+          />
+        )}
       </div>
+      <FormasPagamento value={forma} onChange={setForma} />
+
       {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
-      <button type="submit" className="btn btn-primary btn-block" disabled={enviando}>
+      <button type="button" className="btn btn-primary btn-block" disabled={enviando} onClick={confirmar}>
         {enviando ? 'Registrando…' : 'Registrar pagamento'}
       </button>
-    </form>
+    </div>
   );
 }
 
@@ -1063,7 +1148,7 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
     // outro celular deve atualizar a quantidade aqui em tempo real.
     const canal = supabase
       .channel('estoque-produtos')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'produtos' }, carregarProdutos)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'produtos' }, carregarProdutos)
       .subscribe();
     return () => supabase.removeChannel(canal);
   }, []);
