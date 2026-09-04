@@ -738,14 +738,26 @@ function Comanda({ mesa, mesas, onVoltar }) {
         </button>
       </div>
 
+      {((pedido.status !== 'pago' && restante > 0) || (pedido.status === 'aberto' && itensSelecionados.size > 0)) && (
+        <div className="tab-row">
+          {pedido.status !== 'pago' && restante > 0 && (
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setPagamentoParcialAberto(true)}>
+              <Wallet size={14} /> Pagamento parcial
+            </button>
+          )}
+          {pedido.status === 'aberto' && itensSelecionados.size > 0 && (
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setPagandoSelecionados(true)}>
+              <Wallet size={14} /> Pagar selecionados ({itensSelecionados.size})
+            </button>
+          )}
+        </div>
+      )}
+
       {pedido.status === 'aberto' && itensSelecionados.size > 0 && (
         <div className="tab-row" style={{ background: 'var(--panel-2)', borderRadius: 12, padding: 6 }}>
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => setPagandoSelecionados(true)}>
-            <Wallet size={14} /> Pagar selecionados ({itensSelecionados.size})
-          </button>
           <button
             type="button"
-            className="btn btn-secondary btn-sm"
+            className="btn btn-primary btn-sm"
             onClick={() => {
               const itens = rodadas
                 .flatMap((r) => r.pedido_itens)
@@ -766,22 +778,17 @@ function Comanda({ mesa, mesas, onVoltar }) {
       )}
 
       <div className="tab-row">
-        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setVendoConta(true)}>
+        <button type="button" className="btn btn-primary btn-sm" onClick={() => setVendoConta(true)}>
           <Receipt size={14} /> Imprimir conta
         </button>
         {pedido.status === 'aberto' && (
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setTransferindoMesa(true)} disabled={rodadas.length === 0}>
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setTransferindoMesa(true)} disabled={rodadas.length === 0}>
             <ArrowRightLeft size={14} /> Transferir mesa
           </button>
         )}
         {pedido.status === 'aberto' && (
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setJuntandoMesas(true)} disabled={mesasDestinoJuntar.length === 0}>
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setJuntandoMesas(true)} disabled={mesasDestinoJuntar.length === 0}>
             <Users2 size={14} /> Juntar mesa
-          </button>
-        )}
-        {pedido.status !== 'pago' && restante > 0 && (
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPagamentoParcialAberto(true)}>
-            <Wallet size={14} /> Pagamento parcial
           </button>
         )}
       </div>
@@ -794,8 +801,10 @@ function Comanda({ mesa, mesas, onVoltar }) {
 
       <div>
         <h1 style={{ fontSize: 18, fontWeight: 800 }}>{tituloComanda}</h1>
-        <p className="muted" style={{ fontSize: 13 }}>
-          {pedido.clientes?.nome ? `Cliente: ${pedido.clientes.nome} · ` : ''}
+        {pedido.clientes?.nome && (
+          <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--primary)', margin: '2px 0 0' }}>{pedido.clientes.nome}</p>
+        )}
+        <p className="muted" style={{ fontSize: 13, marginTop: 2 }}>
           {pedido.status === 'aberto' ? 'Comanda aberta' : pedido.status === 'fechado' ? 'Aguardando pagamento' : 'Paga'}
         </p>
         {mesasEnvolvidas.length > 1 && pedido.status === 'aberto' && (
