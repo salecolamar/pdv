@@ -65,6 +65,7 @@ export default function Mesas() {
       <Comanda
         mesa={mesaSelecionada}
         mesas={mesas || []}
+        onDadosAlterados={carregar}
         onVoltar={() => {
           setMesaSelecionada(null);
           carregar();
@@ -326,7 +327,7 @@ function MapaMesas({ mesas, ultimoPedidoPorMesa, grupoPorMesa, agora, onAbrirMes
   );
 }
 
-function Comanda({ mesa, mesas, onVoltar }) {
+function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
   const [pedido, setPedido] = useState(undefined);
   const [precisaCliente, setPrecisaCliente] = useState(false);
   const [rodadas, setRodadas] = useState([]);
@@ -506,6 +507,7 @@ function Comanda({ mesa, mesas, onVoltar }) {
     setJuntandoMesas(false);
     avisar('Mesas juntadas!', 'success');
     verificarPedido();
+    onDadosAlterados?.();
   }
 
   async function separarMesa(mesaId) {
@@ -516,6 +518,7 @@ function Comanda({ mesa, mesas, onVoltar }) {
     }
     avisar('Mesa separada.', 'success');
     verificarPedido();
+    onDadosAlterados?.();
   }
 
   async function transferirMesaPara(mesaDestinoId) {
@@ -525,6 +528,7 @@ function Comanda({ mesa, mesas, onVoltar }) {
       return;
     }
     setTransferindoMesa(false);
+    onDadosAlterados?.();
     onVoltar();
   }
 
@@ -540,6 +544,7 @@ function Comanda({ mesa, mesas, onVoltar }) {
     setItensSelecionados(new Set());
     avisar(itens.length > 1 ? `${itens.length} itens transferidos.` : 'Item transferido.', 'success');
     carregarRodadas(pedido.id);
+    onDadosAlterados?.();
   }
 
   async function registrarPagamentoParcial(forma, valor) {
