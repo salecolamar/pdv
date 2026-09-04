@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Table2, Trash2 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { conectarMaquininha, dispositivoSalvo, estornarUltimaTransacao, listarAparelhosPareados, pagarNaMaquininha, suportaPagamentoPagBank } from '../utils/pagbank';
 
 const STATUS_LABEL = { livre: 'Livre', ocupada: 'Ocupada', reservada: 'Reservada' };
 const STATUS_CHIP = { livre: 'chip-success', ocupada: 'chip-danger', reservada: 'chip-primary' };
+const STATUS_COR = { livre: 'var(--success, #2f9e5f)', ocupada: 'var(--danger)', reservada: 'var(--primary)' };
 
 export default function PosPago() {
   const [mesas, setMesas] = useState(null);
@@ -94,24 +95,29 @@ export default function PosPago() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <p className="muted" style={{ fontSize: 13 }}>
-        Cadastre aqui as mesas que o garçom vai usar no mapa de mesas do PDV.
-      </p>
+      <div className="card row" style={{ padding: '14px 16px', background: 'linear-gradient(135deg, var(--primary), #6C3CE0)', color: '#fff' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5 }}>
+          <Table2 size={18} />
+          Cadastre aqui as mesas que o garçom vai usar no mapa de mesas do PDV.
+        </span>
+      </div>
 
-      <form onSubmit={adicionar} className="card row">
-        <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Mesa 7" style={{ flex: 1 }} />
-        <button type="submit" className="btn btn-primary btn-sm" disabled={enviando}>Adicionar</button>
-      </form>
-      <form onSubmit={criarVarias} className="card row">
-        <input
-          value={quantidade}
-          onChange={(e) => setQuantidade(e.target.value.replace(/\D/g, ''))}
-          inputMode="numeric"
-          placeholder="Quantidade de mesas"
-          style={{ flex: 1 }}
-        />
-        <button type="submit" className="btn btn-secondary btn-sm" disabled={enviando}>Criar várias</button>
-      </form>
+      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <form onSubmit={adicionar} className="row" style={{ gap: 8 }}>
+          <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Mesa 7" style={{ flex: 1 }} />
+          <button type="submit" className="btn btn-primary btn-sm" disabled={enviando}><Plus size={14} /> Adicionar</button>
+        </form>
+        <form onSubmit={criarVarias} className="row" style={{ gap: 8 }}>
+          <input
+            value={quantidade}
+            onChange={(e) => setQuantidade(e.target.value.replace(/\D/g, ''))}
+            inputMode="numeric"
+            placeholder="Quantidade de mesas"
+            style={{ flex: 1 }}
+          />
+          <button type="submit" className="btn btn-secondary btn-sm" disabled={enviando}>Criar várias</button>
+        </form>
+      </div>
       {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
 
       {mesas === null ? (
@@ -122,14 +128,22 @@ export default function PosPago() {
         <div className="list">
           {mesas.map((m) =>
             editandoId === m.id ? (
-              <div key={m.id} className="item" style={{ alignItems: 'center', gap: 8 }}>
+              <div key={m.id} className="card row" style={{ alignItems: 'center', gap: 8 }}>
                 <input value={nomeEditado} onChange={(e) => setNomeEditado(e.target.value)} style={{ flex: 1 }} autoFocus />
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditandoId(null)}>Cancelar</button>
                 <button type="button" className="btn btn-primary btn-sm" disabled={enviando} onClick={() => salvarNome(m.id)}>Salvar</button>
               </div>
             ) : (
-              <div key={m.id} className="item" style={{ alignItems: 'center' }}>
-                <span style={{ flex: 1 }}>{m.nome}</span>
+              <div key={m.id} className="card row" style={{ alignItems: 'center', gap: 10 }}>
+                <div
+                  style={{
+                    width: 34, height: 34, borderRadius: 10, background: STATUS_COR[m.status] || 'var(--text-dim)', color: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}
+                >
+                  <Table2 size={16} />
+                </div>
+                <span style={{ flex: 1, fontWeight: 700, fontSize: 14.5 }}>{m.nome}</span>
                 <span className={'chip ' + (STATUS_CHIP[m.status] || 'chip-danger')}>{STATUS_LABEL[m.status] || m.status}</span>
                 <button
                   type="button"
