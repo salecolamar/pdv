@@ -231,6 +231,9 @@ export function ticketRodada({ tituloMesa, cliente, operador, horario, grupos })
     linhas.push({ texto: categoria.toUpperCase(), negrito: true });
     for (const i of itens) {
       linhas.push({ texto: `${i.quantidade}x ${i.nome_produto}` });
+      for (const c of i.complementos || []) {
+        linhas.push({ texto: `   + ${c.nome}` });
+      }
     }
   }
 

@@ -342,11 +342,16 @@ function TicketCozinha({ rodada, agora, acao, onAvancar }) {
               <div className="ticket-cozinha__categoria">{categoria}</div>
               <ul className="ticket-cozinha__itens">
                 {itens.map((i) => (
-                  <li key={i.id} style={{ opacity: i.cancelado ? 0.5 : 1, textDecoration: i.cancelado ? 'line-through' : 'none' }}>
-                    <span>
-                      <span className="ticket-cozinha__qtd">{i.quantidade}x</span> {i.nome_produto}
+                  <li key={i.id} style={{ opacity: i.cancelado ? 0.5 : 1, textDecoration: i.cancelado ? 'line-through' : 'none', flexDirection: 'column', alignItems: 'stretch' }}>
+                    <span className="row" style={{ width: '100%' }}>
+                      <span>
+                        <span className="ticket-cozinha__qtd">{i.quantidade}x</span> {i.nome_produto}
+                      </span>
+                      <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
                     </span>
-                    <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
+                    {(i.complementos || []).map((c, idx) => (
+                      <span key={idx} className="muted" style={{ fontSize: 11.5, paddingLeft: 18 }}>+ {c.nome}</span>
+                    ))}
                   </li>
                 ))}
               </ul>

@@ -855,32 +855,40 @@ function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
                 {!colapsada && (
                   <>
                     {r.pedido_itens.map((i) => (
-                      <div className="rodada-item" key={i.id} style={{ opacity: i.cancelado ? 0.5 : 1 }}>
-                        {pedido.status === 'aberto' && !i.cancelado ? (
-                          <input
-                            type="checkbox"
-                            className="rodada-item__check"
-                            title="Selecionar pra cancelar"
-                            checked={itensSelecionados.has(i.id)}
-                            onChange={() => alternarSelecaoItem(i.id)}
-                          />
-                        ) : (
-                          <span style={{ width: 16 }} />
-                        )}
-                        <span className="rodada-item__nome" style={{ textDecoration: i.cancelado ? 'line-through' : 'none' }}>
-                          {i.quantidade}x {i.nome_produto}{i.cancelado ? ' (cancelado)' : ''}
-                        </span>
-                        <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
-                        {pedido.status === 'aberto' && !i.cancelado && (
-                          <button
-                            type="button"
-                            title="Transferir item"
-                            onClick={() => setTransferindoItem([i])}
-                            style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: 2 }}
-                          >
-                            <ArrowRightLeft size={13} />
-                          </button>
-                        )}
+                      <div key={i.id} style={{ opacity: i.cancelado ? 0.5 : 1 }}>
+                        <div className="rodada-item">
+                          {pedido.status === 'aberto' && !i.cancelado ? (
+                            <input
+                              type="checkbox"
+                              className="rodada-item__check"
+                              title="Selecionar pra cancelar"
+                              checked={itensSelecionados.has(i.id)}
+                              onChange={() => alternarSelecaoItem(i.id)}
+                            />
+                          ) : (
+                            <span style={{ width: 16 }} />
+                          )}
+                          <span className="rodada-item__nome" style={{ textDecoration: i.cancelado ? 'line-through' : 'none' }}>
+                            {i.quantidade}x {i.nome_produto}{i.cancelado ? ' (cancelado)' : ''}
+                          </span>
+                          <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
+                          {pedido.status === 'aberto' && !i.cancelado && (
+                            <button
+                              type="button"
+                              title="Transferir item"
+                              onClick={() => setTransferindoItem([i])}
+                              style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: 2 }}
+                            >
+                              <ArrowRightLeft size={13} />
+                            </button>
+                          )}
+                        </div>
+                        {(i.complementos || []).map((c, idx) => (
+                          <div key={idx} className="row" style={{ fontSize: 11, color: 'var(--text-dim)', padding: '1px 0 1px 34px' }}>
+                            <span>+ {c.nome}</span>
+                            <span className="tabular">{money(Number(c.preco) * i.quantidade)}</span>
+                          </div>
+                        ))}
                       </div>
                     ))}
                     <div className="rodada-card__subtotal">
@@ -1112,9 +1120,17 @@ function ContaMesa({ mesa, pedido, rodadas, total, taxaPercentual, taxaAtiva, va
             <p className="muted" style={{ fontSize: 13 }}>Nenhum item lançado.</p>
           ) : (
             itens.map((i) => (
-              <div key={i.id} className="row" style={{ fontSize: 13, padding: '3px 0' }}>
-                <span>{i.quantidade}x {i.nome_produto}</span>
-                <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
+              <div key={i.id} style={{ padding: '3px 0' }}>
+                <div className="row" style={{ fontSize: 13 }}>
+                  <span>{i.quantidade}x {i.nome_produto}</span>
+                  <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
+                </div>
+                {(i.complementos || []).map((c, idx) => (
+                  <div key={idx} className="row" style={{ fontSize: 11.5, color: 'var(--text-dim)', paddingLeft: 14 }}>
+                    <span>+ {c.nome}</span>
+                    <span className="tabular">{money(Number(c.preco) * i.quantidade)}</span>
+                  </div>
+                ))}
               </div>
             ))
           )}
@@ -1472,7 +1488,8 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
   const [cardapios, setCardapios] = useState([]);
   const [cardapioAtivo, setCardapioAtivo] = useState('');
   const [complementosPorProduto, setComplementosPorProduto] = useState(new Map());
-  const [complementosAtivosPorProduto, setComplementosAtivosPorProduto] = useState(new Map());
+  const [escolhendoComplementos, setEscolhendoComplementos] = useState(null);
+  const [ultimaVariantePorProduto, setUltimaVariantePorProduto] = useState(new Map());
   const [categoriaAtiva, setCategoriaAtiva] = useState(CATEGORIA_TODAS);
   const [busca, setBusca] = useState('');
   const [carrinho, setCarrinho] = useState([]);
@@ -1523,19 +1540,9 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
     return complementoIds.length ? `${produtoId}|${[...complementoIds].sort().join(',')}` : produtoId;
   }
 
-  function alternarComplementoAtivo(produtoId, complementoId) {
-    setComplementosAtivosPorProduto((atual) => {
-      const nova = new Map(atual);
-      const set = new Set(nova.get(produtoId) || []);
-      if (set.has(complementoId)) set.delete(complementoId);
-      else set.add(complementoId);
-      nova.set(produtoId, set);
-      return nova;
-    });
-  }
-
   function adicionar(p, delta = 1, complementoIds = []) {
     const chave = chaveVariante(p.id, complementoIds);
+    if (delta > 0) setUltimaVariantePorProduto((atual) => new Map(atual).set(p.id, chave));
     setCarrinho((atual) => {
       const existente = atual.find((i) => i.chave === chave);
       const qtdTotalProduto = atual.filter((i) => i.produto_id === p.id).reduce((s, i) => s + i.quantidade, 0);
@@ -1548,13 +1555,20 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
       const complementosSelecionados = complementoIds.map((id) => complementosDoProduto.find((c) => c.id === id)).filter(Boolean);
       const precoBase = precoEfetivo(p, promocoes);
       const precoTotal = precoBase + complementosSelecionados.reduce((s, c) => s + Number(c.preco), 0);
-      const nomeFinal = complementosSelecionados.length ? `${p.nome} + ${complementosSelecionados.map((c) => c.nome).join(', ')}` : p.nome;
-      return [...atual, { chave, produto_id: p.id, nome: nomeFinal, preco: precoTotal, quantidade: 1, estoque: p.estoque, complementoIds }];
+      return [...atual, { chave, produto_id: p.id, nome: p.nome, preco: precoTotal, quantidade: 1, estoque: p.estoque, complementosSelecionados }];
     });
   }
 
-  function quantidadeNoCarrinho(produtoId, complementoIds = []) {
-    return carrinho.find((i) => i.chave === chaveVariante(produtoId, complementoIds))?.quantidade || 0;
+  // Botão "-" do card do produto: desfaz a última variante adicionada
+  // dele (com ou sem complementos) — ajustes mais finos por combinação
+  // ficam pro estepper de cada linha, lá embaixo no carrinho.
+  function removerUltima(p) {
+    const chave = ultimaVariantePorProduto.get(p.id) || p.id;
+    setCarrinho((atual) => atual.map((i) => (i.chave === chave ? { ...i, quantidade: i.quantidade - 1 } : i)).filter((i) => i.quantidade > 0));
+  }
+
+  function quantidadeTotalProduto(produtoId) {
+    return carrinho.filter((i) => i.produto_id === produtoId).reduce((s, i) => s + i.quantidade, 0);
   }
 
   const categoriasComTodos = [CATEGORIA_TODAS, ...categorias.map((c) => c.nome)];
@@ -1590,7 +1604,13 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
     setEnviando(true);
     const { error } = await supabase.rpc('lancar_pedido_itens', {
       p_pedido_id: pedido.id,
-      p_itens: carrinho.map((i) => ({ produto_id: i.produto_id, nome_produto: i.nome, quantidade: i.quantidade, preco_unitario: i.preco })),
+      p_itens: carrinho.map((i) => ({
+        produto_id: i.produto_id,
+        nome_produto: i.nome,
+        quantidade: i.quantidade,
+        preco_unitario: i.preco,
+        complementos: (i.complementosSelecionados || []).map((c) => ({ nome: c.nome, preco: Number(c.preco) })),
+      })),
     });
     setEnviando(false);
     if (error) {
@@ -1642,22 +1662,16 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
             const precoBase = precoEfetivo(p, promocoes);
             const emPromocao = precoBase < Number(p.preco);
             const complementosDisponiveis = complementosPorProduto.get(p.id) || [];
-            const complementosAtivos = complementosAtivosPorProduto.get(p.id) || new Set();
-            const complementoIdsAtivos = [...complementosAtivos];
-            const complementosSelecionados = complementosDisponiveis.filter((c) => complementosAtivos.has(c.id));
-            const precoComComplementos = precoBase + complementosSelecionados.reduce((s, c) => s + Number(c.preco), 0);
-            const qtd = quantidadeNoCarrinho(p.id, complementoIdsAtivos);
-            const qtdTotalProduto = carrinho.filter((i) => i.produto_id === p.id).reduce((s, i) => s + i.quantidade, 0);
+            const qtd = quantidadeTotalProduto(p.id);
             const esgotado = p.estoque !== null && p.estoque <= 0;
+            const semEstoque = esgotado || (p.estoque !== null && qtd >= p.estoque);
             return (
               <div key={p.id} className="card" style={{ opacity: esgotado ? 0.5 : 1 }}>
                 <img src={p.foto_url || PLACEHOLDER_FOTO} alt="" style={{ width: '100%', aspectRatio: '1', borderRadius: 8, objectFit: 'cover', background: 'var(--panel-2)', marginBottom: 6 }} />
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{p.nome}</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
-                  <span className="tabular" style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 700 }}>{money(precoComComplementos)}</span>
-                  {emPromocao && complementosSelecionados.length === 0 && (
-                    <span className="tabular muted" style={{ fontSize: 11, textDecoration: 'line-through' }}>{money(p.preco)}</span>
-                  )}
+                  <span className="tabular" style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 700 }}>{money(precoBase)}</span>
+                  {emPromocao && <span className="tabular muted" style={{ fontSize: 11, textDecoration: 'line-through' }}>{money(p.preco)}</span>}
                 </div>
                 {p.estoque !== null && (
                   <div className={'muted tabular'} style={{ fontSize: 11, marginTop: 2 }}>
@@ -1665,39 +1679,18 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
                   </div>
                 )}
                 {complementosDisponiveis.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
-                    {complementosDisponiveis.map((comp) => {
-                      const ativo = complementosAtivos.has(comp.id);
-                      return (
-                        <button
-                          key={comp.id}
-                          type="button"
-                          className="chip"
-                          style={{
-                            cursor: 'pointer', fontSize: 10.5,
-                            border: ativo ? '1.5px solid var(--primary)' : '1px dashed var(--border)',
-                            background: ativo ? 'var(--primary-soft, rgba(74,95,232,0.1))' : 'transparent',
-                            color: ativo ? 'var(--primary)' : undefined,
-                          }}
-                          onClick={() => alternarComplementoAtivo(p.id, comp.id)}
-                          title={`${comp.nome} (+ ${money(comp.preco)})`}
-                        >
-                          + {comp.nome}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <div className="muted" style={{ fontSize: 10.5, marginTop: 4 }}>+ {complementosDisponiveis.length} complemento(s) disponível(is)</div>
                 )}
                 <div className="stepper-mini" style={{ marginTop: 6, justifyContent: 'center', width: '100%' }}>
-                  <button type="button" className="stepper-mini-btn" disabled={qtd === 0} onClick={() => adicionar(p, -1, complementoIdsAtivos)}>
+                  <button type="button" className="stepper-mini-btn" disabled={qtd === 0} onClick={() => removerUltima(p)}>
                     <Minus size={12} />
                   </button>
                   <span className="stepper-qty tabular">{qtd}</span>
                   <button
                     type="button"
                     className="stepper-mini-btn"
-                    disabled={esgotado || (p.estoque !== null && qtdTotalProduto >= p.estoque)}
-                    onClick={() => adicionar(p, 1, complementoIdsAtivos)}
+                    disabled={semEstoque}
+                    onClick={() => (complementosDisponiveis.length > 0 ? setEscolhendoComplementos(p) : adicionar(p, 1))}
                   >
                     <Plus size={12} />
                   </button>
@@ -1708,22 +1701,43 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
         </div>
       )}
 
+      {escolhendoComplementos && (
+        <EscolherComplementosModal
+          produto={escolhendoComplementos}
+          precoBase={precoEfetivo(escolhendoComplementos, promocoes)}
+          complementosDisponiveis={complementosPorProduto.get(escolhendoComplementos.id) || []}
+          onConfirmar={(idsSelecionados) => {
+            adicionar(escolhendoComplementos, 1, idsSelecionados);
+            setEscolhendoComplementos(null);
+          }}
+          onFechar={() => setEscolhendoComplementos(null)}
+        />
+      )}
+
       {carrinho.length > 0 && (
         <div className="card" style={{ position: 'sticky', bottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div className="list">
             {carrinho.map((i) => (
-              <div key={i.chave} className="item" style={{ alignItems: 'center' }}>
-                <span style={{ flex: 1 }}>{i.nome}</span>
-                <div className="stepper">
-                  <button type="button" className="stepper-btn" onClick={() => adicionar(produtos.find((p) => p.id === i.produto_id), -1, i.complementoIds)}>
-                    <Minus size={12} />
-                  </button>
-                  <span className="stepper-qty tabular">{i.quantidade}</span>
-                  <button type="button" className="stepper-btn" onClick={() => adicionar(produtos.find((p) => p.id === i.produto_id), 1, i.complementoIds)}>
-                    <Plus size={12} />
-                  </button>
+              <div key={i.chave} style={{ padding: '6px 0' }}>
+                <div className="row" style={{ alignItems: 'center' }}>
+                  <span style={{ flex: 1 }}>{i.nome}</span>
+                  <div className="stepper">
+                    <button type="button" className="stepper-btn" onClick={() => adicionar(produtos.find((p) => p.id === i.produto_id), -1, (i.complementosSelecionados || []).map((c) => c.id))}>
+                      <Minus size={12} />
+                    </button>
+                    <span className="stepper-qty tabular">{i.quantidade}</span>
+                    <button type="button" className="stepper-btn" onClick={() => adicionar(produtos.find((p) => p.id === i.produto_id), 1, (i.complementosSelecionados || []).map((c) => c.id))}>
+                      <Plus size={12} />
+                    </button>
+                  </div>
+                  <span className="tabular" style={{ width: 70, textAlign: 'right' }}>{money(i.preco * i.quantidade)}</span>
                 </div>
-                <span className="tabular" style={{ width: 70, textAlign: 'right' }}>{money(i.preco * i.quantidade)}</span>
+                {(i.complementosSelecionados || []).map((c) => (
+                  <div key={c.id} className="row" style={{ fontSize: 11.5, color: 'var(--text-dim)', paddingLeft: 14 }}>
+                    <span>+ {c.nome}</span>
+                    <span className="tabular">{money(Number(c.preco) * i.quantidade)}</span>
+                  </div>
+                ))}
               </div>
             ))}
           </div>
@@ -1747,9 +1761,17 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
             </div>
             <div className="list">
               {carrinho.map((i) => (
-                <div key={i.chave} className="row" style={{ fontSize: 14, padding: '3px 0' }}>
-                  <span>{i.quantidade}x {i.nome}</span>
-                  <span className="tabular">{money(i.preco * i.quantidade)}</span>
+                <div key={i.chave} style={{ padding: '3px 0' }}>
+                  <div className="row" style={{ fontSize: 14 }}>
+                    <span>{i.quantidade}x {i.nome}</span>
+                    <span className="tabular">{money(i.preco * i.quantidade)}</span>
+                  </div>
+                  {(i.complementosSelecionados || []).map((c) => (
+                    <div key={c.id} className="row" style={{ fontSize: 12, color: 'var(--text-dim)', paddingLeft: 14 }}>
+                      <span>+ {c.nome}</span>
+                      <span className="tabular">{money(Number(c.preco) * i.quantidade)}</span>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -1769,6 +1791,63 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function EscolherComplementosModal({ produto, precoBase, complementosDisponiveis, onConfirmar, onFechar }) {
+  const [selecionados, setSelecionados] = useState(new Set());
+
+  function alternar(id) {
+    setSelecionados((atual) => {
+      const nova = new Set(atual);
+      if (nova.has(id)) nova.delete(id);
+      else nova.add(id);
+      return nova;
+    });
+  }
+
+  const totalComplementos = complementosDisponiveis
+    .filter((c) => selecionados.has(c.id))
+    .reduce((s, c) => s + Number(c.preco), 0);
+
+  return (
+    <div className="modal-overlay" onClick={onFechar}>
+      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+        <div style={{ textAlign: 'center' }}>
+          <span className="muted" style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.3 }}>Complementos de</span>
+          <h2 style={{ fontSize: 22, fontWeight: 800 }}>{produto.nome}</h2>
+        </div>
+
+        <div className="list">
+          {complementosDisponiveis.map((c) => (
+            <label key={c.id} className="item" style={{ cursor: 'pointer', alignItems: 'center' }}>
+              <span style={{ flex: 1 }}>{c.nome}</span>
+              <span className="tabular muted" style={{ fontSize: 12.5 }}>+ {money(c.preco)}</span>
+              <input
+                type="checkbox"
+                checked={selecionados.has(c.id)}
+                onChange={() => alternar(c.id)}
+                style={{ marginLeft: 10 }}
+              />
+            </label>
+          ))}
+        </div>
+
+        <div className="row" style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 10 }}>
+          <span style={{ fontWeight: 700 }}>Total do item</span>
+          <span className="tabular" style={{ fontWeight: 800, fontSize: 18 }}>{money(precoBase + totalComplementos)}</span>
+        </div>
+
+        <div className="modal-box__actions">
+          <button type="button" className="btn btn-secondary" onClick={onFechar}>
+            Cancelar
+          </button>
+          <button type="button" className="btn btn-primary" onClick={() => onConfirmar([...selecionados])}>
+            Adicionar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
