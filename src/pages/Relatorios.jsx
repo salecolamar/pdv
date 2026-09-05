@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download, Printer, Search } from 'lucide-react';
+import { Ban, BarChart3, Download, Package, Printer, Search, Ticket, Users2, Wallet } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money, metodoLabel } from '../utils/format';
 import { inicioDoDia, inicioDoMes, subDias } from '../utils/datas';
@@ -42,15 +42,21 @@ export default function Relatorios() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="card row" style={{ padding: '14px 16px', background: 'linear-gradient(135deg, var(--primary), #6C3CE0)', color: '#fff' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5 }}>
+          <BarChart3 size={18} />
+          Acompanhe faturamento, formas de pagamento, operadores e cancelamentos por período.
+        </span>
+      </div>
       <div className="tab-row">
         <button type="button" className="tab" aria-pressed={abaPrincipal === 'resumo'} onClick={() => setAbaPrincipal('resumo')}>
-          Resumo
+          <Wallet size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Resumo
         </button>
         <button type="button" className="tab" aria-pressed={abaPrincipal === 'detalhado'} onClick={() => setAbaPrincipal('detalhado')}>
-          Detalhado
+          <Search size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Detalhado
         </button>
         <button type="button" className="tab" aria-pressed={abaPrincipal === 'cancelamentos'} onClick={() => setAbaPrincipal('cancelamentos')}>
-          Cancelamentos
+          <Ban size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Cancelamentos
         </button>
       </div>
       {abaPrincipal === 'resumo' ? <ResumoVendas /> : abaPrincipal === 'detalhado' ? <RelatorioDetalhado /> : <RelatorioCancelamentos />}
@@ -196,6 +202,7 @@ function RelatorioCancelamentos() {
           </button>
 
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="dash-card-titulo" style={{ padding: '14px 16px 0' }}><Ban size={15} /> Itens e vendas cancelados</div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 680 }}>
                 <thead>
@@ -412,7 +419,7 @@ function ResumoVendas() {
           </div>
 
           <div className="card">
-            <div style={{ fontWeight: 700, marginBottom: 8 }}>Por forma de pagamento</div>
+            <div className="dash-card-titulo"><Wallet size={15} /> Por forma de pagamento</div>
             {resumo.porFormaPagamento.length === 0 ? (
               <p className="muted" style={{ fontSize: 13, margin: 0 }}>Nenhuma venda no período.</p>
             ) : (
@@ -428,7 +435,7 @@ function ResumoVendas() {
           </div>
 
           <div className="card">
-            <div style={{ fontWeight: 700, marginBottom: 8 }}>Por operador</div>
+            <div className="dash-card-titulo"><Users2 size={15} /> Por operador</div>
             {resumo.porOperador.length === 0 ? (
               <p className="muted" style={{ fontSize: 13, margin: 0 }}>Nenhuma venda no período.</p>
             ) : (
@@ -455,7 +462,7 @@ function ResumoVendas() {
 
           <div className="card">
             <div className="row" style={{ marginBottom: 8 }}>
-              <span style={{ fontWeight: 700 }}>Descontos</span>
+              <div className="dash-card-titulo" style={{ marginBottom: 0 }}><Ticket size={15} /> Descontos</div>
               <span className="tabular danger-text" style={{ fontWeight: 800 }}>{money(resumo.totalDescontos)}</span>
             </div>
             {resumo.descontoPorOperador.length === 0 ? (
@@ -487,7 +494,7 @@ function ResumoVendas() {
           </div>
 
           <div className="card no-print">
-            <div style={{ fontWeight: 700, marginBottom: 8 }}>Vendas do período</div>
+            <div className="dash-card-titulo"><Search size={15} /> Vendas do período</div>
             {resumo.vendas.length === 0 ? (
               <p className="muted" style={{ fontSize: 13, margin: 0 }}>Nenhuma venda no período.</p>
             ) : (
@@ -527,7 +534,7 @@ function ResumoVendas() {
           </div>
 
           <div className="card">
-            <div style={{ fontWeight: 700, marginBottom: 8 }}>Produtos mais vendidos</div>
+            <div className="dash-card-titulo"><Package size={15} /> Produtos mais vendidos</div>
             {resumo.maisVendidos.length === 0 ? (
               <p className="muted" style={{ fontSize: 13, margin: 0 }}>Nenhuma venda no período.</p>
             ) : (
@@ -732,6 +739,7 @@ function RelatorioDetalhado() {
       )}
 
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="dash-card-titulo" style={{ marginBottom: 0 }}><Search size={15} /> Filtros</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
           <div>
             <span className="label">Operador</span>
@@ -816,6 +824,7 @@ function RelatorioDetalhado() {
           </button>
 
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="dash-card-titulo" style={{ padding: '14px 16px 0' }}><Package size={15} /> Linhas do relatório</div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 720 }}>
                 <thead>

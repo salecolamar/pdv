@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { Copy, Upload } from 'lucide-react';
+import { Copy, FileSpreadsheet, Pencil, Plus, UtensilsCrossed } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import Promocoes from './Promocoes';
@@ -318,10 +318,10 @@ function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
       {!mostrarForm ? (
         <div style={{ display: 'flex', gap: 8 }}>
           <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={() => { setCampos(campoVazio(null)); setMostrarForm(true); }}>
-            Novo produto
+            <Plus size={15} /> Novo produto
           </button>
           <button type="button" className="btn btn-secondary" onClick={() => setImportando(true)}>
-            <Upload size={15} /> Importar
+            <FileSpreadsheet size={15} /> Importar
           </button>
         </div>
       ) : (
@@ -390,8 +390,8 @@ function ProdutosPorCategoria({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       {grupos.map((grupo) => (
         <div key={grupo.id || 'sem-categoria'}>
-          <div style={{ fontWeight: 800, fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.4, color: 'var(--text-dim)', marginBottom: 8 }}>
-            {grupo.nome} <span className="muted" style={{ fontWeight: 400, textTransform: 'none' }}>({grupo.itens.length})</span>
+          <div className="dash-card-titulo" style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+            <UtensilsCrossed size={14} /> {grupo.nome} <span className="muted" style={{ fontWeight: 400, textTransform: 'none' }}>({grupo.itens.length})</span>
           </div>
           <div className="list">
             {grupo.itens.map((p) => {
@@ -462,7 +462,7 @@ function ProdutosPorCategoria({
                         {p.ativo ? 'Desativar' : 'Ativar'}
                       </button>
                       <button type="button" className="btn btn-secondary btn-sm" onClick={() => onEditar(p)}>
-                        Editar
+                        <Pencil size={13} /> Editar
                       </button>
                     </div>
                   </div>

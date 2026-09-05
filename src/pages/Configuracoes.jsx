@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Percent, Settings, ShieldCheck, UserCog, Users2 } from 'lucide-react';
 import { supabase } from '../supabase';
 import Switch from '../components/Switch';
 
@@ -13,19 +14,27 @@ export default function Configuracoes() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="card row" style={{ padding: '14px 16px', background: 'linear-gradient(135deg, var(--primary), #6C3CE0)', color: '#fff' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5 }}>
+          <Settings size={18} />
+          Ajustes gerais do sistema — taxa de serviço, visibilidade de vendas e cargos.
+        </span>
+      </div>
+
       <TaxaServico empresaId={empresaId} />
       <VisibilidadeVendasGarcom empresaId={empresaId} />
+
       <div className="card">
-        <div style={{ fontWeight: 700, marginBottom: 4 }}>Cargos</div>
-        <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+        <div className="dash-card-titulo"><UserCog size={15} /> Cargos</div>
+        <p className="muted" style={{ fontSize: 12.5, margin: 0, lineHeight: 1.5 }}>
           Ao cadastrar ou editar um garçom em <strong>Usuários</strong>, escolha o cargo: <strong>Garçom</strong> segue o
           padrão de sempre (só lança pedidos e recebe pagamento); <strong>Gerente</strong> também pode cancelar venda ou
           item lançado errado, dar desconto e reimprimir vendas de Ficha.
         </p>
       </div>
       <div className="card">
-        <div style={{ fontWeight: 700, marginBottom: 4 }}>Admins e usuários</div>
-        <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+        <div className="dash-card-titulo"><ShieldCheck size={15} /> Admins e usuários</div>
+        <p className="muted" style={{ fontSize: 12.5, margin: 0, lineHeight: 1.5 }}>
           Cadastro de novos admins, gerentes e garçons fica na tela <strong>Usuários</strong> — lá em "Convidar usuário",
           escolha "Gerente/Admin (e-mail)" e o papel "Admin" pra dar acesso total ao portal.
         </p>
@@ -67,7 +76,7 @@ function TaxaServico({ empresaId }) {
 
   return (
     <form onSubmit={salvar} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ fontWeight: 700 }}>Taxa de serviço</div>
+      <div className="dash-card-titulo" style={{ marginBottom: 0 }}><Percent size={15} /> Taxa de serviço</div>
       <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
         Percentual sugerido na hora de fechar a conta (o garçom pode desativar por venda, na tela de pagamento). Deixe 0 pra não cobrar.
       </p>
@@ -118,7 +127,7 @@ function VisibilidadeVendasGarcom({ empresaId }) {
     <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div className="row">
         <div>
-          <div style={{ fontWeight: 700 }}>Mostrar "quanto vendi" pro garçom</div>
+          <div className="dash-card-titulo" style={{ marginBottom: 2 }}><Users2 size={15} /> Mostrar "quanto vendi" pro garçom</div>
           <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
             Exibe no PDV do garçom uma caixa com o total que ele vendeu no dia.
           </p>

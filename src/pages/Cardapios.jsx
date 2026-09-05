@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { BookOpen, Pencil, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '../supabase';
 
 export default function Cardapios() {
@@ -62,14 +63,17 @@ export default function Cardapios() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <p className="muted" style={{ fontSize: 13, margin: 0 }}>
-        Monte subconjuntos do cardápio (ex: "Cardápio de eventos", "Happy hour") pra usar na hora de lançar itens.
-      </p>
+      <div className="card row" style={{ padding: '14px 16px', background: 'linear-gradient(135deg, var(--primary), #6C3CE0)', color: '#fff' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5 }}>
+          <BookOpen size={18} />
+          Monte subconjuntos do cardápio (ex: "Cardápio de eventos", "Happy hour") pra usar na hora de lançar itens.
+        </span>
+      </div>
 
-      <form onSubmit={criar} className="card row">
+      <form onSubmit={criar} className="card row" style={{ gap: 8 }}>
         <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Novo cardápio (ex: Happy hour)" style={{ flex: 1 }} />
         <button type="submit" className="btn btn-primary btn-sm" disabled={salvando}>
-          Adicionar
+          <Plus size={14} /> Adicionar
         </button>
       </form>
 
@@ -82,7 +86,7 @@ export default function Cardapios() {
           {cardapios.map((c) =>
             editandoId === c.id ? (
               <div key={c.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontWeight: 700 }}>{c.nome}</div>
+                <div className="dash-card-titulo" style={{ marginBottom: 0 }}><BookOpen size={15} /> {c.nome}</div>
                 <span className="label">Produtos incluídos</span>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxHeight: 220, overflowY: 'auto' }}>
                   {produtos.map((p) => (
@@ -110,9 +114,17 @@ export default function Cardapios() {
                 </div>
               </div>
             ) : (
-              <div key={c.id} className="card row">
-                <div>
-                  <div style={{ fontWeight: 600 }}>{c.nome}</div>
+              <div key={c.id} className="card row" style={{ alignItems: 'center', gap: 10, opacity: c.ativo ? 1 : 0.55 }}>
+                <div
+                  style={{
+                    width: 36, height: 36, borderRadius: 10, background: c.ativo ? 'var(--primary)' : 'var(--text-dim)', color: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}
+                >
+                  <BookOpen size={16} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700 }}>{c.nome}</div>
                   <div className="muted" style={{ fontSize: 12 }}>{(c.cardapio_produtos || []).length} produto(s) {c.ativo ? '' : '· inativo'}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -120,10 +132,10 @@ export default function Cardapios() {
                     {c.ativo ? 'Desativar' : 'Ativar'}
                   </button>
                   <button type="button" className="btn btn-secondary btn-sm" onClick={() => editar(c)}>
-                    Editar produtos
+                    <Pencil size={13} /> Editar
                   </button>
                   <button type="button" className="btn btn-secondary btn-sm" onClick={() => excluir(c.id)}>
-                    Excluir
+                    <Trash2 size={13} />
                   </button>
                 </div>
               </div>

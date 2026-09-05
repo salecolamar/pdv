@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Printer, PrinterCheck, X } from 'lucide-react';
+import { ChefHat, Printer, PrinterCheck, X } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import {
@@ -127,9 +127,9 @@ export default function Cozinha() {
   return (
     <div className="cozinha">
       <header className="cozinha__header">
-        <h1>Painel de Pedidos</h1>
+        <h1 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><ChefHat size={22} /> Painel de Pedidos</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span className="muted">{rodadas ? `${pendentes} em preparo` : ''}</span>
+          {rodadas && pendentes > 0 && <span className="chip chip-primary">{pendentes} em preparo</span>}
           {impressoraPronta ? (
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfigAberta(true)}>
               <PrinterCheck size={14} /> Impressora configurada

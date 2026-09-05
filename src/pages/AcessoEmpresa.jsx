@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, Lock, ShieldCheck, UtensilsCrossed } from 'lucide-react';
+import { ChevronLeft, Lock, ShieldCheck, User, UtensilsCrossed } from 'lucide-react';
 import { supabase } from '../supabase';
 import { Centro, FormularioEntrar } from '../App';
+import EscolhaCard from '../components/EscolhaCard';
 
 export default function AcessoEmpresa({ empresaId }) {
   const [modo, setModo] = useState(null); // null | 'admin' | 'garcom'
@@ -25,17 +26,20 @@ export default function AcessoEmpresa({ empresaId }) {
     <Centro>
       <div className="card" style={{ width: 340, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ textAlign: 'center' }}>
-          <Lock size={24} color="var(--primary)" style={{ margin: '0 auto 8px' }} />
-          <h1 style={{ fontSize: 20 }}>PDV</h1>
+          <div
+            style={{
+              width: 48, height: 48, borderRadius: 14, margin: '0 auto 10px', background: 'linear-gradient(135deg, var(--primary), #6C3CE0)',
+              color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <Lock size={22} />
+          </div>
+          <h1 style={{ fontSize: 20, fontWeight: 800 }}>PDV</h1>
           <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>Como você quer entrar?</p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <button type="button" className="btn btn-primary btn-block" onClick={() => setModo('garcom')}>
-            <UtensilsCrossed size={16} /> Sou garçom
-          </button>
-          <button type="button" className="btn btn-secondary btn-block" onClick={() => setModo('admin')}>
-            <ShieldCheck size={16} /> Sou admin
-          </button>
+          <EscolhaCard icon={UtensilsCrossed} titulo="Sou garçom" descricao="Entrar com seu nome + PIN" onClick={() => setModo('garcom')} />
+          <EscolhaCard icon={ShieldCheck} titulo="Sou admin" descricao="Entrar com e-mail e senha" onClick={() => setModo('admin')} />
         </div>
       </div>
     </Centro>
@@ -114,19 +118,16 @@ export function AcessoGarcom({ empresaId, onVoltar }) {
         ) : garcons.length === 0 ? (
           <p className="muted" style={{ textAlign: 'center', fontSize: 13 }}>Nenhum garçom cadastrado ainda. Peça pro admin cadastrar em Usuários.</p>
         ) : (
-          <select
-            defaultValue=""
-            onChange={(e) => {
-              const g = garcons.find((x) => x.id === e.target.value);
-              if (g) { setSelecionado(g); setPin(''); setErro(''); }
-            }}
-            style={{ fontSize: 16, padding: '14px 12px', textAlign: 'center' }}
-          >
-            <option value="" disabled>Selecione seu nome…</option>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
             {garcons.map((g) => (
-              <option key={g.id} value={g.id}>{g.nome}</option>
+              <EscolhaCard
+                key={g.id}
+                icon={User}
+                titulo={g.nome}
+                onClick={() => { setSelecionado(g); setPin(''); setErro(''); }}
+              />
             ))}
-          </select>
+          </div>
         )}
       </div>
     </Centro>
