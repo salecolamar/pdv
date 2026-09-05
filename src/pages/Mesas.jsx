@@ -550,7 +550,7 @@ function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
   }
 
   async function registrarPagamentoParcial(forma, valor) {
-    const { error } = await supabase.rpc('registrar_pagamento_parcial', { p_pedido_id: pedido.id, p_forma: forma, p_valor: valor });
+    const { error } = await supabase.rpc('registrar_pagamento_parcial', { p_pedido_id: pedido.id, p_forma: forma, p_valor: valor, p_taxa_servico: taxaValor });
     if (error) {
       avisar(error.message.replace('P0001: ', ''), 'danger');
       return false;

@@ -161,11 +161,9 @@ export default function Usuarios() {
                           <div className="muted" style={{ fontSize: 12 }}>{u.login_tipo === 'pin' ? 'Acesso por PIN' : u.email}</div>
                         </div>
                         {!u.ativo && <span className="chip chip-danger" style={{ marginRight: 4 }}>Inativo</span>}
-                        {u.role !== 'admin' && (
-                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditandoId(u.id)}>
-                            <Pencil size={13} /> Editar
-                          </button>
-                        )}
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditandoId(u.id)}>
+                          <Pencil size={13} /> Editar
+                        </button>
                       </div>
                     )
                   )}
@@ -211,6 +209,8 @@ function LinkAcesso({ empresaId }) {
 }
 
 function EditarUsuario({ usuario, onCancelar, onSalvo }) {
+  const ehAdmin = usuario.role === 'admin';
+  const [nome, setNome] = useState(usuario.nome);
   const [role, setRole] = useState(usuario.role);
   const [ativo, setAtivo] = useState(usuario.ativo);
   const [permissoes, setPermissoes] = useState(usuario.permissoes || {});
@@ -223,10 +223,16 @@ function EditarUsuario({ usuario, onCancelar, onSalvo }) {
   }
 
   async function salvar() {
+    if (!nome.trim()) {
+      setErro('Informe o nome.');
+      return;
+    }
     setEnviando(true);
     setErro('');
-    const comissaoNum = Number(comissao.replace(',', '.')) || 0;
-    const { error } = await supabase.from('usuarios').update({ role, ativo, permissoes, comissao_percentual: comissaoNum }).eq('id', usuario.id);
+    const dados = ehAdmin
+      ? { nome: nome.trim(), ativo }
+      : { nome: nome.trim(), role, ativo, permissoes, comissao_percentual: Number(comissao.replace(',', '.')) || 0 };
+    const { error } = await supabase.from('usuarios').update(dados).eq('id', usuario.id);
     setEnviando(false);
     if (error) {
       setErro(error.message);
@@ -239,8 +245,8 @@ function EditarUsuario({ usuario, onCancelar, onSalvo }) {
     <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="row">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Avatar nome={usuario.nome} role={role} />
-          <div style={{ fontWeight: 800, fontSize: 16 }}>{usuario.nome}</div>
+          <Avatar nome={nome || usuario.nome} role={role} />
+          <div style={{ fontWeight: 800, fontSize: 16 }}>Editar usuário</div>
         </div>
         <button type="button" onClick={onCancelar} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>
           <X size={18} />
@@ -248,51 +254,62 @@ function EditarUsuario({ usuario, onCancelar, onSalvo }) {
       </div>
 
       <div>
-        <span className="label">Papel</span>
-        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-          <EscolhaCard selecionado={role === 'gerente'} onClick={() => setRole('gerente')} icon={UserCog} titulo="Gerente" descricao="E-mail, telas do garçom + permissões extras" />
-          <EscolhaCard selecionado={role === 'operador'} onClick={() => setRole('operador')} icon={UtensilsCrossed} titulo="Operador" descricao="PIN, vende pelo PDV" />
-        </div>
+        <span className="label">Nome</span>
+        <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome completo" />
       </div>
+
+      {!ehAdmin && (
+        <div>
+          <span className="label">Papel</span>
+          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+            <EscolhaCard selecionado={role === 'gerente'} onClick={() => setRole('gerente')} icon={UserCog} titulo="Gerente" descricao="E-mail, telas do garçom + permissões extras" />
+            <EscolhaCard selecionado={role === 'operador'} onClick={() => setRole('operador')} icon={UtensilsCrossed} titulo="Operador" descricao="PIN, vende pelo PDV" />
+          </div>
+        </div>
+      )}
 
       <div className="card row" style={{ padding: '10px 14px' }}>
         <span style={{ fontSize: 13, fontWeight: 600 }}>Usuário ativo</span>
         <Switch checked={ativo} onChange={setAtivo} />
       </div>
 
-      <div>
-        <span className="label">Comissão sobre vendas (%)</span>
-        <input value={comissao} onChange={(e) => setComissao(e.target.value.replace(/[^\d,.-]/g, ''))} inputMode="decimal" placeholder="Ex: 10" />
-      </div>
-
-      {(role === 'operador' || role === 'gerente') && (
-        <div>
-          <span className="label">Cargo (atalho rápido)</span>
-          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-            <EscolhaCard
-              selecionado={!permissoes.cancelar_venda && !permissoes.dar_desconto}
-              onClick={() => setPermissoes({ realizar_vendas: true })}
-              icon={UtensilsCrossed}
-              titulo="Garçom"
-              descricao="Padrão, sem cancelar/dar desconto"
-            />
-            <EscolhaCard
-              selecionado={!!permissoes.cancelar_venda && !!permissoes.dar_desconto}
-              onClick={() => setPermissoes({ realizar_vendas: true, cancelar_venda: true, dar_desconto: true, reimprimir: true })}
-              icon={UserCog}
-              titulo="Gerente"
-              descricao="Cancela, dá desconto e reimprime"
-            />
+      {!ehAdmin && (
+        <>
+          <div>
+            <span className="label">Comissão sobre vendas (%)</span>
+            <input value={comissao} onChange={(e) => setComissao(e.target.value.replace(/[^\d,.-]/g, ''))} inputMode="decimal" placeholder="Ex: 10" />
           </div>
-        </div>
-      )}
 
-      <div>
-        <span className="label">Permissões</span>
-        <div style={{ marginTop: 4 }}>
-          <ListaPermissoes permissoes={permissoes} onAlternar={alternar} />
-        </div>
-      </div>
+          {(role === 'operador' || role === 'gerente') && (
+            <div>
+              <span className="label">Cargo (atalho rápido)</span>
+              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                <EscolhaCard
+                  selecionado={!permissoes.cancelar_venda && !permissoes.dar_desconto}
+                  onClick={() => setPermissoes({ realizar_vendas: true })}
+                  icon={UtensilsCrossed}
+                  titulo="Garçom"
+                  descricao="Padrão, sem cancelar/dar desconto"
+                />
+                <EscolhaCard
+                  selecionado={!!permissoes.cancelar_venda && !!permissoes.dar_desconto}
+                  onClick={() => setPermissoes({ realizar_vendas: true, cancelar_venda: true, dar_desconto: true, reimprimir: true })}
+                  icon={UserCog}
+                  titulo="Gerente"
+                  descricao="Cancela, dá desconto e reimprime"
+                />
+              </div>
+            </div>
+          )}
+
+          <div>
+            <span className="label">Permissões</span>
+            <div style={{ marginTop: 4 }}>
+              <ListaPermissoes permissoes={permissoes} onAlternar={alternar} />
+            </div>
+          </div>
+        </>
+      )}
 
       {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
       <div style={{ display: 'flex', gap: 8 }}>

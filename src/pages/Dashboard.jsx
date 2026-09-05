@@ -61,22 +61,38 @@ function fimDoDiaEm(dataStr) {
 export default function Dashboard() {
   const [resumo, setResumo] = useState(undefined); // undefined = carregando
   const [erro, setErro] = useState('');
-  const [dataFiltro, setDataFiltro] = useState(() => inicioDoDia().toISOString().slice(0, 10));
+  const hojeStr = () => inicioDoDia().toISOString().slice(0, 10);
+  const [dataInicio, setDataInicio] = useState(hojeStr);
+  const [dataFim, setDataFim] = useState(hojeStr);
 
   useEffect(() => {
     carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataFiltro]);
+  }, [dataInicio, dataFim]);
 
   async function carregar() {
+    // Enquanto o admin ainda está digitando a data no seletor nativo, o
+    // input passa por estados intermediários vazios/incompletos — ignora
+    // esses disparos em vez de tentar montar um período inválido.
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dataInicio) || !/^\d{4}-\d{2}-\d{2}$/.test(dataFim)) return;
+
     setResumo(undefined);
     setErro('');
 
-    const inicioPeriodo = inicioDoDiaEm(dataFiltro).toISOString();
-    const fimPeriodo = fimDoDiaEm(dataFiltro).toISOString();
-    const inicioAnterior = inicioDoDia(subDias(new Date(dataFiltro + 'T00:00:00'), 1)).toISOString();
+    // Corrige o período se o admin escolher "Até" antes de "De" — sem isso a
+    // query em si continuaria funcionando (viraria um intervalo vazio), só
+    // não seria o que a pessoa esperava ao mexer nos dois seletores.
+    const [dataDe, dataAte] = dataInicio <= dataFim ? [dataInicio, dataFim] : [dataFim, dataInicio];
+    const inicioPeriodoDate = inicioDoDiaEm(dataDe);
+    const fimPeriodoDate = fimDoDiaEm(dataAte);
+    const inicioPeriodo = inicioPeriodoDate.toISOString();
+    const fimPeriodo = fimPeriodoDate.toISOString();
+    // Período anterior de comparação: mesma duração, imediatamente antes.
+    const duracaoDias = Math.max(1, Math.round((fimPeriodoDate - inicioPeriodoDate) / 86400000) + 1);
+    const inicioAnterior = inicioDoDia(subDias(inicioPeriodoDate, duracaoDias)).toISOString();
     const mes = inicioDoMes().toISOString();
-    const ehHoje = dataFiltro === inicioDoDia().toISOString().slice(0, 10);
+    const ehHoje = dataDe === hojeStr() && dataAte === hojeStr();
+    const ehPeriodoUnico = dataDe === dataAte;
 
     const [vendasPeriodoResp, vendasAnteriorResp, vendasMesResp, estoqueResp, pagamentosResp, pedidosResp, caixaAbertoResp] = await Promise.all([
       supabase
@@ -180,6 +196,9 @@ export default function Dashboard() {
 
     setResumo({
       ehHoje,
+      ehPeriodoUnico,
+      dataDe,
+      dataAte,
       faturamentoHoje,
       faturamentoAnterior,
       variacao,
@@ -204,7 +223,10 @@ export default function Dashboard() {
   if (resumo === undefined) return <p className="muted">Carregando…</p>;
   if (resumo === null) return <p className="danger-text">Falha ao carregar o dashboard: {erro}</p>;
 
-  const dataFormatada = new Date(dataFiltro + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+  const formatarCurta = (dataStr) => new Date(dataStr + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  const dataFormatada = resumo.ehPeriodoUnico
+    ? new Date(resumo.dataDe + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
+    : `${formatarCurta(resumo.dataDe)} até ${formatarCurta(resumo.dataAte)}`;
   const subiu = resumo.variacao >= 0;
   const melhorHorario = resumo.picoVendas.length
     ? resumo.picoVendas.reduce((melhor, b) => (b.total > melhor.total ? b : melhor), resumo.picoVendas[0])
@@ -218,24 +240,39 @@ export default function Dashboard() {
         <div className="dash-hero__top">
           <div>
             <span className="dash-hero__eyebrow"><Sparkles size={13} /> {dataFormatada}</span>
-            <h1 className="dash-hero__titulo">{resumo.ehHoje ? 'Faturamento de hoje' : 'Faturamento do dia'}</h1>
+            <h1 className="dash-hero__titulo">
+              {resumo.ehHoje ? 'Faturamento de hoje' : resumo.ehPeriodoUnico ? 'Faturamento do dia' : 'Faturamento do período'}
+            </h1>
           </div>
-          <input
-            type="date"
-            value={dataFiltro}
-            onChange={(e) => setDataFiltro(e.target.value)}
-            className="dash-hero__data"
-          />
+          <div className="dash-hero__periodo">
+            <input
+              type="date"
+              value={dataInicio}
+              max={dataFim}
+              onChange={(e) => setDataInicio(e.target.value)}
+              className="dash-hero__data"
+              title="De"
+            />
+            <span className="dash-hero__periodo-ate">até</span>
+            <input
+              type="date"
+              value={dataFim}
+              min={dataInicio}
+              onChange={(e) => setDataFim(e.target.value)}
+              className="dash-hero__data"
+              title="Até"
+            />
+          </div>
         </div>
         <div className="dash-hero__valor tabular">{money(resumo.faturamentoHoje)}</div>
         <div className="dash-hero__rodape">
           <span className={'dash-hero__delta' + (subiu ? ' is-up' : ' is-down')}>
             {subiu ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-            {Math.abs(resumo.variacao).toFixed(0)}% vs. dia anterior
+            {Math.abs(resumo.variacao).toFixed(0)}% vs. {resumo.ehPeriodoUnico ? 'dia anterior' : 'período anterior'}
           </span>
           <span className="dash-hero__info">{resumo.numeroVendas} vendas · ticket médio {money(resumo.ticketMedio)}</span>
           {!resumo.ehHoje && (
-            <button type="button" className="dash-hero__voltar" onClick={() => setDataFiltro(inicioDoDia().toISOString().slice(0, 10))}>
+            <button type="button" className="dash-hero__voltar" onClick={() => { setDataInicio(hojeStr()); setDataFim(hojeStr()); }}>
               Voltar pra hoje
             </button>
           )}
@@ -244,7 +281,7 @@ export default function Dashboard() {
 
       <div className="dash-grid-stats">
         <CartaoIcone icon={Wallet} cor="#6C3CE0" titulo="Faturamento do mês" valor={money(resumo.faturamentoMes)} />
-        <CartaoIcone icon={ShoppingBag} cor="var(--primary)" titulo={resumo.ehHoje ? 'Vendas hoje' : 'Vendas no dia'} valor={resumo.numeroVendas} />
+        <CartaoIcone icon={ShoppingBag} cor="var(--primary)" titulo={resumo.ehHoje ? 'Vendas hoje' : resumo.ehPeriodoUnico ? 'Vendas no dia' : 'Vendas no período'} valor={resumo.numeroVendas} />
         <CartaoIcone icon={Receipt} cor="var(--success, #2f9e5f)" titulo="Ticket médio" valor={money(resumo.ticketMedio)} />
         <CartaoIcone icon={Percent} cor="var(--atencao)" titulo="Taxa de serviço" valor={money(resumo.taxaServicoTotal)} />
         <CartaoIcone icon={Ticket} cor="var(--danger)" titulo="Descontos concedidos" valor={money(resumo.descontoTotal)} />
