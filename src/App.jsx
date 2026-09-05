@@ -3,6 +3,7 @@ import { ShieldCheck, UtensilsCrossed } from 'lucide-react';
 import { supabase } from './supabase';
 import Shell from './Shell';
 import AcessoEmpresa, { AcessoGarcom } from './pages/AcessoEmpresa';
+import EscolhaCard from './components/EscolhaCard';
 
 const ROTA_ACESSO_EMPRESA = window.location.pathname.match(/^\/garcom\/([0-9a-f-]{36})$/i);
 
@@ -103,26 +104,24 @@ function PosLogin({ session }) {
           <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>Como você quer usar esse aparelho?</p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <button
-            type="button"
-            className="btn btn-primary btn-block"
+          <EscolhaCard
+            icon={UtensilsCrossed}
+            titulo="Entrar como garçom"
+            descricao="Escolher seu nome + PIN pra vender"
             onClick={() => {
               sessionStorage.setItem(chaveEscolha, 'garcom');
               setModo('garcom');
             }}
-          >
-            <UtensilsCrossed size={16} /> Entrar como garçom
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary btn-block"
+          />
+          <EscolhaCard
+            icon={ShieldCheck}
+            titulo={`Continuar como ${perfil.nome}`}
+            descricao="Acesso total ao portal de gestão"
             onClick={() => {
               sessionStorage.setItem(chaveEscolha, 'admin');
               setModo('admin');
             }}
-          >
-            <ShieldCheck size={16} /> Continuar como {perfil.nome}
-          </button>
+          />
         </div>
       </div>
     </Centro>

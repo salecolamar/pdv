@@ -172,7 +172,7 @@ export default function Pdv() {
             const emPromocao = preco < Number(p.preco);
             const qtd = quantidadeNoCarrinho(p.id);
             return (
-              <div key={p.id} className="card" style={{ opacity: esgotado ? 0.5 : 1 }}>
+              <div key={p.id} className="card" style={{ opacity: esgotado ? 0.5 : 1, border: qtd > 0 ? '1.5px solid var(--primary)' : undefined }}>
                 <img src={p.foto_url || PLACEHOLDER_FOTO} alt="" style={{ width: '100%', aspectRatio: '1', borderRadius: 8, objectFit: 'cover', background: 'var(--panel-2)', marginBottom: 6 }} />
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{p.nome}</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
@@ -180,7 +180,7 @@ export default function Pdv() {
                   {emPromocao && <span className="tabular muted" style={{ fontSize: 11, textDecoration: 'line-through' }}>{money(p.preco)}</span>}
                 </div>
                 {p.estoque !== null && (
-                  <div className="muted tabular" style={{ fontSize: 11, marginTop: 2 }}>
+                  <div className={'tabular ' + (esgotado ? 'danger-text' : 'muted')} style={{ fontSize: 11, marginTop: 2 }}>
                     {esgotado ? 'Esgotado' : `Estoque: ${p.estoque}`}
                   </div>
                 )}
@@ -206,9 +206,9 @@ export default function Pdv() {
       )}
 
       {carrinho.length > 0 && (
-        <div className="card" style={{ position: 'sticky', bottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <ShoppingCart size={16} /> Carrinho
+        <div className="card" style={{ position: 'sticky', bottom: 12, display: 'flex', flexDirection: 'column', gap: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
+          <div className="dash-card-titulo" style={{ marginBottom: 0 }}>
+            <ShoppingCart size={15} /> Carrinho <span className="chip chip-primary" style={{ marginLeft: 'auto' }}>{carrinho.reduce((s, i) => s + i.quantidade, 0)} itens</span>
           </div>
           <div className="list">
             {carrinho.map((i) => (
