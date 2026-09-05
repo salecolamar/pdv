@@ -87,6 +87,15 @@ input, select, textarea {
 
 input::placeholder { color: var(--text-dim); }
 
+/* Checkbox/radio crus não devem herdar o width:100% acima — senão viram
+   flex items gigantes (visto num checkbox de seleção em massa esticando
+   706px de largura) e empurram o resto da linha pra fora da tela. */
+input[type="checkbox"], input[type="radio"] {
+  width: auto;
+  padding: 0;
+  flex-shrink: 0;
+}
+
 input:hover, select:hover, textarea:hover { border-color: #cfc2ec; }
 
 input:focus, select:focus, textarea:focus {

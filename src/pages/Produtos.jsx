@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { Copy, FileSpreadsheet, Pencil, Plus, UtensilsCrossed } from 'lucide-react';
+import { Copy, FileSpreadsheet, Pencil, Plus, PlusCircle, Trash2, UtensilsCrossed } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import Promocoes from './Promocoes';
@@ -35,6 +35,9 @@ export default function Produtos() {
         <button type="button" className="tab" aria-pressed={aba === 'cardapios'} onClick={() => setAba('cardapios')}>
           Cardápios
         </button>
+        <button type="button" className="tab" aria-pressed={aba === 'complementos'} onClick={() => setAba('complementos')}>
+          Complementos
+        </button>
         <button type="button" className="tab" aria-pressed={aba === 'promocoes'} onClick={() => setAba('promocoes')}>
           Promoções
         </button>
@@ -46,6 +49,8 @@ export default function Produtos() {
         <Categorias categorias={categorias} onMudou={carregarCategorias} />
       ) : aba === 'cardapios' ? (
         <Cardapios />
+      ) : aba === 'complementos' ? (
+        <Complementos />
       ) : aba === 'promocoes' ? (
         <Promocoes />
       ) : aba === 'estoque' ? (
@@ -98,6 +103,144 @@ function Categorias({ categorias, onMudou }) {
               </button>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Complementos() {
+  const [complementos, setComplementos] = useState(null);
+  const [nome, setNome] = useState('');
+  const [preco, setPreco] = useState('');
+  const [editandoId, setEditandoId] = useState(null);
+  const [nomeEditado, setNomeEditado] = useState('');
+  const [precoEditado, setPrecoEditado] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  useEffect(() => {
+    carregar();
+  }, []);
+
+  async function carregar() {
+    const { data } = await supabase.from('complementos').select('*').order('nome');
+    setComplementos(data || []);
+  }
+
+  async function adicionar(e) {
+    e.preventDefault();
+    setErro('');
+    const precoNum = Number(preco.replace(',', '.'));
+    if (!nome.trim() || !(precoNum >= 0)) {
+      setErro('Preencha o nome e um preço válido.');
+      return;
+    }
+    setSalvando(true);
+    const { error } = await supabase.from('complementos').insert({ nome: nome.trim(), preco: precoNum });
+    setSalvando(false);
+    if (error) {
+      setErro(error.message);
+      return;
+    }
+    setNome('');
+    setPreco('');
+    carregar();
+  }
+
+  function editar(c) {
+    setEditandoId(c.id);
+    setNomeEditado(c.nome);
+    setPrecoEditado(String(c.preco));
+    setErro('');
+  }
+
+  async function salvarEdicao(id) {
+    const precoNum = Number(precoEditado.replace(',', '.'));
+    if (!nomeEditado.trim() || !(precoNum >= 0)) {
+      setErro('Preencha o nome e um preço válido.');
+      return;
+    }
+    setSalvando(true);
+    const { error } = await supabase.from('complementos').update({ nome: nomeEditado.trim(), preco: precoNum }).eq('id', id);
+    setSalvando(false);
+    if (error) {
+      setErro(error.message);
+      return;
+    }
+    setEditandoId(null);
+    carregar();
+  }
+
+  async function alternarAtivo(c) {
+    await supabase.from('complementos').update({ ativo: !c.ativo }).eq('id', c.id);
+    carregar();
+  }
+
+  async function excluir(id) {
+    if (!window.confirm('Excluir esse complemento? Ele sai de todos os produtos que o usam.')) return;
+    await supabase.from('complementos').delete().eq('id', id);
+    carregar();
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="card row" style={{ padding: '14px 16px', background: 'linear-gradient(135deg, var(--primary), #6C3CE0)', color: '#fff' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5 }}>
+          <PlusCircle size={18} />
+          Cadastre aqui os adicionais (ex: bacon extra, queijo extra) — na edição de cada produto você escolhe quais desses valem pra ele.
+        </span>
+      </div>
+
+      <form onSubmit={adicionar} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {erro && <p className="danger-text" style={{ fontSize: 13, margin: 0 }}>{erro}</p>}
+        <div className="row" style={{ gap: 8 }}>
+          <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Bacon extra" style={{ flex: 1 }} />
+          <input value={preco} onChange={(e) => setPreco(e.target.value)} inputMode="decimal" placeholder="Preço" style={{ width: 100 }} />
+          <button type="submit" className="btn btn-primary btn-sm" disabled={salvando}>
+            <Plus size={14} /> Adicionar
+          </button>
+        </div>
+      </form>
+
+      {complementos === null ? (
+        <p className="muted">Carregando…</p>
+      ) : complementos.length === 0 ? (
+        <p className="muted" style={{ fontSize: 13 }}>Nenhum complemento cadastrado ainda.</p>
+      ) : (
+        <div className="list">
+          {complementos.map((c) =>
+            editandoId === c.id ? (
+              <div key={c.id} className="card row" style={{ gap: 8 }}>
+                <input value={nomeEditado} onChange={(e) => setNomeEditado(e.target.value)} style={{ flex: 1 }} autoFocus />
+                <input value={precoEditado} onChange={(e) => setPrecoEditado(e.target.value)} inputMode="decimal" style={{ width: 100 }} />
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditandoId(null)}>Cancelar</button>
+                <button type="button" className="btn btn-primary btn-sm" disabled={salvando} onClick={() => salvarEdicao(c.id)}>Salvar</button>
+              </div>
+            ) : (
+              <div key={c.id} className="card row" style={{ alignItems: 'center', gap: 10, opacity: c.ativo ? 1 : 0.55 }}>
+                <div
+                  style={{
+                    width: 34, height: 34, borderRadius: 10, background: c.ativo ? 'var(--primary)' : 'var(--text-dim)', color: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}
+                >
+                  <PlusCircle size={16} />
+                </div>
+                <span style={{ flex: 1, fontWeight: 700, fontSize: 14.5 }}>{c.nome}</span>
+                <span className="tabular" style={{ fontWeight: 600 }}>+ {money(c.preco)}</span>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => alternarAtivo(c)}>
+                  {c.ativo ? 'Desativar' : 'Ativar'}
+                </button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => editar(c)}>
+                  <Pencil size={13} />
+                </button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => excluir(c.id)}>
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            )
+          )}
         </div>
       )}
     </div>
@@ -209,16 +352,43 @@ function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
   const [editandoId, setEditandoId] = useState(null);
   const [campos, setCampos] = useState(campoVazio(null));
   const [complementos, setComplementos] = useState([]);
+  const [complementosDisponiveis, setComplementosDisponiveis] = useState([]);
+  const [selecionados, setSelecionados] = useState(new Set());
+  const [excluindoSelecionados, setExcluindoSelecionados] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
 
   useEffect(() => {
     carregar();
+    supabase.from('complementos').select('*').eq('ativo', true).order('nome').then(({ data }) => setComplementosDisponiveis(data || []));
   }, []);
 
   async function carregar() {
     const { data } = await supabase.from('produtos').select('*').order('nome');
     setProdutos(data || []);
+  }
+
+  function alternarSelecionado(id) {
+    setSelecionados((atual) => {
+      const nova = new Set(atual);
+      if (nova.has(id)) nova.delete(id);
+      else nova.add(id);
+      return nova;
+    });
+  }
+
+  async function excluirSelecionados() {
+    if (selecionados.size === 0) return;
+    if (!window.confirm(`Excluir ${selecionados.size} produto(s) selecionado(s)? Essa ação não pode ser desfeita.`)) return;
+    setExcluindoSelecionados(true);
+    const { error } = await supabase.from('produtos').delete().in('id', [...selecionados]);
+    setExcluindoSelecionados(false);
+    if (error) {
+      window.alert('Falha ao excluir: ' + error.message);
+      return;
+    }
+    setSelecionados(new Set());
+    carregar();
   }
 
   async function adicionar(e) {
@@ -255,8 +425,8 @@ function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
     setEditandoId(p.id);
     setCampos(campoVazio(p));
     setErro('');
-    const { data } = await supabase.from('produto_complementos_permitidos').select('complemento_produto_id').eq('produto_id', p.id);
-    setComplementos((data || []).map((c) => c.complemento_produto_id));
+    const { data } = await supabase.from('produto_complementos').select('complemento_id').eq('produto_id', p.id);
+    setComplementos((data || []).map((c) => c.complemento_id));
   }
 
   function alternarComplemento(produtoId) {
@@ -275,9 +445,9 @@ function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
       setErro(error.message);
       return;
     }
-    await supabase.from('produto_complementos_permitidos').delete().eq('produto_id', id);
+    await supabase.from('produto_complementos').delete().eq('produto_id', id);
     if (complementos.length > 0) {
-      await supabase.from('produto_complementos_permitidos').insert(complementos.map((complemento_produto_id) => ({ produto_id: id, complemento_produto_id })));
+      await supabase.from('produto_complementos').insert(complementos.map((complemento_id) => ({ produto_id: id, complemento_id })));
     }
     setSalvando(false);
     if (original && Number(original.preco) !== dados.preco) {
@@ -324,7 +494,23 @@ function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
             <FileSpreadsheet size={15} /> Importar
           </button>
         </div>
-      ) : (
+      ) : null}
+
+      {selecionados.size > 0 && (
+        <div className="card row" style={{ padding: '10px 14px', background: 'var(--danger)', color: '#fff' }}>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>{selecionados.size} produto(s) selecionado(s)</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" className="btn btn-sm" style={{ background: 'rgba(255,255,255,0.2)', color: '#fff' }} onClick={() => setSelecionados(new Set())}>
+              Limpar
+            </button>
+            <button type="button" className="btn btn-sm" style={{ background: '#fff', color: 'var(--danger)', fontWeight: 700 }} disabled={excluindoSelecionados} onClick={excluirSelecionados}>
+              <Trash2 size={13} /> {excluindoSelecionados ? 'Excluindo…' : 'Excluir selecionados'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {mostrarForm && (
         <form onSubmit={adicionar} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>Novo produto</div>
           <CamposProduto campos={campos} setCampos={setCampos} categorias={categorias} />
@@ -352,7 +538,10 @@ function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
           campos={campos}
           setCampos={setCampos}
           complementos={complementos}
+          complementosDisponiveis={complementosDisponiveis}
           onAlternarComplemento={alternarComplemento}
+          selecionados={selecionados}
+          onAlternarSelecionado={alternarSelecionado}
           erro={erro}
           salvando={salvando}
           onCancelarEdicao={() => setEditandoId(null)}
@@ -373,7 +562,10 @@ function ProdutosPorCategoria({
   campos,
   setCampos,
   complementos,
+  complementosDisponiveis,
   onAlternarComplemento,
+  selecionados,
+  onAlternarSelecionado,
   erro,
   salvando,
   onCancelarEdicao,
@@ -399,28 +591,25 @@ function ProdutosPorCategoria({
                 return (
                   <div key={p.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <CamposProduto campos={campos} setCampos={setCampos} categorias={categorias} />
-                    <span className="label" style={{ marginTop: 6 }}>Complementos (produtos já cadastrados que podem ser acrescentados)</span>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxHeight: 140, overflowY: 'auto', padding: '4px 0' }}>
-                      {produtos.filter((op) => op.id !== p.id).map((op) => (
-                        <label
-                          key={op.id}
-                          className="chip"
-                          style={{
-                            cursor: 'pointer',
-                            border: complementos.includes(op.id) ? '1.5px solid var(--primary)' : '1px solid var(--border)',
-                            background: complementos.includes(op.id) ? 'var(--primary-soft, rgba(74,95,232,0.1))' : 'transparent',
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={complementos.includes(op.id)}
-                            onChange={() => onAlternarComplemento(op.id)}
-                            style={{ marginRight: 4 }}
-                          />
-                          {op.nome}
-                        </label>
-                      ))}
-                    </div>
+                    <span className="label" style={{ marginTop: 6 }}>Complementos (cadastrados na aba Complementos)</span>
+                    {complementosDisponiveis.length === 0 ? (
+                      <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>Nenhum complemento cadastrado ainda — crie na aba "Complementos".</p>
+                    ) : (
+                      <div className="list" style={{ maxHeight: 200, overflowY: 'auto' }}>
+                        {complementosDisponiveis.map((op) => (
+                          <label key={op.id} className="item" style={{ cursor: 'pointer', alignItems: 'center' }}>
+                            <span style={{ flex: 1 }}>{op.nome}</span>
+                            <span className="tabular muted" style={{ fontSize: 12 }}>+ {money(op.preco)}</span>
+                            <input
+                              type="checkbox"
+                              checked={complementos.includes(op.id)}
+                              onChange={() => onAlternarComplemento(op.id)}
+                              style={{ marginLeft: 10 }}
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    )}
                     {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
                     <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                       <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={onCancelarEdicao}>
@@ -436,7 +625,13 @@ function ProdutosPorCategoria({
               const semControle = p.estoque === null;
               const baixo = !semControle && p.estoque_minimo != null && Number(p.estoque) <= Number(p.estoque_minimo);
               return (
-                <div key={p.id} className="card row" style={{ opacity: p.ativo ? 1 : 0.5 }}>
+                <div key={p.id} className="card row" style={{ opacity: p.ativo ? 1 : 0.5, alignItems: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={selecionados.has(p.id)}
+                    onChange={() => onAlternarSelecionado(p.id)}
+                    style={{ marginRight: 2, flexShrink: 0 }}
+                  />
                   <img className="product-thumb" src={p.foto_url || PLACEHOLDER_FOTO} alt="" style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover', background: 'var(--panel-2)' }} />
                   <div style={{ flex: 1, paddingRight: 8 }}>
                     <div>{p.nome}</div>

@@ -1472,6 +1472,7 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
   const [cardapios, setCardapios] = useState([]);
   const [cardapioAtivo, setCardapioAtivo] = useState('');
   const [complementosPorProduto, setComplementosPorProduto] = useState(new Map());
+  const [complementosAtivosPorProduto, setComplementosAtivosPorProduto] = useState(new Map());
   const [categoriaAtiva, setCategoriaAtiva] = useState(CATEGORIA_TODAS);
   const [busca, setBusca] = useState('');
   const [carrinho, setCarrinho] = useState([]);
@@ -1486,16 +1487,16 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
       supabase.from('categorias').select('*').order('ordem').order('nome'),
       supabase.from('promocoes').select('*').eq('ativo', true),
       supabase.from('cardapios').select('*, cardapio_produtos(produto_id)').eq('ativo', true).order('nome'),
-      supabase.from('produto_complementos_permitidos').select('produto_id, produtos:complemento_produto_id(id, nome, preco, preco_promocional)'),
+      supabase.from('produto_complementos').select('produto_id, complementos:complemento_id(id, nome, preco)'),
     ]).then(([catResp, promoResp, cardapiosResp, complResp]) => {
       setCategorias(catResp.data || []);
       setPromocoes(promoResp.data || []);
       setCardapios(cardapiosResp.data || []);
       const mapa = new Map();
       for (const c of complResp.data || []) {
-        if (!c.produtos) continue;
+        if (!c.complementos) continue;
         const atual = mapa.get(c.produto_id) || [];
-        atual.push(c.produtos);
+        atual.push(c.complementos);
         mapa.set(c.produto_id, atual);
       }
       setComplementosPorProduto(mapa);
@@ -1515,21 +1516,45 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
     setProdutos(data || []);
   }
 
-  function adicionar(p, delta = 1) {
-    setCarrinho((atual) => {
-      const existente = atual.find((i) => i.produto_id === p.id);
-      const qtdAtual = existente?.quantidade || 0;
-      if (delta > 0 && p.estoque !== null && qtdAtual >= p.estoque) return atual;
-      if (existente) {
-        return atual.map((i) => (i.produto_id === p.id ? { ...i, quantidade: i.quantidade + delta } : i)).filter((i) => i.quantidade > 0);
-      }
-      if (delta <= 0) return atual;
-      return [...atual, { produto_id: p.id, nome: p.nome, preco: precoEfetivo(p, promocoes), quantidade: 1, estoque: p.estoque }];
+  // Uma "variante" é o produto + o conjunto de complementos escolhidos —
+  // cada combinação vira sua própria linha no carrinho, com preço e nome já
+  // somando o(s) adicional(is) (em vez de virar item separado na conta).
+  function chaveVariante(produtoId, complementoIds) {
+    return complementoIds.length ? `${produtoId}|${[...complementoIds].sort().join(',')}` : produtoId;
+  }
+
+  function alternarComplementoAtivo(produtoId, complementoId) {
+    setComplementosAtivosPorProduto((atual) => {
+      const nova = new Map(atual);
+      const set = new Set(nova.get(produtoId) || []);
+      if (set.has(complementoId)) set.delete(complementoId);
+      else set.add(complementoId);
+      nova.set(produtoId, set);
+      return nova;
     });
   }
 
-  function quantidadeNoCarrinho(produtoId) {
-    return carrinho.find((i) => i.produto_id === produtoId)?.quantidade || 0;
+  function adicionar(p, delta = 1, complementoIds = []) {
+    const chave = chaveVariante(p.id, complementoIds);
+    setCarrinho((atual) => {
+      const existente = atual.find((i) => i.chave === chave);
+      const qtdTotalProduto = atual.filter((i) => i.produto_id === p.id).reduce((s, i) => s + i.quantidade, 0);
+      if (delta > 0 && p.estoque !== null && qtdTotalProduto >= p.estoque) return atual;
+      if (existente) {
+        return atual.map((i) => (i.chave === chave ? { ...i, quantidade: i.quantidade + delta } : i)).filter((i) => i.quantidade > 0);
+      }
+      if (delta <= 0) return atual;
+      const complementosDoProduto = complementosPorProduto.get(p.id) || [];
+      const complementosSelecionados = complementoIds.map((id) => complementosDoProduto.find((c) => c.id === id)).filter(Boolean);
+      const precoBase = precoEfetivo(p, promocoes);
+      const precoTotal = precoBase + complementosSelecionados.reduce((s, c) => s + Number(c.preco), 0);
+      const nomeFinal = complementosSelecionados.length ? `${p.nome} + ${complementosSelecionados.map((c) => c.nome).join(', ')}` : p.nome;
+      return [...atual, { chave, produto_id: p.id, nome: nomeFinal, preco: precoTotal, quantidade: 1, estoque: p.estoque, complementoIds }];
+    });
+  }
+
+  function quantidadeNoCarrinho(produtoId, complementoIds = []) {
+    return carrinho.find((i) => i.chave === chaveVariante(produtoId, complementoIds))?.quantidade || 0;
   }
 
   const categoriasComTodos = [CATEGORIA_TODAS, ...categorias.map((c) => c.nome)];
@@ -1614,48 +1639,69 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
           style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}
         >
           {produtosFiltrados.map((p) => {
-            const preco = precoEfetivo(p, promocoes);
-            const emPromocao = preco < Number(p.preco);
-            const qtd = quantidadeNoCarrinho(p.id);
+            const precoBase = precoEfetivo(p, promocoes);
+            const emPromocao = precoBase < Number(p.preco);
+            const complementosDisponiveis = complementosPorProduto.get(p.id) || [];
+            const complementosAtivos = complementosAtivosPorProduto.get(p.id) || new Set();
+            const complementoIdsAtivos = [...complementosAtivos];
+            const complementosSelecionados = complementosDisponiveis.filter((c) => complementosAtivos.has(c.id));
+            const precoComComplementos = precoBase + complementosSelecionados.reduce((s, c) => s + Number(c.preco), 0);
+            const qtd = quantidadeNoCarrinho(p.id, complementoIdsAtivos);
+            const qtdTotalProduto = carrinho.filter((i) => i.produto_id === p.id).reduce((s, i) => s + i.quantidade, 0);
             const esgotado = p.estoque !== null && p.estoque <= 0;
             return (
               <div key={p.id} className="card" style={{ opacity: esgotado ? 0.5 : 1 }}>
                 <img src={p.foto_url || PLACEHOLDER_FOTO} alt="" style={{ width: '100%', aspectRatio: '1', borderRadius: 8, objectFit: 'cover', background: 'var(--panel-2)', marginBottom: 6 }} />
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{p.nome}</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
-                  <span className="tabular" style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 700 }}>{money(preco)}</span>
-                  {emPromocao && <span className="tabular muted" style={{ fontSize: 11, textDecoration: 'line-through' }}>{money(p.preco)}</span>}
+                  <span className="tabular" style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 700 }}>{money(precoComComplementos)}</span>
+                  {emPromocao && complementosSelecionados.length === 0 && (
+                    <span className="tabular muted" style={{ fontSize: 11, textDecoration: 'line-through' }}>{money(p.preco)}</span>
+                  )}
                 </div>
                 {p.estoque !== null && (
                   <div className={'muted tabular'} style={{ fontSize: 11, marginTop: 2 }}>
                     {esgotado ? 'Esgotado' : `Estoque: ${p.estoque}`}
                   </div>
                 )}
+                {complementosDisponiveis.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                    {complementosDisponiveis.map((comp) => {
+                      const ativo = complementosAtivos.has(comp.id);
+                      return (
+                        <button
+                          key={comp.id}
+                          type="button"
+                          className="chip"
+                          style={{
+                            cursor: 'pointer', fontSize: 10.5,
+                            border: ativo ? '1.5px solid var(--primary)' : '1px dashed var(--border)',
+                            background: ativo ? 'var(--primary-soft, rgba(74,95,232,0.1))' : 'transparent',
+                            color: ativo ? 'var(--primary)' : undefined,
+                          }}
+                          onClick={() => alternarComplementoAtivo(p.id, comp.id)}
+                          title={`${comp.nome} (+ ${money(comp.preco)})`}
+                        >
+                          + {comp.nome}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
                 <div className="stepper-mini" style={{ marginTop: 6, justifyContent: 'center', width: '100%' }}>
-                  <button type="button" className="stepper-mini-btn" disabled={qtd === 0} onClick={() => adicionar(p, -1)}>
+                  <button type="button" className="stepper-mini-btn" disabled={qtd === 0} onClick={() => adicionar(p, -1, complementoIdsAtivos)}>
                     <Minus size={12} />
                   </button>
                   <span className="stepper-qty tabular">{qtd}</span>
-                  <button type="button" className="stepper-mini-btn" disabled={esgotado || (p.estoque !== null && qtd >= p.estoque)} onClick={() => adicionar(p, 1)}>
+                  <button
+                    type="button"
+                    className="stepper-mini-btn"
+                    disabled={esgotado || (p.estoque !== null && qtdTotalProduto >= p.estoque)}
+                    onClick={() => adicionar(p, 1, complementoIdsAtivos)}
+                  >
                     <Plus size={12} />
                   </button>
                 </div>
-                {qtd > 0 && (complementosPorProduto.get(p.id) || []).length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
-                    {(complementosPorProduto.get(p.id) || []).map((comp) => (
-                      <button
-                        key={comp.id}
-                        type="button"
-                        className="chip"
-                        style={{ cursor: 'pointer', fontSize: 10.5, border: '1px dashed var(--primary)' }}
-                        onClick={() => adicionar(produtos.find((prod) => prod.id === comp.id) || comp, 1)}
-                        title={`Adicionar ${comp.nome} (${money(precoEfetivo(comp, promocoes))})`}
-                      >
-                        + {comp.nome}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
             );
           })}
@@ -1666,14 +1712,14 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
         <div className="card" style={{ position: 'sticky', bottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div className="list">
             {carrinho.map((i) => (
-              <div key={i.produto_id} className="item" style={{ alignItems: 'center' }}>
+              <div key={i.chave} className="item" style={{ alignItems: 'center' }}>
                 <span style={{ flex: 1 }}>{i.nome}</span>
                 <div className="stepper">
-                  <button type="button" className="stepper-btn" onClick={() => adicionar(produtos.find((p) => p.id === i.produto_id), -1)}>
+                  <button type="button" className="stepper-btn" onClick={() => adicionar(produtos.find((p) => p.id === i.produto_id), -1, i.complementoIds)}>
                     <Minus size={12} />
                   </button>
                   <span className="stepper-qty tabular">{i.quantidade}</span>
-                  <button type="button" className="stepper-btn" onClick={() => adicionar(produtos.find((p) => p.id === i.produto_id), 1)}>
+                  <button type="button" className="stepper-btn" onClick={() => adicionar(produtos.find((p) => p.id === i.produto_id), 1, i.complementoIds)}>
                     <Plus size={12} />
                   </button>
                 </div>
@@ -1701,7 +1747,7 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
             </div>
             <div className="list">
               {carrinho.map((i) => (
-                <div key={i.produto_id} className="row" style={{ fontSize: 14, padding: '3px 0' }}>
+                <div key={i.chave} className="row" style={{ fontSize: 14, padding: '3px 0' }}>
                   <span>{i.quantidade}x {i.nome}</span>
                   <span className="tabular">{money(i.preco * i.quantidade)}</span>
                 </div>
