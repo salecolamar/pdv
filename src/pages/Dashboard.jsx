@@ -1,8 +1,26 @@
 import { useEffect, useState } from 'react';
-import { Banknote, CreditCard, Landmark, QrCode } from 'lucide-react';
+import {
+  Banknote,
+  CreditCard,
+  Flame,
+  Landmark,
+  Package,
+  Percent,
+  QrCode,
+  Receipt,
+  ShoppingBag,
+  Sparkles,
+  Ticket,
+  TrendingDown,
+  TrendingUp,
+  Trophy,
+  Wallet,
+} from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import { inicioDoDia, inicioDoMes, subDias } from '../utils/datas';
+
+const MEDALHA = ['#FFD54A', '#C9CBD1', '#E0A458'];
 
 const FORMAS_PAGAMENTO = [
   { forma: 'dinheiro', label: 'Dinheiro', icon: Banknote },
@@ -56,16 +74,18 @@ export default function Dashboard() {
 
     const inicioPeriodo = inicioDoDiaEm(dataFiltro).toISOString();
     const fimPeriodo = fimDoDiaEm(dataFiltro).toISOString();
+    const inicioAnterior = inicioDoDia(subDias(new Date(dataFiltro + 'T00:00:00'), 1)).toISOString();
     const mes = inicioDoMes().toISOString();
     const ehHoje = dataFiltro === inicioDoDia().toISOString().slice(0, 10);
 
-    const [vendasPeriodoResp, vendasMesResp, estoqueResp, pagamentosResp, pedidosResp, caixaAbertoResp] = await Promise.all([
+    const [vendasPeriodoResp, vendasAnteriorResp, vendasMesResp, estoqueResp, pagamentosResp, pedidosResp, caixaAbertoResp] = await Promise.all([
       supabase
         .from('vendas')
         .select('id, total, desconto, taxa_servico, criado_em, operador_id, caixa_id, usuarios(nome)')
         .eq('cancelada', false)
         .gte('criado_em', inicioPeriodo)
         .lte('criado_em', fimPeriodo),
+      supabase.from('vendas').select('total').eq('cancelada', false).gte('criado_em', inicioAnterior).lt('criado_em', inicioPeriodo),
       supabase.from('vendas').select('total').eq('cancelada', false).gte('criado_em', mes),
       supabase.from('produtos').select('nome, estoque, estoque_minimo').eq('ativo', true).not('estoque', 'is', null).order('estoque', { ascending: true }).limit(5),
       supabase
@@ -94,6 +114,8 @@ export default function Dashboard() {
     const numeroVendas = vendasPeriodo.length;
     const ticketMedio = numeroVendas ? faturamentoHoje / numeroVendas : 0;
     const faturamentoMes = vendasMesResp.data.reduce((s, v) => s + Number(v.total), 0);
+    const faturamentoAnterior = (vendasAnteriorResp.data || []).reduce((s, v) => s + Number(v.total), 0);
+    const variacao = faturamentoAnterior > 0 ? ((faturamentoHoje - faturamentoAnterior) / faturamentoAnterior) * 100 : faturamentoHoje > 0 ? 100 : 0;
     const taxaServicoTotal = vendasPeriodo.reduce((s, v) => s + Number(v.taxa_servico || 0), 0);
     const descontoTotal = vendasPeriodo.reduce((s, v) => s + Number(v.desconto || 0), 0);
 
@@ -159,6 +181,8 @@ export default function Dashboard() {
     setResumo({
       ehHoje,
       faturamentoHoje,
+      faturamentoAnterior,
+      variacao,
       faturamentoMes,
       numeroVendas,
       ticketMedio,
@@ -180,42 +204,58 @@ export default function Dashboard() {
   if (resumo === undefined) return <p className="muted">Carregando…</p>;
   if (resumo === null) return <p className="danger-text">Falha ao carregar o dashboard: {erro}</p>;
 
+  const dataFormatada = new Date(dataFiltro + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+  const subiu = resumo.variacao >= 0;
+  const melhorHorario = resumo.picoVendas.length
+    ? resumo.picoVendas.reduce((melhor, b) => (b.total > melhor.total ? b : melhor), resumo.picoVendas[0])
+    : null;
+  const totalFormas = Object.values(resumo.porFormaPagamento).reduce((s, v) => s + v, 0) || 1;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div className="card row" style={{ padding: '10px 14px' }}>
-        <span className="label" style={{ margin: 0 }}>Data</span>
-        <input type="date" value={dataFiltro} onChange={(e) => setDataFiltro(e.target.value)} style={{ width: 160 }} />
-        {!resumo.ehHoje && (
-          <button type="button" className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setDataFiltro(inicioDoDia().toISOString().slice(0, 10))}>
-            Voltar pra hoje
-          </button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="dash-hero">
+        <div className="dash-hero__glow" />
+        <div className="dash-hero__top">
+          <div>
+            <span className="dash-hero__eyebrow"><Sparkles size={13} /> {dataFormatada}</span>
+            <h1 className="dash-hero__titulo">{resumo.ehHoje ? 'Faturamento de hoje' : 'Faturamento do dia'}</h1>
+          </div>
+          <input
+            type="date"
+            value={dataFiltro}
+            onChange={(e) => setDataFiltro(e.target.value)}
+            className="dash-hero__data"
+          />
+        </div>
+        <div className="dash-hero__valor tabular">{money(resumo.faturamentoHoje)}</div>
+        <div className="dash-hero__rodape">
+          <span className={'dash-hero__delta' + (subiu ? ' is-up' : ' is-down')}>
+            {subiu ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+            {Math.abs(resumo.variacao).toFixed(0)}% vs. dia anterior
+          </span>
+          <span className="dash-hero__info">{resumo.numeroVendas} vendas · ticket médio {money(resumo.ticketMedio)}</span>
+          {!resumo.ehHoje && (
+            <button type="button" className="dash-hero__voltar" onClick={() => setDataFiltro(inicioDoDia().toISOString().slice(0, 10))}>
+              Voltar pra hoje
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="dash-grid-stats">
+        <CartaoIcone icon={Wallet} cor="#6C3CE0" titulo="Faturamento do mês" valor={money(resumo.faturamentoMes)} />
+        <CartaoIcone icon={ShoppingBag} cor="var(--primary)" titulo={resumo.ehHoje ? 'Vendas hoje' : 'Vendas no dia'} valor={resumo.numeroVendas} />
+        <CartaoIcone icon={Receipt} cor="var(--success, #2f9e5f)" titulo="Ticket médio" valor={money(resumo.ticketMedio)} />
+        <CartaoIcone icon={Percent} cor="var(--atencao)" titulo="Taxa de serviço" valor={money(resumo.taxaServicoTotal)} />
+        <CartaoIcone icon={Ticket} cor="var(--danger)" titulo="Descontos concedidos" valor={money(resumo.descontoTotal)} />
+        {melhorHorario && melhorHorario.total > 0 && (
+          <CartaoIcone icon={Flame} cor="#ff6b6b" titulo="Horário mais forte" valor={rotuloBucket(melhorHorario.idx)} />
         )}
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-          gap: 12,
-        }}
-      >
-        <Cartao titulo={resumo.ehHoje ? 'Faturamento hoje' : 'Faturamento no dia'} valor={money(resumo.faturamentoHoje)} destaque />
-        <Cartao titulo="Faturamento do mês" valor={money(resumo.faturamentoMes)} />
-        <Cartao titulo={resumo.ehHoje ? 'Vendas hoje' : 'Vendas no dia'} valor={resumo.numeroVendas} />
-        <Cartao titulo="Ticket médio" valor={money(resumo.ticketMedio)} />
-        <Cartao titulo="Taxa de serviço" valor={money(resumo.taxaServicoTotal)} />
-        <Cartao titulo="Descontos concedidos" valor={money(resumo.descontoTotal)} />
-      </div>
-
       <div className="card">
-        <div style={{ fontWeight: 700, marginBottom: 8 }}>Vendas por Ficha (balcão, sem mesa)</div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-            gap: 10,
-          }}
-        >
+        <div className="dash-card-titulo"><ShoppingBag size={15} /> Vendas por Ficha (balcão, sem mesa)</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
           <Cartao titulo="Faturamento Ficha" valor={money(resumo.faturamentoFicha)} />
           <Cartao titulo="Vendas Ficha" valor={resumo.numeroVendasFicha} />
           <Cartao titulo="Ticket médio Ficha" valor={money(resumo.ticketMedioFicha)} />
@@ -223,56 +263,42 @@ export default function Dashboard() {
       </div>
 
       <div className="card">
-        <div style={{ fontWeight: 700, marginBottom: 8 }}>Recebido no dia por forma de pagamento</div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-            gap: 10,
-          }}
-        >
-          {FORMAS_PAGAMENTO.map((f) => (
-            <div key={f.forma} className="card" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 12 }}>
-              <div
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  background: 'var(--panel-2)',
-                  color: 'var(--primary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <f.icon size={18} />
+        <div className="dash-card-titulo"><Wallet size={15} /> Recebido no dia por forma de pagamento</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {FORMAS_PAGAMENTO.map((f) => {
+            const valor = resumo.porFormaPagamento[f.forma] || 0;
+            const pct = Math.round((valor / totalFormas) * 100);
+            return (
+              <div key={f.forma} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className="dash-forma-icone">
+                  <f.icon size={16} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="row" style={{ marginBottom: 3 }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 600 }}>{f.label}</span>
+                    <span className="tabular" style={{ fontSize: 13, fontWeight: 800 }}>{money(valor)}</span>
+                  </div>
+                  <div className="dash-forma-barra">
+                    <div className="dash-forma-barra__fill" style={{ width: `${Math.max(pct, valor > 0 ? 3 : 0)}%` }} />
+                  </div>
+                </div>
               </div>
-              <div style={{ minWidth: 0 }}>
-                <p className="muted" style={{ fontSize: 11, margin: 0 }}>{f.label}</p>
-                <p className="tabular" style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>{money(resumo.porFormaPagamento[f.forma] || 0)}</p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
       <div className="card">
-        <div style={{ fontWeight: 700, marginBottom: 8 }}>Pico de vendas (a cada 30min)</div>
+        <div className="dash-card-titulo"><Flame size={15} /> Pico de vendas (a cada 30min)</div>
         <GraficoPico buckets={resumo.picoVendas} />
       </div>
 
       <TendenciaFaturamento />
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: 12,
-        }}
-      >
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
         <Ranking
           titulo="Top produtos"
+          icon={Package}
           itens={resumo.maisVendidos}
           vazio="Nenhuma venda registrada hoje ainda."
           renderLinha={(p) => (
@@ -287,6 +313,7 @@ export default function Dashboard() {
 
         <Ranking
           titulo="Top garçom"
+          icon={Trophy}
           itens={resumo.topGarcons}
           vazio="Nenhuma venda registrada no período."
           renderLinha={(g) => (
@@ -302,6 +329,7 @@ export default function Dashboard() {
         {resumo.caixaAbertoId && (
           <Ranking
             titulo="Taxa de serviço por garçom (caixa aberto)"
+            icon={Percent}
             itens={resumo.topGarcomTaxa}
             vazio="Nenhuma taxa de serviço registrada nesse caixa ainda."
             renderLinha={(g) => (
@@ -315,8 +343,10 @@ export default function Dashboard() {
 
         <Ranking
           titulo="Estoque quase acabando"
+          icon={Package}
           itens={resumo.estoqueBaixo}
           vazio="Nenhum produto com estoque baixo."
+          semMedalha
           renderLinha={(p) => (
             <>
               <span>{p.nome}</span>
@@ -368,21 +398,44 @@ function GraficoPico({ buckets }) {
   );
 }
 
-function Ranking({ titulo, itens, vazio, renderLinha }) {
+function Ranking({ titulo, icon: Icon, itens, vazio, renderLinha, semMedalha }) {
   return (
     <div className="card">
-      <div style={{ fontWeight: 700, marginBottom: 8 }}>{titulo}</div>
+      <div className="dash-card-titulo" style={{ marginBottom: 8 }}>
+        {Icon && <Icon size={15} />} {titulo}
+      </div>
       {itens.length === 0 ? (
         <p className="muted" style={{ fontSize: 13, margin: 0 }}>{vazio}</p>
       ) : (
         <div className="list">
           {itens.map((item, idx) => (
-            <div className="item" key={idx}>
-              {renderLinha(item)}
+            <div className="item" key={idx} style={{ alignItems: 'center', gap: 10 }}>
+              {!semMedalha && idx < 3 ? (
+                <span className="dash-medalha" style={{ background: MEDALHA[idx] }}>{idx + 1}</span>
+              ) : (
+                !semMedalha && <span className="dash-medalha dash-medalha--vazia">{idx + 1}</span>
+              )}
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                {renderLinha(item)}
+              </div>
             </div>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function CartaoIcone({ icon: Icon, cor, titulo, valor }) {
+  return (
+    <div className="card dash-stat-card">
+      <div className="dash-stat-card__icone" style={{ background: cor }}>
+        <Icon size={17} />
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <p className="muted" style={{ fontSize: 11.5, margin: 0 }}>{titulo}</p>
+        <p className="tabular" style={{ fontSize: 19, fontWeight: 800, margin: '2px 0 0' }}>{valor}</p>
+      </div>
     </div>
   );
 }
