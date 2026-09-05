@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Ban, DoorClosed, DoorOpen, History, Percent, Tag, Wallet } from 'lucide-react';
+import { Ban, DoorClosed, DoorOpen, History, Percent, Star, Tag, Wallet } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 
@@ -10,6 +10,7 @@ const ACAO_LABEL = {
   alterar_preco: 'Alterou preço',
   cancelar_venda: 'Cancelou venda',
   cancelar_item_pedido: 'Cancelou item da comanda',
+  resgate_fidelidade: 'Resgatou pontos de fidelidade',
 };
 
 const ACAO_ICONE = {
@@ -19,6 +20,7 @@ const ACAO_ICONE = {
   alterar_preco: [Tag, 'var(--primary)'],
   cancelar_venda: [Ban, 'var(--danger)'],
   cancelar_item_pedido: [Ban, 'var(--danger)'],
+  resgate_fidelidade: [Star, 'var(--atencao)'],
 };
 
 function resumoDetalhes(log) {
@@ -36,6 +38,8 @@ function resumoDetalhes(log) {
       return `Total ${money(d.total)}${d.motivo ? ` · Motivo: ${d.motivo}` : ''}`;
     case 'cancelar_item_pedido':
       return `"${d.nome_produto}" · ${money(d.valor)}${d.motivo ? ` · Motivo: ${d.motivo}` : ''}`;
+    case 'resgate_fidelidade':
+      return `${d.pontos} ponto${d.pontos === 1 ? '' : 's'}`;
     default:
       return JSON.stringify(d);
   }

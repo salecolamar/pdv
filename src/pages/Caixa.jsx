@@ -300,13 +300,17 @@ function CaixaAberto({ caixa, onFechado }) {
 }
 
 function FecharCaixa({ caixa, resumoPagamentos, totalMovimentos, onVoltar, onFechado }) {
-  const [valorInformado, setValorInformado] = useState('');
+  const vendasDinheiro = resumoPagamentos?.dinheiro || 0;
+  const esperado = Number(caixa.valor_inicial) + vendasDinheiro + totalMovimentos;
+
+  // Vem pré-preenchido com o valor esperado (o garçom só ajusta se contou
+  // diferente) — deixar em branco fazia o campo virar 0 se a pessoa
+  // confirmasse sem digitar nada, acusando uma "quebra de caixa" falsa do
+  // tamanho inteiro do valor esperado.
+  const [valorInformado, setValorInformado] = useState(() => esperado.toFixed(2));
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
   const [resultado, setResultado] = useState(null);
-
-  const vendasDinheiro = resumoPagamentos?.dinheiro || 0;
-  const esperado = Number(caixa.valor_inicial) + vendasDinheiro + totalMovimentos;
 
   async function confirmar() {
     setErro('');
@@ -377,7 +381,12 @@ function FecharCaixa({ caixa, resumoPagamentos, totalMovimentos, onVoltar, onFec
       </div>
       <div className="card">
         <span className="label">Valor contado no caixa (R$)</span>
-        <input value={valorInformado} onChange={(e) => setValorInformado(e.target.value)} inputMode="decimal" placeholder={esperado.toFixed(2)} />
+        <input
+          value={valorInformado}
+          onChange={(e) => setValorInformado(e.target.value)}
+          onFocus={(e) => e.target.select()}
+          inputMode="decimal"
+        />
       </div>
       {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
       <button type="button" className="btn btn-danger btn-block" disabled={enviando} onClick={confirmar}>

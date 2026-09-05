@@ -178,7 +178,7 @@ export function HistoricoPDV() {
     }
     setProdutosAbertos(vendaId);
     if (!itensPorVenda.has(vendaId)) {
-      const { data } = await supabase.from('venda_itens').select('nome_produto, quantidade, preco_unitario').eq('venda_id', vendaId);
+      const { data } = await supabase.from('venda_itens').select('nome_produto, quantidade, preco_unitario, complementos').eq('venda_id', vendaId);
       setItensPorVenda((atual) => new Map(atual).set(vendaId, data || []));
     }
   }
@@ -231,9 +231,17 @@ export function HistoricoPDV() {
             {produtosAbertos === v.id && (
               <div className="list" style={{ marginTop: 4, borderTop: '1px solid var(--border-soft)', paddingTop: 6 }}>
                 {(itensPorVenda.get(v.id) || []).map((i, idx) => (
-                  <div key={idx} className="row" style={{ fontSize: 12.5 }}>
-                    <span>{i.quantidade}x {i.nome_produto}</span>
-                    <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
+                  <div key={idx}>
+                    <div className="row" style={{ fontSize: 12.5 }}>
+                      <span>{i.quantidade}x {i.nome_produto}</span>
+                      <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
+                    </div>
+                    {(i.complementos || []).map((c, cidx) => (
+                      <div key={cidx} className="row" style={{ fontSize: 11, color: 'var(--text-dim)', paddingLeft: 14 }}>
+                        <span>+ {c.nome}</span>
+                        <span className="tabular">{money(Number(c.preco) * i.quantidade)}</span>
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
