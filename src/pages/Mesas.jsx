@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRightLeft, Calendar, ChevronDown, CreditCard, Lock, Mail, Minus, Package, Phone, Plus, Printer, Receipt, RefreshCw, Search, ShieldCheck, ShoppingCart, Trash2, User, Users2, Wallet, X } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, Calendar, ChevronDown, CreditCard, Lock, Mail, Minus, Package, Phone, Plus, Printer, Receipt, RefreshCw, Search, ShieldCheck, ShoppingCart, Trash2, User, Users2, Wallet, X } from 'lucide-react';
 import IconeMesaGenerico from '../components/IconeMesa';
 import { supabase } from '../supabase';
 import { money, mascararTelefone, mascararCpf, mascararDataBr, dataBrParaIso, metodoLabel } from '../utils/format';
@@ -27,6 +27,7 @@ export default function Mesas() {
   const [mesas, setMesas] = useState(null);
   const [ultimoPedidoPorMesa, setUltimoPedidoPorMesa] = useState(new Map());
   const [grupoPorMesa, setGrupoPorMesa] = useState(new Map());
+  const [prontoPorMesa, setProntoPorMesa] = useState(new Map());
   const [agora, setAgora] = useState(() => Date.now());
 
   useEffect(() => {
@@ -43,7 +44,7 @@ export default function Mesas() {
   async function carregar() {
     const [mesasResp, pedidosResp] = await Promise.all([
       supabase.from('mesas').select('*').order('nome'),
-      supabase.from('pedidos').select('mesa_id, mesas_juntadas, aberto_em, pedido_rodadas(criado_em)').eq('status', 'aberto'),
+      supabase.from('pedidos').select('mesa_id, mesas_juntadas, aberto_em, pedido_rodadas(criado_em, status, visto)').eq('status', 'aberto'),
     ]);
     const listaMesas = (mesasResp.data || []).sort((a, b) => {
       const na = Number(a.nome.match(/\d+/)?.[0]);
@@ -56,18 +57,22 @@ export default function Mesas() {
     const mapaNomes = new Map(listaMesas.map((m) => [m.id, m.nome]));
     const mapaUltimo = new Map();
     const mapaGrupo = new Map();
+    const mapaPronto = new Map();
     for (const p of pedidosResp.data || []) {
       const horarios = (p.pedido_rodadas || []).map((r) => new Date(r.criado_em).getTime());
       const ultimo = horarios.length ? Math.max(...horarios) : new Date(p.aberto_em).getTime();
       const grupo = [p.mesa_id, ...(p.mesas_juntadas || [])];
       const nomesGrupo = grupo.map((id) => mapaNomes.get(id)).filter(Boolean);
+      const temProntoNaoVisto = (p.pedido_rodadas || []).some((r) => r.status === 'pronto' && !r.visto);
       for (const mesaId of grupo) {
         mapaUltimo.set(mesaId, ultimo);
         if (grupo.length > 1) mapaGrupo.set(mesaId, nomesGrupo);
+        if (temProntoNaoVisto) mapaPronto.set(mesaId, true);
       }
     }
     setUltimoPedidoPorMesa(mapaUltimo);
     setGrupoPorMesa(mapaGrupo);
+    setProntoPorMesa(mapaPronto);
   }
 
   if (mesaSelecionada) {
@@ -104,7 +109,7 @@ export default function Mesas() {
       {abaPdv === 'ficha' ? (
         <Pdv />
       ) : (
-        <MapaMesas mesas={mesas} ultimoPedidoPorMesa={ultimoPedidoPorMesa} grupoPorMesa={grupoPorMesa} agora={agora} onAbrirMesa={setMesaSelecionada} />
+        <MapaMesas mesas={mesas} ultimoPedidoPorMesa={ultimoPedidoPorMesa} grupoPorMesa={grupoPorMesa} prontoPorMesa={prontoPorMesa} agora={agora} onAbrirMesa={setMesaSelecionada} />
       )}
     </div>
   );
@@ -310,7 +315,7 @@ function IconeMesa() {
   );
 }
 
-function MapaMesas({ mesas, ultimoPedidoPorMesa, grupoPorMesa, agora, onAbrirMesa }) {
+function MapaMesas({ mesas, ultimoPedidoPorMesa, grupoPorMesa, prontoPorMesa, agora, onAbrirMesa }) {
   if (mesas === null) return <p className="muted">Carregando…</p>;
   if (mesas.length === 0) {
     return <p className="muted" style={{ fontSize: 13 }}>Nenhuma mesa cadastrada ainda. Peça pro admin cadastrar em Mapa de Mesas.</p>;
@@ -322,6 +327,7 @@ function MapaMesas({ mesas, ultimoPedidoPorMesa, grupoPorMesa, agora, onAbrirMes
         const { cor, label } = corMesa(m, ultimoPedidoPorMesa, agora);
         const numero = (m.nome.match(/\d+/) || [m.nome])[0];
         const grupo = grupoPorMesa.get(m.id);
+        const pedidoPronto = prontoPorMesa.get(m.id);
         return (
           <button
             key={m.id}
@@ -331,6 +337,11 @@ function MapaMesas({ mesas, ultimoPedidoPorMesa, grupoPorMesa, agora, onAbrirMes
             style={{ '--mesa-cor': cor }}
             onClick={() => onAbrirMesa(m)}
           >
+            {pedidoPronto && (
+              <span className="mesa-card__alerta" title="Pedido pronto na cozinha">
+                <AlertTriangle size={13} />
+              </span>
+            )}
             <span className="mesa-card__numero">{numero}</span>
             <span className="mesa-card__icon-wrap">
               <IconeMesa />
@@ -493,6 +504,16 @@ function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
       .eq('pedido_id', pedidoId)
       .order('criado_em');
     setRodadas(data || []);
+
+    // Abrir a comanda é o jeito natural do garçom "ver" que o pedido ficou
+    // pronto — marca como visto pra parar de piscar o alerta no mapa.
+    const idsProntosNaoVistos = (data || []).filter((r) => r.status === 'pronto' && !r.visto).map((r) => r.id);
+    if (idsProntosNaoVistos.length > 0) {
+      // Sem await de propósito (não deve travar a tela) — mas o builder do
+      // supabase-js só dispara a requisição quando alguém consome a
+      // promise, então precisa de um .then() mesmo sem usar o resultado.
+      supabase.from('pedido_rodadas').update({ visto: true }).in('id', idsProntosNaoVistos).then(() => {});
+    }
   }
 
   async function carregarPagamentosParciais(pedidoId) {
