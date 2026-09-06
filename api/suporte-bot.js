@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { CONHECIMENTO_SISTEMA } from './_conhecimento-sistema.js';
 
-const MODELO = 'claude-sonnet-5';
+const MODELO = 'gemini-2.5-flash';
 const MAX_MENSAGENS = 30;
 
 export default async function handler(req, res) {
@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.GEMINI_API_KEY) {
     res.status(500).json({ error: 'Suporte por chat ainda não foi configurado (falta a chave da IA).' });
     return;
   }
@@ -44,10 +44,13 @@ export default async function handler(req, res) {
     return;
   }
 
-  const historico = mensagens.slice(-MAX_MENSAGENS).map((m) => ({
-    role: m.role === 'assistant' ? 'assistant' : 'user',
-    content: String(m.content || '').slice(0, 4000),
-  }));
+  const historico = mensagens
+    .slice(-MAX_MENSAGENS)
+    .map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: String(m.content || '').slice(0, 4000) }],
+    }))
+    .filter((_, idx, arr) => !(idx === 0 && arr[0].role === 'model'));
 
   const systemPrompt = `${CONHECIMENTO_SISTEMA}
 
@@ -57,18 +60,13 @@ Empresa: ${perfil.empresas?.nome || 'desconhecida'} (${perfil.empresas?.categori
 Quem pergunta: ${perfil.nome}, papel: ${perfil.role}`;
 
   try {
-    const resposta = await fetch('https://api.anthropic.com/v1/messages', {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELO}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+    const resposta = await fetch(url, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        model: MODELO,
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: historico,
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: historico,
       }),
     });
 
@@ -80,7 +78,7 @@ Quem pergunta: ${perfil.nome}, papel: ${perfil.role}`;
     }
 
     const dados = await resposta.json();
-    const texto = (dados.content || []).map((bloco) => (bloco.type === 'text' ? bloco.text : '')).join('').trim();
+    const texto = (dados.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('').trim();
     res.status(200).json({ resposta: texto || 'Não consegui gerar uma resposta agora. Pode reformular a pergunta?' });
   } catch (e) {
     console.error('Falha ao chamar a IA:', e);
