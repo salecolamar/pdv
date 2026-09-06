@@ -902,8 +902,9 @@ function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
                           ) : (
                             <span style={{ width: 16 }} />
                           )}
-                          <span className="rodada-item__nome" style={{ textDecoration: i.cancelado ? 'line-through' : 'none' }}>
+                          <span className="rodada-item__nome" style={{ textDecoration: i.cancelado ? 'line-through' : 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
                             {i.quantidade}x {i.nome_produto}{i.cancelado ? ' (cancelado)' : ''}
+                            {i.pago && !i.cancelado && <span className="chip chip-success" style={{ fontSize: 10 }}>Pago</span>}
                           </span>
                           <span className="tabular">{money(i.quantidade * precoBaseSemComplementos(i.preco_unitario, i.complementos))}</span>
                           {pedido.status === 'aberto' && !i.cancelado && !i.pago && (
@@ -917,11 +918,6 @@ function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
                             </button>
                           )}
                         </div>
-                        {i.pago && !i.cancelado && (
-                          <div style={{ paddingLeft: 34 }}>
-                            <span className="chip chip-success" style={{ fontSize: 10.5 }}>Pago</span>
-                          </div>
-                        )}
                         {(i.complementos || []).map((c, idx) => (
                           <div key={idx} className="row" style={{ fontSize: 11, color: 'var(--text-dim)', padding: '1px 0 1px 34px' }}>
                             <span>+ {c.nome}</span>
