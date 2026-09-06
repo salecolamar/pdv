@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { CONHECIMENTO_SISTEMA } from './_conhecimento-sistema.js';
 
-const MODELO = 'gemini-2.5-flash';
+const MODELO = 'gemini-3.6-flash';
 const MAX_MENSAGENS = 30;
 
 export default async function handler(req, res) {
