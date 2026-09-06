@@ -565,8 +565,14 @@ function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
     onDadosAlterados?.();
   }
 
-  async function registrarPagamentoParcial(forma, valor) {
-    const { error } = await supabase.rpc('registrar_pagamento_parcial', { p_pedido_id: pedido.id, p_forma: forma, p_valor: valor, p_taxa_servico: taxaValor });
+  async function registrarPagamentoParcial(forma, valor, itemIds) {
+    const { error } = await supabase.rpc('registrar_pagamento_parcial', {
+      p_pedido_id: pedido.id,
+      p_forma: forma,
+      p_valor: valor,
+      p_taxa_servico: taxaValor,
+      p_item_ids: itemIds && itemIds.length > 0 ? itemIds : null,
+    });
     if (error) {
       avisar(error.message.replace('P0001: ', ''), 'danger');
       return false;
@@ -574,6 +580,7 @@ function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
     setPagamentoParcialAberto(false);
     avisar('Pagamento parcial registrado.', 'success');
     carregarPagamentosParciais(pedido.id);
+    carregarRodadas(pedido.id);
     return true;
   }
 
@@ -705,7 +712,7 @@ function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
         itensSelecionados={itens}
         taxaPercentual={taxaAtiva ? taxaPercentual : 0}
         onConfirmar={async (forma, valor) => {
-          const ok = await registrarPagamentoParcial(forma, valor);
+          const ok = await registrarPagamentoParcial(forma, valor, itens.map((i) => i.id));
           if (ok) {
             setPagandoSelecionados(false);
             setItensSelecionados(new Set());
@@ -884,7 +891,7 @@ function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
                     {r.pedido_itens.map((i) => (
                       <div key={i.id} style={{ opacity: i.cancelado ? 0.5 : 1 }}>
                         <div className="rodada-item">
-                          {pedido.status === 'aberto' && !i.cancelado ? (
+                          {pedido.status === 'aberto' && !i.cancelado && !i.pago ? (
                             <input
                               type="checkbox"
                               className="rodada-item__check"
@@ -899,7 +906,7 @@ function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
                             {i.quantidade}x {i.nome_produto}{i.cancelado ? ' (cancelado)' : ''}
                           </span>
                           <span className="tabular">{money(i.quantidade * precoBaseSemComplementos(i.preco_unitario, i.complementos))}</span>
-                          {pedido.status === 'aberto' && !i.cancelado && (
+                          {pedido.status === 'aberto' && !i.cancelado && !i.pago && (
                             <button
                               type="button"
                               title="Transferir item"
@@ -910,6 +917,11 @@ function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
                             </button>
                           )}
                         </div>
+                        {i.pago && !i.cancelado && (
+                          <div style={{ paddingLeft: 34 }}>
+                            <span className="chip chip-success" style={{ fontSize: 10.5 }}>Pago</span>
+                          </div>
+                        )}
                         {(i.complementos || []).map((c, idx) => (
                           <div key={idx} className="row" style={{ fontSize: 11, color: 'var(--text-dim)', padding: '1px 0 1px 34px' }}>
                             <span>+ {c.nome}</span>
@@ -1354,9 +1366,17 @@ function PagamentoParcialForm({ restante, itensSelecionados, taxaPercentual = 0,
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span className="label">Itens a pagar</span>
           {itensSelecionados.map((item) => (
-            <div key={item.id} className="row" style={{ fontSize: 13 }}>
-              <span>{item.quantidade}x {item.nome_produto}</span>
-              <span className="tabular">{money(item.quantidade * item.preco_unitario)}</span>
+            <div key={item.id}>
+              <div className="row" style={{ fontSize: 13 }}>
+                <span>{item.quantidade}x {item.nome_produto}</span>
+                <span className="tabular">{money(item.quantidade * precoBaseSemComplementos(item.preco_unitario, item.complementos))}</span>
+              </div>
+              {(item.complementos || []).map((c, idx) => (
+                <div key={idx} className="row" style={{ fontSize: 11.5, color: 'var(--text-dim)', paddingLeft: 14 }}>
+                  <span>+ {c.nome}</span>
+                  <span className="tabular">{money(Number(c.preco) * item.quantidade)}</span>
+                </div>
+              ))}
             </div>
           ))}
           {taxaSelecionada > 0 && (
