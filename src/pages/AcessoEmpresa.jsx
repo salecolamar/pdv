@@ -38,9 +38,9 @@ export default function AcessoEmpresa({ empresaId }) {
           <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>Como você quer entrar?</p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <EscolhaCard icon={UtensilsCrossed} titulo="Sou garçom" descricao="Entrar com seu nome + PIN" onClick={() => setModo('garcom')} />
-          <EscolhaCard icon={UserCog} titulo="Sou gerente" descricao="Entrar com seu nome + PIN" onClick={() => setModo('gerente')} />
-          <EscolhaCard icon={ShieldCheck} titulo="Sou admin" descricao="Entrar com e-mail e senha" onClick={() => setModo('admin')} />
+          <EscolhaCard icon={UtensilsCrossed} titulo="Garçom" onClick={() => setModo('garcom')} />
+          <EscolhaCard icon={UserCog} titulo="Gerente" onClick={() => setModo('gerente')} />
+          <EscolhaCard icon={ShieldCheck} titulo="Administrador" onClick={() => setModo('admin')} />
         </div>
       </div>
     </Centro>
