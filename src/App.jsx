@@ -155,34 +155,7 @@ function LogoAppVia({ onCliques }) {
         width: '100%',
       }}
     >
-      <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="appviaGrad" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stopColor="#2E9EF5" />
-            <stop offset="1" stopColor="#6C3CE0" />
-          </linearGradient>
-        </defs>
-        <rect x="14" y="4" width="20" height="34" rx="6" stroke="url(#appviaGrad)" strokeWidth="2.4" />
-        <line x1="21" y1="10" x2="27" y2="10" stroke="url(#appviaGrad)" strokeWidth="2.4" strokeLinecap="round" />
-        <path d="M19 21l-4 4 4 4" stroke="url(#appviaGrad)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M29 21l4 4-4 4" stroke="url(#appviaGrad)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-        <line x1="26" y1="19" x2="22" y2="31" stroke="url(#appviaGrad)" strokeWidth="2.2" strokeLinecap="round" />
-        <rect x="36" y="10" width="5" height="5" rx="1.2" fill="#6C3CE0" opacity="0.85" />
-        <rect x="40" y="17" width="4" height="4" rx="1" fill="#6C3CE0" opacity="0.55" />
-      </svg>
-      <span style={{ fontSize: 21, fontWeight: 800, letterSpacing: -0.3 }}>
-        <span style={{ color: 'var(--text)' }}>App</span>
-        <span
-          style={{
-            background: 'linear-gradient(135deg, #2E9EF5, #6C3CE0)',
-            WebkitBackgroundClip: 'text',
-            backgroundClip: 'text',
-            color: 'transparent',
-          }}
-        >
-          Via
-        </span>
-      </span>
+      <img src="/brand/logo-three-solutions-full.png" alt="Three Solutions" style={{ height: 44, width: 'auto' }} />
     </button>
   );
 }
