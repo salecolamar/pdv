@@ -54,7 +54,7 @@ const MODULOS = [
   { id: 'relatorios', label: 'Relatórios', icon: BarChart3, papeis: ['admin'] },
   { id: 'auditoria', label: 'Auditoria', icon: History, papeis: ['admin'] },
   { id: 'configuracoes', label: 'Configurações', icon: Settings, papeis: ['admin'] },
-  { id: 'ajuda', label: 'Ajuda', icon: LifeBuoy, papeis: ['admin'] },
+  { id: 'ajuda', label: 'Suporte', icon: LifeBuoy, papeis: ['admin'] },
 ];
 
 export default function Shell({ session }) {

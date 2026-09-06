@@ -55,7 +55,7 @@ export default function Ajuda() {
   return (
     <div className="ajuda">
       <h1 style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <LifeBuoy size={22} /> Ajuda
+        <LifeBuoy size={22} /> Suporte
       </h1>
 
       <div className="ajuda-chat">
