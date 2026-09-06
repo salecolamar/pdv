@@ -5,7 +5,7 @@ import { Centro, FormularioEntrar } from '../App';
 import EscolhaCard from '../components/EscolhaCard';
 
 export default function AcessoEmpresa({ empresaId }) {
-  const [modo, setModo] = useState(null); // null | 'admin' | 'garcom'
+  const [modo, setModo] = useState(null); // null | 'admin' | 'garcom' | 'gerente'
 
   if (modo === 'admin') {
     return (
@@ -18,8 +18,8 @@ export default function AcessoEmpresa({ empresaId }) {
     );
   }
 
-  if (modo === 'garcom') {
-    return <AcessoGarcom empresaId={empresaId} onVoltar={() => setModo(null)} />;
+  if (modo === 'garcom' || modo === 'gerente') {
+    return <AcessoGarcom empresaId={empresaId} tipoInicial={modo === 'gerente' ? 'gerente' : 'operador'} onVoltar={() => setModo(null)} />;
   }
 
   return (
@@ -39,6 +39,7 @@ export default function AcessoEmpresa({ empresaId }) {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <EscolhaCard icon={UtensilsCrossed} titulo="Sou garçom" descricao="Entrar com seu nome + PIN" onClick={() => setModo('garcom')} />
+          <EscolhaCard icon={UserCog} titulo="Sou gerente" descricao="Entrar com seu nome + PIN" onClick={() => setModo('gerente')} />
           <EscolhaCard icon={ShieldCheck} titulo="Sou admin" descricao="Entrar com e-mail e senha" onClick={() => setModo('admin')} />
         </div>
       </div>
@@ -57,9 +58,9 @@ function VoltarEscolha({ onVoltar, titulo }) {
   );
 }
 
-export function AcessoGarcom({ empresaId, onVoltar }) {
+export function AcessoGarcom({ empresaId, onVoltar, tipoInicial = 'operador' }) {
   const [usuarios, setUsuarios] = useState(undefined);
-  const [tipo, setTipo] = useState('operador'); // 'operador' | 'gerente'
+  const [tipo, setTipo] = useState(tipoInicial); // 'operador' | 'gerente'
   const [selecionado, setSelecionado] = useState(null);
   const [pin, setPin] = useState('');
   const [erro, setErro] = useState('');
@@ -94,7 +95,10 @@ export function AcessoGarcom({ empresaId, onVoltar }) {
   return (
     <Centro>
       <div className="card" style={{ width: 340, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <VoltarEscolha onVoltar={selecionado ? () => { setSelecionado(null); setPin(''); setErro(''); } : onVoltar} titulo="Acesso do garçom" />
+        <VoltarEscolha
+          onVoltar={selecionado ? () => { setSelecionado(null); setPin(''); setErro(''); } : onVoltar}
+          titulo={selecionado ? (selecionado.role === 'gerente' ? 'Acesso do gerente' : 'Acesso do garçom') : tipo === 'gerente' ? 'Acesso do gerente' : 'Acesso do garçom'}
+        />
 
         {!selecionado && usuarios && usuarios.length > 0 && temGerentes && (
           <div className="tab-row">

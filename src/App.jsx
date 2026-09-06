@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ShieldCheck, UtensilsCrossed } from 'lucide-react';
+import { ShieldCheck, UserCog, UtensilsCrossed } from 'lucide-react';
 import { supabase } from './supabase';
 import Shell from './Shell';
 import AcessoEmpresa, { AcessoGarcom } from './pages/AcessoEmpresa';
@@ -51,7 +51,7 @@ export function Centro({ children }) {
 // já logou por PIN (role operador) não vê essa tela, vai direto pro PDV.
 function PosLogin({ session }) {
   const [perfil, setPerfil] = useState(undefined);
-  const [modo, setModo] = useState(null); // null | 'admin' | 'garcom'
+  const [modo, setModo] = useState(null); // null | 'admin' | 'garcom' | 'gerente'
   const chaveEscolha = `pdv_modo_${session.user.id}`;
 
   useEffect(() => {
@@ -84,10 +84,11 @@ function PosLogin({ session }) {
     return <Shell session={session} />;
   }
 
-  if (escolhaSalva === 'garcom') {
+  if (escolhaSalva === 'garcom' || escolhaSalva === 'gerente') {
     return (
       <AcessoGarcom
         empresaId={perfil.empresa_id}
+        tipoInicial={escolhaSalva === 'gerente' ? 'gerente' : 'operador'}
         onVoltar={() => {
           sessionStorage.removeItem(chaveEscolha);
           setModo(null);
@@ -111,6 +112,15 @@ function PosLogin({ session }) {
             onClick={() => {
               sessionStorage.setItem(chaveEscolha, 'garcom');
               setModo('garcom');
+            }}
+          />
+          <EscolhaCard
+            icon={UserCog}
+            titulo="Entrar como gerente"
+            descricao="Escolher seu nome + PIN pra vender"
+            onClick={() => {
+              sessionStorage.setItem(chaveEscolha, 'gerente');
+              setModo('gerente');
             }}
           />
           <EscolhaCard
