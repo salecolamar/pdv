@@ -5,6 +5,7 @@ import {
   ChefHat,
   History,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
   Menu,
   Package,
@@ -32,6 +33,7 @@ import Auditoria from './pages/Auditoria';
 import PosPago from './pages/PosPago';
 import Reservas from './pages/Reservas';
 import Configuracoes from './pages/Configuracoes';
+import Ajuda from './pages/Ajuda';
 
 // Cada módulo diz quais papéis podem vê-lo (seção 10 do documento):
 // garçom (operador, login por PIN) e gerente (login por e-mail) só
@@ -52,6 +54,7 @@ const MODULOS = [
   { id: 'relatorios', label: 'Relatórios', icon: BarChart3, papeis: ['admin'] },
   { id: 'auditoria', label: 'Auditoria', icon: History, papeis: ['admin'] },
   { id: 'configuracoes', label: 'Configurações', icon: Settings, papeis: ['admin'] },
+  { id: 'ajuda', label: 'Ajuda', icon: LifeBuoy, papeis: ['admin'] },
 ];
 
 export default function Shell({ session }) {
@@ -177,6 +180,7 @@ export default function Shell({ session }) {
           {abaAtiva === 'usuarios' && <Usuarios />}
           {abaAtiva === 'auditoria' && <Auditoria />}
           {abaAtiva === 'configuracoes' && <Configuracoes />}
+          {abaAtiva === 'ajuda' && <Ajuda />}
         </main>
       </div>
     </div>
