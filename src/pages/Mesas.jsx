@@ -13,6 +13,14 @@ import Pdv from './Pdv';
 const STATUS_LABEL = { livre: 'Disponível', ocupada: 'Ocupada', reservada: 'Reservada' };
 const LIMITE_SEM_PEDIDO_MS = 20 * 60 * 1000;
 
+// preco_unitario de um item já vem com os complementos somados (pra fechar a
+// conta certo) — mas no extrato queremos mostrar o produto pelo preço dele
+// sozinho, com cada complemento discriminado embaixo com o preço próprio.
+function precoBaseSemComplementos(precoUnitario, complementos) {
+  const totalComplementos = (complementos || []).reduce((s, c) => s + Number(c.preco), 0);
+  return Number(precoUnitario) - totalComplementos;
+}
+
 export default function Mesas() {
   const [mesaSelecionada, setMesaSelecionada] = useState(null);
   const [abaPdv, setAbaPdv] = useState('mesa');
@@ -234,7 +242,7 @@ export function HistoricoPDV() {
                   <div key={idx}>
                     <div className="row" style={{ fontSize: 12.5 }}>
                       <span>{i.quantidade}x {i.nome_produto}</span>
-                      <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
+                      <span className="tabular">{money(i.quantidade * precoBaseSemComplementos(i.preco_unitario, i.complementos))}</span>
                     </div>
                     {(i.complementos || []).map((c, cidx) => (
                       <div key={cidx} className="row" style={{ fontSize: 11, color: 'var(--text-dim)', paddingLeft: 14 }}>
@@ -890,7 +898,7 @@ function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
                           <span className="rodada-item__nome" style={{ textDecoration: i.cancelado ? 'line-through' : 'none' }}>
                             {i.quantidade}x {i.nome_produto}{i.cancelado ? ' (cancelado)' : ''}
                           </span>
-                          <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
+                          <span className="tabular">{money(i.quantidade * precoBaseSemComplementos(i.preco_unitario, i.complementos))}</span>
                           {pedido.status === 'aberto' && !i.cancelado && (
                             <button
                               type="button"
@@ -1148,7 +1156,7 @@ function ContaMesa({ mesa, pedido, rodadas, total, taxaPercentual, taxaAtiva, va
               <div key={i.id} style={{ padding: '3px 0' }}>
                 <div className="row" style={{ fontSize: 13 }}>
                   <span>{i.quantidade}x {i.nome_produto}</span>
-                  <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
+                  <span className="tabular">{money(i.quantidade * precoBaseSemComplementos(i.preco_unitario, i.complementos))}</span>
                 </div>
                 {(i.complementos || []).map((c, idx) => (
                   <div key={idx} className="row" style={{ fontSize: 11.5, color: 'var(--text-dim)', paddingLeft: 14 }}>
@@ -1755,7 +1763,7 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
                       <Plus size={12} />
                     </button>
                   </div>
-                  <span className="tabular" style={{ width: 70, textAlign: 'right' }}>{money(i.preco * i.quantidade)}</span>
+                  <span className="tabular" style={{ width: 70, textAlign: 'right' }}>{money(precoBaseSemComplementos(i.preco, i.complementosSelecionados) * i.quantidade)}</span>
                 </div>
                 {(i.complementosSelecionados || []).map((c) => (
                   <div key={c.id} className="row" style={{ fontSize: 11.5, color: 'var(--text-dim)', paddingLeft: 14 }}>
@@ -1789,7 +1797,7 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
                 <div key={i.chave} style={{ padding: '3px 0' }}>
                   <div className="row" style={{ fontSize: 14 }}>
                     <span>{i.quantidade}x {i.nome}</span>
-                    <span className="tabular">{money(i.preco * i.quantidade)}</span>
+                    <span className="tabular">{money(precoBaseSemComplementos(i.preco, i.complementosSelecionados) * i.quantidade)}</span>
                   </div>
                   {(i.complementosSelecionados || []).map((c) => (
                     <div key={c.id} className="row" style={{ fontSize: 12, color: 'var(--text-dim)', paddingLeft: 14 }}>

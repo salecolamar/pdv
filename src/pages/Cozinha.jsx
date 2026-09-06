@@ -341,19 +341,23 @@ function TicketCozinha({ rodada, agora, acao, onAvancar }) {
             <div key={categoria} className="ticket-cozinha__grupo">
               <div className="ticket-cozinha__categoria">{categoria}</div>
               <ul className="ticket-cozinha__itens">
-                {itens.map((i) => (
-                  <li key={i.id} style={{ opacity: i.cancelado ? 0.5 : 1, textDecoration: i.cancelado ? 'line-through' : 'none', flexDirection: 'column', alignItems: 'stretch' }}>
-                    <span className="row" style={{ width: '100%' }}>
-                      <span>
-                        <span className="ticket-cozinha__qtd">{i.quantidade}x</span> {i.nome_produto}
+                {itens.map((i) => {
+                  const totalComplementos = (i.complementos || []).reduce((s, c) => s + Number(c.preco), 0);
+                  const precoBase = Number(i.preco_unitario) - totalComplementos;
+                  return (
+                    <li key={i.id} style={{ opacity: i.cancelado ? 0.5 : 1, textDecoration: i.cancelado ? 'line-through' : 'none', flexDirection: 'column', alignItems: 'stretch' }}>
+                      <span className="row" style={{ width: '100%' }}>
+                        <span>
+                          <span className="ticket-cozinha__qtd">{i.quantidade}x</span> {i.nome_produto}
+                        </span>
+                        <span className="tabular">{money(i.quantidade * precoBase)}</span>
                       </span>
-                      <span className="tabular">{money(i.quantidade * i.preco_unitario)}</span>
-                    </span>
-                    {(i.complementos || []).map((c, idx) => (
-                      <span key={idx} className="muted" style={{ fontSize: 11.5, paddingLeft: 18 }}>+ {c.nome}</span>
-                    ))}
-                  </li>
-                ))}
+                      {(i.complementos || []).map((c, idx) => (
+                        <span key={idx} className="muted" style={{ fontSize: 11.5, paddingLeft: 18 }}>+ {c.nome}</span>
+                      ))}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}
