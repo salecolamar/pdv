@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChefHat, Printer, PrinterCheck, X } from 'lucide-react';
+import { ChefHat, Printer, PrinterCheck, Settings, X } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import {
@@ -48,6 +48,7 @@ export default function Cozinha() {
   const [agora, setAgora] = useState(() => Date.now());
   const [impressoraPronta, setImpressoraPronta] = useState(() => impressoraConfigurada());
   const [configAberta, setConfigAberta] = useState(false);
+  const [configProdutosAberta, setConfigProdutosAberta] = useState(false);
   const [erroImpressora, setErroImpressora] = useState('');
   const impressoraProntaRef = useRef(impressoraPronta);
   const imprimindoRef = useRef(new Set());
@@ -75,11 +76,14 @@ export default function Cozinha() {
   async function carregar() {
     const { data } = await supabase
       .from('pedido_rodadas')
-      .select('*, pedido_itens(*, produtos(categorias(nome))), pedidos(mesas(nome), clientes(nome)), usuarios(nome)')
+      .select('*, pedido_itens(*, produtos(categorias(nome), exibir_no_kds)), pedidos(mesas(nome), clientes(nome)), usuarios(nome)')
       .gte('criado_em', inicioDoDia())
       .order('criado_em');
-    setRodadas(data || []);
-    imprimirNovas(data || []);
+    const visiveis = (data || [])
+      .map((r) => ({ ...r, pedido_itens: r.pedido_itens.filter((i) => i.produtos?.exibir_no_kds !== false) }))
+      .filter((r) => r.pedido_itens.length > 0);
+    setRodadas(visiveis);
+    imprimirNovas(visiveis);
   }
 
   async function imprimirNovas(lista) {
@@ -130,6 +134,9 @@ export default function Cozinha() {
         <h1 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><ChefHat size={22} /> Painel de Pedidos</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {rodadas && pendentes > 0 && <span className="chip chip-primary">{pendentes} em preparo</span>}
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfigProdutosAberta(true)}>
+            <Settings size={14} /> Produtos no painel
+          </button>
           {impressoraPronta ? (
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfigAberta(true)}>
               <PrinterCheck size={14} /> Impressora configurada
@@ -155,6 +162,10 @@ export default function Cozinha() {
           onErro={setErroImpressora}
           onFechar={() => setConfigAberta(false)}
         />
+      )}
+
+      {configProdutosAberta && (
+        <ConfigProdutosKds onFechar={() => setConfigProdutosAberta(false)} onMudou={carregar} />
       )}
 
       {rodadas === null ? (
@@ -300,6 +311,92 @@ function ConfigImpressora({ impressoraPronta, onPronta, onEsquecer, onErro, onFe
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function ConfigProdutosKds({ onFechar, onMudou }) {
+  const [categorias, setCategorias] = useState(null);
+  const [produtos, setProdutos] = useState(null);
+
+  useEffect(() => {
+    carregar();
+  }, []);
+
+  async function carregar() {
+    const [{ data: cats }, { data: prods }] = await Promise.all([
+      supabase.from('categorias').select('*').order('ordem').order('nome'),
+      supabase.from('produtos').select('id, nome, categoria_id, exibir_no_kds').order('nome'),
+    ]);
+    setCategorias(cats || []);
+    setProdutos(prods || []);
+  }
+
+  async function alternarProduto(p) {
+    const novoValor = !p.exibir_no_kds;
+    setProdutos((atual) => atual.map((x) => (x.id === p.id ? { ...x, exibir_no_kds: novoValor } : x)));
+    await supabase.from('produtos').update({ exibir_no_kds: novoValor }).eq('id', p.id);
+    onMudou();
+  }
+
+  async function alternarGrupo(itens, ligar) {
+    const ids = itens.map((p) => p.id);
+    setProdutos((atual) => atual.map((x) => (ids.includes(x.id) ? { ...x, exibir_no_kds: ligar } : x)));
+    await supabase.from('produtos').update({ exibir_no_kds: ligar }).in('id', ids);
+    onMudou();
+  }
+
+  const grupos = categorias
+    ? [...categorias.map((c) => ({ id: c.id, nome: c.nome })), { id: null, nome: 'Sem categoria' }]
+        .map((c) => ({ ...c, itens: (produtos || []).filter((p) => (p.categoria_id || null) === c.id) }))
+        .filter((c) => c.itens.length > 0)
+    : [];
+
+  return (
+    <div className="modal-overlay" onClick={onFechar}>
+      <div className="modal-box" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+        <div className="row" style={{ marginBottom: 4 }}>
+          <span style={{ fontWeight: 700 }}>Produtos exibidos no painel</span>
+          <button type="button" onClick={onFechar} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>
+            <X size={16} />
+          </button>
+        </div>
+        <p className="muted" style={{ fontSize: 12.5, marginTop: 0 }}>
+          Desmarque os produtos ou categorias que não precisam aparecer no Painel de Pedidos (ex: taxas, itens que não vão pra cozinha).
+        </p>
+
+        {categorias === null ? (
+          <p className="muted" style={{ fontSize: 13 }}>Carregando…</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxHeight: 420, overflowY: 'auto' }}>
+            {grupos.map((g) => {
+              const todosLigados = g.itens.every((p) => p.exibir_no_kds);
+              return (
+                <div key={g.id ?? 'sem-categoria'}>
+                  <div className="row" style={{ marginBottom: 6 }}>
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>{g.nome}</span>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => alternarGrupo(g.itens, !todosLigados)}
+                    >
+                      {todosLigados ? 'Ocultar todos' : 'Mostrar todos'}
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {g.itens.map((p) => (
+                      <label key={p.id} className="row" style={{ fontSize: 13.5, cursor: 'pointer', padding: '2px 0' }}>
+                        <span>{p.nome}</span>
+                        <input type="checkbox" checked={p.exibir_no_kds} onChange={() => alternarProduto(p)} />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
