@@ -585,6 +585,17 @@ function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
     avisar('Comanda reaberta.', 'success');
   }
 
+  async function fecharMesaSemConsumo() {
+    if (!window.confirm('Fechar essa mesa sem cobrar nada? Só funciona porque não tem item lançado (ou tudo foi cancelado).')) return;
+    const { error } = await supabase.rpc('fechar_mesa_sem_consumo', { p_pedido_id: pedido.id });
+    if (error) {
+      avisar(error.message.replace('P0001: ', ''), 'danger');
+      return;
+    }
+    avisar('Mesa liberada.', 'success');
+    onVoltar();
+  }
+
   if (precisaCliente) {
     return <FormAbrirMesa mesa={mesa} onAbrir={abrirComCliente} onVoltar={onVoltar} />;
   }
@@ -934,7 +945,13 @@ function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
         <p className="success-text" style={{ textAlign: 'center' }}>Comanda paga — mesa liberada para o próximo grupo.</p>
       )}
 
-      {pedido.status !== 'pago' && (
+      {pedido.status === 'aberto' && total === 0 && (
+        <button type="button" className="btn btn-danger btn-block" onClick={fecharMesaSemConsumo}>
+          Fechar mesa (sem consumo)
+        </button>
+      )}
+
+      {pedido.status !== 'pago' && !(pedido.status === 'aberto' && total === 0) && (
         <div className="comanda-bottombar">
           <div className="comanda-bottombar__stats">
             <div className="comanda-bottombar__stat">
@@ -1067,7 +1084,7 @@ export function AutorizacaoGerente({ titulo, onAutorizado, onVoltar }) {
       ) : (
         <>
           <span className="label">Autorizado por</span>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 240, overflowY: 'auto' }}>
             {autorizadores.map((u) => (
               <EscolhaCard
                 key={u.id}
