@@ -201,6 +201,21 @@ export default function Shell({ session }) {
           </button>
         </div>
 
+        {precisaCaixaAberto && caixaInfo && (
+          <div
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, margin: '0 16px 8px', padding: '8px 10px',
+              borderRadius: 10, background: 'rgba(255,255,255,0.12)', color: '#fff', fontSize: 11.5,
+            }}
+          >
+            <Wallet size={14} style={{ flexShrink: 0, opacity: 0.85 }} />
+            <span style={{ opacity: 0.92 }}>
+              Caixa aberto por <strong>{caixaInfo.usuarios?.nome || '—'}</strong> às{' '}
+              {new Date(caixaInfo.aberto_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        )}
+
         <nav className="sidebar__nav">
           {modulosVisiveis.map((m) => (
             <button key={m.id} type="button" className={'sidebar__link' + (abaAtiva === m.id ? ' is-active' : '')} onClick={() => irPara(m.id)}>
