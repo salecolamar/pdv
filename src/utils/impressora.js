@@ -234,6 +234,9 @@ export function ticketRodada({ tituloMesa, cliente, operador, horario, grupos })
       for (const c of i.complementos || []) {
         linhas.push({ texto: `   + ${c.nome}` });
       }
+      for (const g of i.observacoes || []) {
+        linhas.push({ texto: `   ${g.titulo}: ${g.opcoes.join(', ')}`, negrito: true });
+      }
     }
   }
 

@@ -453,6 +453,11 @@ function TicketCozinha({ rodada, agora, acao, onAvancar }) {
                       {(i.complementos || []).map((c, idx) => (
                         <span key={idx} className="muted" style={{ fontSize: 11.5, paddingLeft: 18 }}>+ {c.nome}</span>
                       ))}
+                      {(i.observacoes || []).map((g, idx) => (
+                        <span key={idx} className="muted" style={{ fontSize: 11.5, paddingLeft: 18, fontWeight: 700 }}>
+                          {g.titulo}: {g.opcoes.join(', ')}
+                        </span>
+                      ))}
                     </li>
                   );
                 })}

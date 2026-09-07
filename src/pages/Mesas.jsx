@@ -211,7 +211,7 @@ export function HistoricoPDV() {
     }
     setProdutosAbertos(vendaId);
     if (!itensPorVenda.has(vendaId)) {
-      const { data } = await supabase.from('venda_itens').select('nome_produto, quantidade, preco_unitario, complementos').eq('venda_id', vendaId);
+      const { data } = await supabase.from('venda_itens').select('nome_produto, quantidade, preco_unitario, complementos, observacoes').eq('venda_id', vendaId);
       setItensPorVenda((atual) => new Map(atual).set(vendaId, data || []));
     }
   }
@@ -273,6 +273,11 @@ export function HistoricoPDV() {
                       <div key={cidx} className="row" style={{ fontSize: 11, color: 'var(--text-dim)', paddingLeft: 14 }}>
                         <span>+ {c.nome}</span>
                         <span className="tabular">{money(Number(c.preco) * i.quantidade)}</span>
+                      </div>
+                    ))}
+                    {(i.observacoes || []).map((g, gidx) => (
+                      <div key={gidx} className="muted" style={{ fontSize: 11, paddingLeft: 14 }}>
+                        {g.titulo}: {g.opcoes.join(', ')}
                       </div>
                     ))}
                   </div>
@@ -975,6 +980,11 @@ function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
                             <span className="tabular">{money(Number(c.preco) * i.quantidade)}</span>
                           </div>
                         ))}
+                        {(i.observacoes || []).map((g, idx) => (
+                          <div key={idx} className="muted" style={{ fontSize: 11, padding: '1px 0 1px 34px' }}>
+                            {g.titulo}: {g.opcoes.join(', ')}
+                          </div>
+                        ))}
                       </div>
                     ))}
                     <div className="rodada-card__subtotal">
@@ -1223,6 +1233,11 @@ function ContaMesa({ mesa, pedido, rodadas, total, taxaPercentual, taxaAtiva, va
                     <span className="tabular">{money(Number(c.preco) * i.quantidade)}</span>
                   </div>
                 ))}
+                {(i.observacoes || []).map((g, idx) => (
+                  <div key={idx} className="muted" style={{ fontSize: 11.5, paddingLeft: 14 }}>
+                    {g.titulo}: {g.opcoes.join(', ')}
+                  </div>
+                ))}
               </div>
             ))
           )}
@@ -1422,6 +1437,11 @@ function PagamentoParcialForm({ restante, itensSelecionados, taxaPercentual = 0,
                 <div key={idx} className="row" style={{ fontSize: 11.5, color: 'var(--text-dim)', paddingLeft: 14 }}>
                   <span>+ {c.nome}</span>
                   <span className="tabular">{money(Number(c.preco) * item.quantidade)}</span>
+                </div>
+              ))}
+              {(item.observacoes || []).map((g, idx) => (
+                <div key={idx} className="muted" style={{ fontSize: 11.5, paddingLeft: 14 }}>
+                  {g.titulo}: {g.opcoes.join(', ')}
                 </div>
               ))}
             </div>
@@ -1653,15 +1673,22 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
     setProdutos(data || []);
   }
 
-  // Uma "variante" é o produto + o conjunto de complementos escolhidos —
-  // cada combinação vira sua própria linha no carrinho, com preço e nome já
-  // somando o(s) adicional(is) (em vez de virar item separado na conta).
-  function chaveVariante(produtoId, complementoIds) {
-    return complementoIds.length ? `${produtoId}|${[...complementoIds].sort().join(',')}` : produtoId;
+  // Uma "variante" é o produto + o conjunto de complementos/observações
+  // escolhidos — cada combinação vira sua própria linha no carrinho, com
+  // preço e nome já somando o(s) adicional(is) (em vez de virar item
+  // separado na conta). Observação não muda o preço, só entra na chave
+  // pra escolhas diferentes não se misturarem na mesma linha.
+  function chaveVariante(produtoId, complementoIds, gruposObsSelecionados = []) {
+    const partes = [];
+    if (complementoIds.length) partes.push('c:' + [...complementoIds].sort().join(','));
+    if (gruposObsSelecionados.length) {
+      partes.push('o:' + gruposObsSelecionados.map((g) => `${g.titulo}=${[...g.opcoes].sort().join('|')}`).sort().join(';'));
+    }
+    return partes.length ? `${produtoId}|${partes.join('|')}` : produtoId;
   }
 
-  function adicionar(p, delta = 1, complementoIds = []) {
-    const chave = chaveVariante(p.id, complementoIds);
+  function adicionar(p, delta = 1, complementoIds = [], gruposObsSelecionados = []) {
+    const chave = chaveVariante(p.id, complementoIds, gruposObsSelecionados);
     if (delta > 0) setUltimaVariantePorProduto((atual) => new Map(atual).set(p.id, chave));
     setCarrinho((atual) => {
       const existente = atual.find((i) => i.chave === chave);
@@ -1675,13 +1702,16 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
       const complementosSelecionados = complementoIds.map((id) => complementosDoProduto.find((c) => c.id === id)).filter(Boolean);
       const precoBase = precoEfetivo(p, promocoes);
       const precoTotal = precoBase + complementosSelecionados.reduce((s, c) => s + Number(c.preco), 0);
-      return [...atual, { chave, produto_id: p.id, nome: p.nome, preco: precoTotal, quantidade: 1, estoque: p.estoque, complementosSelecionados }];
+      return [
+        ...atual,
+        { chave, produto_id: p.id, nome: p.nome, preco: precoTotal, quantidade: 1, estoque: p.estoque, complementosSelecionados, observacoesSelecionadas: gruposObsSelecionados },
+      ];
     });
   }
 
   // Botão "-" do card do produto: desfaz a última variante adicionada
-  // dele (com ou sem complementos) — ajustes mais finos por combinação
-  // ficam pro estepper de cada linha, lá embaixo no carrinho.
+  // dele (com ou sem complementos/observação) — ajustes mais finos por
+  // combinação ficam pro estepper de cada linha, lá embaixo no carrinho.
   function removerUltima(p) {
     const chave = ultimaVariantePorProduto.get(p.id) || p.id;
     setCarrinho((atual) => atual.map((i) => (i.chave === chave ? { ...i, quantidade: i.quantidade - 1 } : i)).filter((i) => i.quantidade > 0));
@@ -1730,6 +1760,7 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
         quantidade: i.quantidade,
         preco_unitario: i.preco,
         complementos: (i.complementosSelecionados || []).map((c) => ({ nome: c.nome, preco: Number(c.preco) })),
+        observacoes: i.observacoesSelecionadas || [],
       })),
     });
     setEnviando(false);
@@ -1782,6 +1813,8 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
             const precoBase = precoEfetivo(p, promocoes);
             const emPromocao = precoBase < Number(p.preco);
             const complementosDisponiveis = complementosPorProduto.get(p.id) || [];
+            const gruposObservacao = p.grupos_observacao || [];
+            const temEscolhas = complementosDisponiveis.length > 0 || gruposObservacao.length > 0;
             const qtd = quantidadeTotalProduto(p.id);
             const esgotado = p.estoque !== null && p.estoque <= 0;
             const semEstoque = esgotado || (p.estoque !== null && qtd >= p.estoque);
@@ -1801,6 +1834,9 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
                 {complementosDisponiveis.length > 0 && (
                   <div className="muted" style={{ fontSize: 10.5, marginTop: 4 }}>+ {complementosDisponiveis.length} complemento(s) disponível(is)</div>
                 )}
+                {gruposObservacao.length > 0 && (
+                  <div className="muted" style={{ fontSize: 10.5, marginTop: 2 }}>{gruposObservacao.map((g) => g.titulo).join(', ')}</div>
+                )}
                 <div className="stepper-mini" style={{ marginTop: 6, justifyContent: 'center', width: '100%' }}>
                   <button type="button" className="stepper-mini-btn" disabled={qtd === 0} onClick={() => removerUltima(p)}>
                     <Minus size={12} />
@@ -1810,7 +1846,7 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
                     type="button"
                     className="stepper-mini-btn"
                     disabled={semEstoque}
-                    onClick={() => (complementosDisponiveis.length > 0 ? setEscolhendoComplementos(p) : adicionar(p, 1))}
+                    onClick={() => (temEscolhas ? setEscolhendoComplementos(p) : adicionar(p, 1))}
                   >
                     <Plus size={12} />
                   </button>
@@ -1826,8 +1862,9 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
           produto={escolhendoComplementos}
           precoBase={precoEfetivo(escolhendoComplementos, promocoes)}
           complementosDisponiveis={complementosPorProduto.get(escolhendoComplementos.id) || []}
-          onConfirmar={(idsSelecionados) => {
-            adicionar(escolhendoComplementos, 1, idsSelecionados);
+          gruposObservacao={escolhendoComplementos.grupos_observacao || []}
+          onConfirmar={(idsSelecionados, gruposObsSelecionados) => {
+            adicionar(escolhendoComplementos, 1, idsSelecionados, gruposObsSelecionados);
             setEscolhendoComplementos(null);
           }}
           onFechar={() => setEscolhendoComplementos(null)}
@@ -1842,11 +1879,11 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
                 <div className="row" style={{ alignItems: 'center' }}>
                   <span style={{ flex: 1 }}>{i.nome}</span>
                   <div className="stepper">
-                    <button type="button" className="stepper-btn" onClick={() => adicionar(produtos.find((p) => p.id === i.produto_id), -1, (i.complementosSelecionados || []).map((c) => c.id))}>
+                    <button type="button" className="stepper-btn" onClick={() => adicionar(produtos.find((p) => p.id === i.produto_id), -1, (i.complementosSelecionados || []).map((c) => c.id), i.observacoesSelecionadas)}>
                       <Minus size={12} />
                     </button>
                     <span className="stepper-qty tabular">{i.quantidade}</span>
-                    <button type="button" className="stepper-btn" onClick={() => adicionar(produtos.find((p) => p.id === i.produto_id), 1, (i.complementosSelecionados || []).map((c) => c.id))}>
+                    <button type="button" className="stepper-btn" onClick={() => adicionar(produtos.find((p) => p.id === i.produto_id), 1, (i.complementosSelecionados || []).map((c) => c.id), i.observacoesSelecionadas)}>
                       <Plus size={12} />
                     </button>
                   </div>
@@ -1856,6 +1893,11 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
                   <div key={c.id} className="row" style={{ fontSize: 11.5, color: 'var(--text-dim)', paddingLeft: 14 }}>
                     <span>+ {c.nome}</span>
                     <span className="tabular">{money(Number(c.preco) * i.quantidade)}</span>
+                  </div>
+                ))}
+                {(i.observacoesSelecionadas || []).map((g) => (
+                  <div key={g.titulo} className="muted" style={{ fontSize: 11.5, paddingLeft: 14 }}>
+                    {g.titulo}: {g.opcoes.join(', ')}
                   </div>
                 ))}
               </div>
@@ -1892,6 +1934,11 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
                       <span className="tabular">{money(Number(c.preco) * i.quantidade)}</span>
                     </div>
                   ))}
+                  {(i.observacoesSelecionadas || []).map((g) => (
+                    <div key={g.titulo} className="muted" style={{ fontSize: 12, paddingLeft: 14 }}>
+                      {g.titulo}: {g.opcoes.join(', ')}
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -1915,8 +1962,9 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
   );
 }
 
-function EscolherComplementosModal({ produto, precoBase, complementosDisponiveis, onConfirmar, onFechar }) {
+function EscolherComplementosModal({ produto, precoBase, complementosDisponiveis, gruposObservacao = [], onConfirmar, onFechar }) {
   const [selecionados, setSelecionados] = useState(new Set());
+  const [obsSelecionadas, setObsSelecionadas] = useState(() => new Map(gruposObservacao.map((g) => [g.titulo, new Set()])));
 
   function alternar(id) {
     setSelecionados((atual) => {
@@ -1927,32 +1975,71 @@ function EscolherComplementosModal({ produto, precoBase, complementosDisponiveis
     });
   }
 
+  function alternarObs(titulo, opcao) {
+    setObsSelecionadas((atual) => {
+      const nova = new Map(atual);
+      const doGrupo = new Set(nova.get(titulo));
+      if (doGrupo.has(opcao)) doGrupo.delete(opcao);
+      else doGrupo.add(opcao);
+      nova.set(titulo, doGrupo);
+      return nova;
+    });
+  }
+
   const totalComplementos = complementosDisponiveis
     .filter((c) => selecionados.has(c.id))
     .reduce((s, c) => s + Number(c.preco), 0);
+
+  function confirmar() {
+    const gruposSelecionados = gruposObservacao
+      .map((g) => ({ titulo: g.titulo, opcoes: [...(obsSelecionadas.get(g.titulo) || [])] }))
+      .filter((g) => g.opcoes.length > 0);
+    onConfirmar([...selecionados], gruposSelecionados);
+  }
 
   return (
     <div className="modal-overlay" onClick={onFechar}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <div style={{ textAlign: 'center' }}>
-          <span className="muted" style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.3 }}>Complementos de</span>
+          <span className="muted" style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.3 }}>Personalizar</span>
           <h2 style={{ fontSize: 22, fontWeight: 800 }}>{produto.nome}</h2>
         </div>
 
-        <div className="list">
-          {complementosDisponiveis.map((c) => (
-            <label key={c.id} className="item" style={{ cursor: 'pointer', alignItems: 'center' }}>
-              <span style={{ flex: 1 }}>{c.nome}</span>
-              <span className="tabular muted" style={{ fontSize: 12.5 }}>+ {money(c.preco)}</span>
-              <input
-                type="checkbox"
-                checked={selecionados.has(c.id)}
-                onChange={() => alternar(c.id)}
-                style={{ marginLeft: 10 }}
-              />
-            </label>
-          ))}
-        </div>
+        {complementosDisponiveis.length > 0 && (
+          <div className="list">
+            {complementosDisponiveis.map((c) => (
+              <label key={c.id} className="item" style={{ cursor: 'pointer', alignItems: 'center' }}>
+                <span style={{ flex: 1 }}>{c.nome}</span>
+                <span className="tabular muted" style={{ fontSize: 12.5 }}>+ {money(c.preco)}</span>
+                <input
+                  type="checkbox"
+                  checked={selecionados.has(c.id)}
+                  onChange={() => alternar(c.id)}
+                  style={{ marginLeft: 10 }}
+                />
+              </label>
+            ))}
+          </div>
+        )}
+
+        {gruposObservacao.map((g) => (
+          <div key={g.titulo} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span className="label" style={{ margin: 0 }}>{g.titulo}</span>
+            <div className="list">
+              {g.opcoes.map((op) => (
+                <label key={op} className="item" style={{ cursor: 'pointer', alignItems: 'center' }}>
+                  <span style={{ flex: 1 }}>{op}</span>
+                  <input
+                    type="checkbox"
+                    checked={obsSelecionadas.get(g.titulo)?.has(op) || false}
+                    onChange={() => alternarObs(g.titulo, op)}
+                    style={{ marginLeft: 10 }}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
 
         <div className="row" style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 10 }}>
           <span style={{ fontWeight: 700 }}>Total do item</span>
@@ -1963,7 +2050,7 @@ function EscolherComplementosModal({ produto, precoBase, complementosDisponiveis
           <button type="button" className="btn btn-secondary" onClick={onFechar}>
             Cancelar
           </button>
-          <button type="button" className="btn btn-primary" onClick={() => onConfirmar([...selecionados])}>
+          <button type="button" className="btn btn-primary" onClick={confirmar}>
             Adicionar
           </button>
         </div>

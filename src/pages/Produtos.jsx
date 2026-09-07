@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { Camera, Copy, FileSpreadsheet, Pencil, Plus, PlusCircle, Trash2, UtensilsCrossed } from 'lucide-react';
+import { Camera, Copy, FileSpreadsheet, Pencil, Plus, PlusCircle, Trash2, UtensilsCrossed, X } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import Promocoes from './Promocoes';
@@ -261,6 +261,7 @@ function campoVazio(produto) {
     unidade: produto?.unidade || 'un',
     foto_url: produto?.foto_url || '',
     ativo: produto?.ativo ?? true,
+    grupos_observacao: produto?.grupos_observacao?.length ? produto.grupos_observacao : [],
   };
 }
 
@@ -287,10 +288,45 @@ function validar(campos, avisar) {
     unidade: campos.unidade.trim() || 'un',
     foto_url: campos.foto_url.trim() || null,
     ativo: campos.ativo,
+    grupos_observacao: (campos.grupos_observacao || [])
+      .map((g) => ({ titulo: g.titulo.trim(), opcoes: g.opcoes.map((o) => o.trim()).filter(Boolean) }))
+      .filter((g) => g.titulo && g.opcoes.length > 0),
   };
 }
 
 function CamposProduto({ campos, setCampos, categorias }) {
+  const grupos = campos.grupos_observacao || [];
+
+  function atualizarGrupos(novosGrupos) {
+    setCampos({ ...campos, grupos_observacao: novosGrupos });
+  }
+
+  function adicionarGrupo() {
+    atualizarGrupos([...grupos, { titulo: '', opcoes: [''] }]);
+  }
+
+  function removerGrupo(idx) {
+    atualizarGrupos(grupos.filter((_, i) => i !== idx));
+  }
+
+  function atualizarTituloGrupo(idx, titulo) {
+    atualizarGrupos(grupos.map((g, i) => (i === idx ? { ...g, titulo } : g)));
+  }
+
+  function adicionarOpcao(idx) {
+    atualizarGrupos(grupos.map((g, i) => (i === idx ? { ...g, opcoes: [...g.opcoes, ''] } : g)));
+  }
+
+  function atualizarOpcao(idxGrupo, idxOpcao, valor) {
+    atualizarGrupos(
+      grupos.map((g, i) => (i === idxGrupo ? { ...g, opcoes: g.opcoes.map((o, j) => (j === idxOpcao ? valor : o)) } : g))
+    );
+  }
+
+  function removerOpcao(idxGrupo, idxOpcao) {
+    atualizarGrupos(grupos.map((g, i) => (i === idxGrupo ? { ...g, opcoes: g.opcoes.filter((_, j) => j !== idxOpcao) } : g)));
+  }
+
   return (
     <>
       <div className="form-secao">
@@ -354,6 +390,47 @@ function CamposProduto({ campos, setCampos, categorias }) {
             <input value={campos.estoque_minimo} onChange={(e) => setCampos({ ...campos, estoque_minimo: e.target.value })} inputMode="decimal" placeholder="ex: 5" />
           </div>
         </div>
+      </div>
+
+      <div className="form-secao">
+        <span className="form-secao__titulo">Observações (sem custo, pro cliente escolher)</span>
+        <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+          Ex: título "Escolha seu molho" com as opções Ketchup, Mostarda, Maionese — o garçom marca as escolhidas ao lançar o item.
+        </p>
+        {grupos.map((g, idxGrupo) => (
+          <div key={idxGrupo} className="card" style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--panel-2)' }}>
+            <div className="row" style={{ gap: 6 }}>
+              <input
+                style={{ flex: 1 }}
+                value={g.titulo}
+                onChange={(e) => atualizarTituloGrupo(idxGrupo, e.target.value)}
+                placeholder="Título, ex: Escolha seu molho"
+              />
+              <button type="button" onClick={() => removerGrupo(idxGrupo)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', flexShrink: 0 }} title="Remover grupo">
+                <Trash2 size={15} />
+              </button>
+            </div>
+            {g.opcoes.map((op, idxOpcao) => (
+              <div key={idxOpcao} className="row" style={{ gap: 6, paddingLeft: 14 }}>
+                <input
+                  style={{ flex: 1 }}
+                  value={op}
+                  onChange={(e) => atualizarOpcao(idxGrupo, idxOpcao, e.target.value)}
+                  placeholder="Opção, ex: Ketchup"
+                />
+                <button type="button" onClick={() => removerOpcao(idxGrupo, idxOpcao)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', flexShrink: 0 }} title="Remover opção">
+                  <X size={15} />
+                </button>
+              </div>
+            ))}
+            <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start', marginLeft: 14 }} onClick={() => adicionarOpcao(idxGrupo)}>
+              <Plus size={13} /> Opção
+            </button>
+          </div>
+        ))}
+        <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={adicionarGrupo}>
+          <Plus size={13} /> Grupo de observação
+        </button>
       </div>
 
       <div className="form-secao">
