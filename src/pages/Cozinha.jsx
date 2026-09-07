@@ -60,6 +60,7 @@ export default function Cozinha() {
     const canal = supabase
       .channel('pedido_rodadas_novas')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedido_rodadas' }, () => carregar())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'produtos' }, () => carregar())
       .subscribe();
 
     return () => {

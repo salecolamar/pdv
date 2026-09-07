@@ -33,7 +33,17 @@ export default function Mesas() {
   useEffect(() => {
     carregar();
     const t = setInterval(carregar, 30000);
-    return () => clearInterval(t);
+    // Mesa nova/renomeada (admin) ou pedido aberto/fechado em outro
+    // aparelho também deve aparecer sem esperar o próximo ciclo de 30s.
+    const canal = supabase
+      .channel('mapa-mesas-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mesas' }, carregar)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, carregar)
+      .subscribe();
+    return () => {
+      clearInterval(t);
+      supabase.removeChannel(canal);
+    };
   }, []);
 
   useEffect(() => {
@@ -118,30 +128,40 @@ export default function Mesas() {
 function VendasDoGarcom() {
   const [resumo, setResumo] = useState(null);
 
-  useEffect(() => {
-    let cancelado = false;
-    (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: perfil } = await supabase.from('usuarios').select('role, ocultar_vendas, empresas(mostrar_vendas_garcom)').eq('id', user.id).maybeSingle();
-      if (cancelado || !perfil || perfil.role !== 'operador' || perfil.ocultar_vendas || !perfil.empresas?.mostrar_vendas_garcom) return;
+  async function carregar() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: perfil } = await supabase.from('usuarios').select('role, ocultar_vendas, empresas(mostrar_vendas_garcom)').eq('id', user.id).maybeSingle();
+    if (!perfil || perfil.role !== 'operador' || perfil.ocultar_vendas || !perfil.empresas?.mostrar_vendas_garcom) {
+      setResumo(null);
+      return;
+    }
 
-      const { data: vendas } = await supabase
-        .from('vendas')
-        .select('total, taxa_servico')
-        .eq('operador_id', user.id)
-        .eq('cancelada', false)
-        .gte('criado_em', inicioDoDia().toISOString());
-      if (cancelado) return;
-      const total = (vendas || []).reduce((s, v) => s + Number(v.total), 0);
-      const taxaServico = (vendas || []).reduce((s, v) => s + Number(v.taxa_servico || 0), 0);
-      setResumo({ total, taxaServico, quantidade: vendas?.length || 0 });
-    })();
-    return () => {
-      cancelado = true;
-    };
+    const { data: vendas } = await supabase
+      .from('vendas')
+      .select('total, taxa_servico')
+      .eq('operador_id', user.id)
+      .eq('cancelada', false)
+      .gte('criado_em', inicioDoDia().toISOString());
+    const total = (vendas || []).reduce((s, v) => s + Number(v.total), 0);
+    const taxaServico = (vendas || []).reduce((s, v) => s + Number(v.taxa_servico || 0), 0);
+    setResumo({ total, taxaServico, quantidade: vendas?.length || 0 });
+  }
+
+  useEffect(() => {
+    carregar();
+    // Admin pode ligar/desligar "mostrar vendas" (geral ou individual) ou o
+    // garçom pode fazer uma venda nova — tudo isso precisa refletir aqui
+    // sem esperar recarregar a página.
+    const canal = supabase
+      .channel('vendas-do-garcom-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendas' }, carregar)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'empresas' }, carregar)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'usuarios' }, carregar)
+      .subscribe();
+    return () => supabase.removeChannel(canal);
   }, []);
 
   if (!resumo) return null;
@@ -411,12 +431,22 @@ function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
   }
 
   useEffect(() => {
-    supabase
-      .from('usuarios')
-      .select('empresas(taxa_servico_percentual)')
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => setTaxaPercentual(Number(data?.empresas?.taxa_servico_percentual) || 0));
+    function carregarTaxa() {
+      supabase
+        .from('usuarios')
+        .select('empresas(taxa_servico_percentual)')
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => setTaxaPercentual(Number(data?.empresas?.taxa_servico_percentual) || 0));
+    }
+    carregarTaxa();
+    // Admin pode mudar o percentual da taxa de serviço com a comanda já
+    // aberta na tela do garçom.
+    const canal = supabase
+      .channel('comanda-taxa-live')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'empresas' }, carregarTaxa)
+      .subscribe();
+    return () => supabase.removeChannel(canal);
   }, []);
 
   useEffect(() => {
@@ -1570,33 +1600,53 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
 
   useEffect(() => {
     carregarProdutos();
-    Promise.all([
-      supabase.from('categorias').select('*').order('ordem').order('nome'),
-      supabase.from('promocoes').select('*').eq('ativo', true),
-      supabase.from('cardapios').select('*, cardapio_produtos(produto_id)').eq('ativo', true).order('nome'),
-      supabase.from('produto_complementos').select('produto_id, complementos:complemento_id(id, nome, preco)'),
-    ]).then(([catResp, promoResp, cardapiosResp, complResp]) => {
-      setCategorias(catResp.data || []);
-      setPromocoes(promoResp.data || []);
-      setCardapios(cardapiosResp.data || []);
-      const mapa = new Map();
-      for (const c of complResp.data || []) {
-        if (!c.complementos) continue;
-        const atual = mapa.get(c.produto_id) || [];
-        atual.push(c.complementos);
-        mapa.set(c.produto_id, atual);
-      }
-      setComplementosPorProduto(mapa);
-    });
+    carregarCategorias();
+    carregarPromocoes();
+    carregarCardapios();
+    carregarComplementos();
 
-    // Estoque é compartilhado entre todos os garçons — qualquer venda em
-    // outro celular deve atualizar a quantidade aqui em tempo real.
+    // O admin pode mudar preço/estoque/categoria/complemento/cardápio/promoção
+    // a qualquer momento — o garçom já com essa tela aberta precisa ver isso
+    // sem precisar sair e voltar.
     const canal = supabase
-      .channel('estoque-produtos')
+      .channel('lancar-itens-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'produtos' }, carregarProdutos)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categorias' }, carregarCategorias)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'promocoes' }, carregarPromocoes)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cardapios' }, carregarCardapios)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cardapio_produtos' }, carregarCardapios)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'complementos' }, carregarComplementos)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'produto_complementos' }, carregarComplementos)
       .subscribe();
     return () => supabase.removeChannel(canal);
   }, []);
+
+  async function carregarCategorias() {
+    const { data } = await supabase.from('categorias').select('*').order('ordem').order('nome');
+    setCategorias(data || []);
+  }
+
+  async function carregarPromocoes() {
+    const { data } = await supabase.from('promocoes').select('*').eq('ativo', true);
+    setPromocoes(data || []);
+  }
+
+  async function carregarCardapios() {
+    const { data } = await supabase.from('cardapios').select('*, cardapio_produtos(produto_id)').eq('ativo', true).order('nome');
+    setCardapios(data || []);
+  }
+
+  async function carregarComplementos() {
+    const { data } = await supabase.from('produto_complementos').select('produto_id, complementos:complemento_id(id, nome, preco)');
+    const mapa = new Map();
+    for (const c of data || []) {
+      if (!c.complementos) continue;
+      const atual = mapa.get(c.produto_id) || [];
+      atual.push(c.complementos);
+      mapa.set(c.produto_id, atual);
+    }
+    setComplementosPorProduto(mapa);
+  }
 
   async function carregarProdutos() {
     const { data } = await supabase.from('produtos').select('*').eq('ativo', true).order('nome');

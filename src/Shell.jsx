@@ -71,22 +71,33 @@ export default function Shell({ session }) {
 
   useEffect(() => {
     let cancelado = false;
-    supabase
-      .from('usuarios')
-      .select('*, empresas(*)')
-      .eq('id', session.user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (cancelado) return;
-        if (error) {
-          console.error('Falha ao carregar perfil:', error);
-          setPerfil(null);
-          return;
-        }
-        setPerfil(data);
-      });
+    function carregarPerfil() {
+      supabase
+        .from('usuarios')
+        .select('*, empresas(*)')
+        .eq('id', session.user.id)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (cancelado) return;
+          if (error) {
+            console.error('Falha ao carregar perfil:', error);
+            setPerfil(null);
+            return;
+          }
+          setPerfil(data);
+        });
+    }
+    carregarPerfil();
+    // Admin pode mudar cargo/permissões/nome da própria empresa a qualquer
+    // momento — precisa refletir sem o usuário ter que deslogar e logar de novo.
+    const canal = supabase
+      .channel('perfil-live')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'usuarios', filter: `id=eq.${session.user.id}` }, carregarPerfil)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'empresas' }, carregarPerfil)
+      .subscribe();
     return () => {
       cancelado = true;
+      supabase.removeChannel(canal);
     };
   }, [session.user.id]);
 

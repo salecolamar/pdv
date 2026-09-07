@@ -23,11 +23,14 @@ export default function Pdv() {
 
   useEffect(() => {
     carregar();
-    // Estoque é compartilhado entre todos os garçons — qualquer venda em
-    // outro celular deve atualizar a quantidade aqui em tempo real.
+    // O admin pode mudar preço/estoque/categoria/promoção a qualquer
+    // momento — o garçom já com essa tela aberta precisa ver isso sem
+    // precisar sair e voltar.
     const canal = supabase
-      .channel('estoque-produtos-pdv')
+      .channel('ficha-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'produtos' }, carregarProdutos)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categorias' }, carregarCategorias)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'promocoes' }, carregarPromocoes)
       .subscribe();
     return () => supabase.removeChannel(canal);
   }, []);
@@ -41,6 +44,16 @@ export default function Pdv() {
   async function carregarProdutos() {
     const { data } = await supabase.from('produtos').select('*').eq('ativo', true).order('nome');
     setProdutos(data || []);
+  }
+
+  async function carregarCategorias() {
+    const { data } = await supabase.from('categorias').select('*').order('ordem').order('nome');
+    setCategorias(data || []);
+  }
+
+  async function carregarPromocoes() {
+    const { data } = await supabase.from('promocoes').select('*').eq('ativo', true);
+    setPromocoes(data || []);
   }
 
   async function carregar() {
