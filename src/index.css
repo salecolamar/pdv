@@ -973,3 +973,67 @@ button:focus-visible {
   align-items: center;
   justify-content: center;
 }
+
+/* Lista em cascata (seleção de garçom/gerente no login por PIN) —
+   mesma linguagem visual do menu lateral, mas em tema claro. */
+.lista-cascata {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-soft);
+  overflow: hidden;
+}
+.lista-cascata__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: none;
+  border-bottom: 1px solid var(--border-soft);
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  transition: background 0.14s ease;
+}
+.lista-cascata__item:last-child { border-bottom: none; }
+.lista-cascata__item:hover { background: var(--panel-2); }
+.lista-cascata__item-icone {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--panel-2);
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.lista-cascata__item-tag {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.secao-caixa {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.secao-caixa__titulo {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

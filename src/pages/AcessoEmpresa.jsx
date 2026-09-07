@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, Lock, LogIn, LogOut, ShieldCheck, User, UserCog, UtensilsCrossed, Wallet } from 'lucide-react';
+import { ChevronLeft, Lock, LogIn, LogOut, ShieldCheck, UserCog, UtensilsCrossed, Wallet } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import { Centro, FormularioEntrar } from '../App';
@@ -20,7 +20,7 @@ export default function AcessoEmpresa({ empresaId }) {
   }
 
   if (modo === 'garcom' || modo === 'gerente') {
-    return <AcessoGarcom empresaId={empresaId} tipoInicial={modo === 'gerente' ? 'gerente' : 'operador'} onVoltar={() => setModo(null)} />;
+    return <AcessoGarcom empresaId={empresaId} onVoltar={() => setModo(null)} />;
   }
 
   return (
@@ -59,9 +59,8 @@ function VoltarEscolha({ onVoltar, titulo }) {
   );
 }
 
-export function AcessoGarcom({ empresaId, onVoltar, tipoInicial = 'operador' }) {
+export function AcessoGarcom({ empresaId, onVoltar }) {
   const [usuarios, setUsuarios] = useState(undefined);
-  const [tipo, setTipo] = useState(tipoInicial); // 'operador' | 'gerente'
   const [selecionado, setSelecionado] = useState(null);
   const [pin, setPin] = useState('');
   const [erro, setErro] = useState('');
@@ -101,8 +100,7 @@ export function AcessoGarcom({ empresaId, onVoltar, tipoInicial = 'operador' }) 
     // Sucesso: onAuthStateChange no App troca de tela sozinho.
   }
 
-  const temGerentes = (usuarios || []).some((u) => u.role === 'gerente');
-  const listaFiltrada = (usuarios || []).filter((u) => u.role === tipo);
+  const listaOrdenada = [...(usuarios || [])].sort((a, b) => a.nome.localeCompare(b.nome));
 
   if (acaoCaixa) {
     return (
@@ -128,11 +126,12 @@ export function AcessoGarcom({ empresaId, onVoltar, tipoInicial = 'operador' }) 
       <div className="card" style={{ width: 340, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <VoltarEscolha
           onVoltar={selecionado ? () => { setSelecionado(null); setPin(''); setErro(''); } : onVoltar}
-          titulo={selecionado ? (selecionado.role === 'gerente' ? 'Acesso do gerente' : 'Acesso do garçom') : tipo === 'gerente' ? 'Acesso do gerente' : 'Acesso do garçom'}
+          titulo={selecionado ? (selecionado.role === 'gerente' ? 'Acesso do gerente' : 'Acesso do garçom') : 'Entrar'}
         />
 
         {!selecionado && resumoCaixa !== undefined && (
-          <div className="card" style={{ background: 'var(--panel-2)', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="secao-caixa">
+            <span className="secao-caixa__titulo">Caixa do dia</span>
             {resumoCaixa ? (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
@@ -160,17 +159,7 @@ export function AcessoGarcom({ empresaId, onVoltar, tipoInicial = 'operador' }) 
           </div>
         )}
 
-        {!selecionado && usuarios && usuarios.length > 0 && temGerentes && (
-          <div className="tab-row">
-            <button type="button" className="tab" aria-pressed={tipo === 'operador'} onClick={() => setTipo('operador')}>
-              <UtensilsCrossed size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Garçom
-            </button>
-            <button type="button" className="tab" aria-pressed={tipo === 'gerente'} onClick={() => setTipo('gerente')}>
-              <UserCog size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Gerente
-            </button>
-          </div>
-        )}
-        {!selecionado && <p className="muted" style={{ fontSize: 13, textAlign: 'center', marginTop: -8 }}>Toque no seu nome pra entrar.</p>}
+        {!selecionado && <p className="muted" style={{ fontSize: 13, textAlign: 'center' }}>Toque no seu nome pra entrar.</p>}
 
         {selecionado ? (
           <form onSubmit={entrar} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -194,19 +183,25 @@ export function AcessoGarcom({ empresaId, onVoltar, tipoInicial = 'operador' }) 
           <p className="muted" style={{ textAlign: 'center' }}>Carregando…</p>
         ) : usuarios === null ? (
           <p className="danger-text" style={{ textAlign: 'center', fontSize: 13 }}>Não foi possível carregar a lista de garçons.</p>
-        ) : listaFiltrada.length === 0 ? (
+        ) : listaOrdenada.length === 0 ? (
           <p className="muted" style={{ textAlign: 'center', fontSize: 13 }}>
-            {tipo === 'gerente' ? 'Nenhum gerente cadastrado ainda.' : 'Nenhum garçom cadastrado ainda.'} Peça pro admin cadastrar em Usuários.
+            Nenhum garçom ou gerente cadastrado ainda. Peça pro admin cadastrar em Usuários.
           </p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
-            {listaFiltrada.map((u) => (
-              <EscolhaCard
+          <div className="lista-cascata" style={{ maxHeight: 320, overflowY: 'auto' }}>
+            {listaOrdenada.map((u) => (
+              <button
                 key={u.id}
-                icon={u.role === 'gerente' ? UserCog : User}
-                titulo={u.nome}
+                type="button"
+                className="lista-cascata__item"
                 onClick={() => { setSelecionado(u); setPin(''); setErro(''); }}
-              />
+              >
+                <span className="lista-cascata__item-icone">
+                  {u.role === 'gerente' ? <UserCog size={15} /> : <UtensilsCrossed size={15} />}
+                </span>
+                {u.nome}
+                <span className="lista-cascata__item-tag">{u.role === 'gerente' ? 'Gerente' : 'Garçom'}</span>
+              </button>
             ))}
           </div>
         )}

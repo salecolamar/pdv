@@ -88,7 +88,6 @@ function PosLogin({ session }) {
     return (
       <AcessoGarcom
         empresaId={perfil.empresa_id}
-        tipoInicial={escolhaSalva === 'gerente' ? 'gerente' : 'operador'}
         onVoltar={() => {
           sessionStorage.removeItem(chaveEscolha);
           setModo(null);
