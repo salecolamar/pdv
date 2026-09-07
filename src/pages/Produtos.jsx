@@ -293,53 +293,75 @@ function validar(campos, avisar) {
 function CamposProduto({ campos, setCampos, categorias }) {
   return (
     <>
-      <span className="label">Nome</span>
-      <input value={campos.nome} onChange={(e) => setCampos({ ...campos, nome: e.target.value })} placeholder="Coca Cola Zero Lata" />
-      <span className="label">Descrição (opcional)</span>
-      <input value={campos.descricao} onChange={(e) => setCampos({ ...campos, descricao: e.target.value })} />
-      <span className="label">Observação (uso interno, não aparece pro cliente)</span>
-      <input value={campos.observacoes} onChange={(e) => setCampos({ ...campos, observacoes: e.target.value })} placeholder="Ex: sem estoque às segundas" />
-      <div className="row" style={{ gap: 8 }}>
-        <div style={{ flex: 1 }}>
-          <span className="label">Preço (R$)</span>
-          <input value={campos.preco} onChange={(e) => setCampos({ ...campos, preco: e.target.value })} inputMode="decimal" placeholder="8" />
+      <div className="form-secao">
+        <span className="form-secao__titulo">Informações</span>
+        <div>
+          <span className="label" style={{ marginTop: 0 }}>Nome</span>
+          <input value={campos.nome} onChange={(e) => setCampos({ ...campos, nome: e.target.value })} placeholder="Coca Cola Zero Lata" />
         </div>
-        <div style={{ flex: 1 }}>
-          <span className="label">Preço promocional</span>
-          <input value={campos.preco_promocional} onChange={(e) => setCampos({ ...campos, preco_promocional: e.target.value })} inputMode="decimal" placeholder="opcional" />
+        <div>
+          <span className="label">Descrição (opcional)</span>
+          <input value={campos.descricao} onChange={(e) => setCampos({ ...campos, descricao: e.target.value })} />
         </div>
-      </div>
-      <span className="label">Categoria</span>
-      <select value={campos.categoria_id} onChange={(e) => setCampos({ ...campos, categoria_id: e.target.value })}>
-        <option value="">Sem categoria</option>
-        {categorias.map((c) => (
-          <option key={c.id} value={c.id}>{c.nome}</option>
-        ))}
-      </select>
-      <div className="row" style={{ gap: 8 }}>
-        <div style={{ flex: 1 }}>
-          <span className="label">SKU (opcional)</span>
-          <input value={campos.sku} onChange={(e) => setCampos({ ...campos, sku: e.target.value })} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <span className="label">Unidade</span>
-          <input value={campos.unidade} onChange={(e) => setCampos({ ...campos, unidade: e.target.value })} placeholder="un" />
+        <div>
+          <span className="label">Observação (uso interno, não aparece pro cliente)</span>
+          <input value={campos.observacoes} onChange={(e) => setCampos({ ...campos, observacoes: e.target.value })} placeholder="Ex: sem estoque às segundas" />
         </div>
       </div>
-      <div className="row" style={{ gap: 8 }}>
-        <div style={{ flex: 1 }}>
-          <span className="label">Estoque (vazio = sem controle)</span>
-          <input value={campos.estoque} onChange={(e) => setCampos({ ...campos, estoque: e.target.value })} inputMode="decimal" placeholder="ex: 30" />
+
+      <div className="form-secao">
+        <span className="form-secao__titulo">Preço e categoria</span>
+        <div className="row" style={{ gap: 8 }}>
+          <div style={{ flex: 1 }}>
+            <span className="label" style={{ marginTop: 0 }}>Preço (R$)</span>
+            <input value={campos.preco} onChange={(e) => setCampos({ ...campos, preco: e.target.value })} inputMode="decimal" placeholder="8" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <span className="label" style={{ marginTop: 0 }}>Preço promocional</span>
+            <input value={campos.preco_promocional} onChange={(e) => setCampos({ ...campos, preco_promocional: e.target.value })} inputMode="decimal" placeholder="opcional" />
+          </div>
         </div>
-        <div style={{ flex: 1 }}>
-          <span className="label">Estoque mínimo</span>
-          <input value={campos.estoque_minimo} onChange={(e) => setCampos({ ...campos, estoque_minimo: e.target.value })} inputMode="decimal" placeholder="ex: 5" />
+        <div>
+          <span className="label">Categoria</span>
+          <select value={campos.categoria_id} onChange={(e) => setCampos({ ...campos, categoria_id: e.target.value })}>
+            <option value="">Sem categoria</option>
+            {categorias.map((c) => (
+              <option key={c.id} value={c.id}>{c.nome}</option>
+            ))}
+          </select>
         </div>
       </div>
-      <span className="label">Foto (link, opcional)</span>
-      <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
-        <img className="product-thumb" src={campos.foto_url || PLACEHOLDER_FOTO} alt="" style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover', background: 'var(--panel-2)' }} />
-        <input style={{ flex: 1 }} value={campos.foto_url} onChange={(e) => setCampos({ ...campos, foto_url: e.target.value })} placeholder="https://..." />
+
+      <div className="form-secao">
+        <span className="form-secao__titulo">Estoque</span>
+        <div className="row" style={{ gap: 8 }}>
+          <div style={{ flex: 1 }}>
+            <span className="label" style={{ marginTop: 0 }}>SKU (opcional)</span>
+            <input value={campos.sku} onChange={(e) => setCampos({ ...campos, sku: e.target.value })} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <span className="label" style={{ marginTop: 0 }}>Unidade</span>
+            <input value={campos.unidade} onChange={(e) => setCampos({ ...campos, unidade: e.target.value })} placeholder="un" />
+          </div>
+        </div>
+        <div className="row" style={{ gap: 8 }}>
+          <div style={{ flex: 1 }}>
+            <span className="label" style={{ marginTop: 0 }}>Estoque (vazio = sem controle)</span>
+            <input value={campos.estoque} onChange={(e) => setCampos({ ...campos, estoque: e.target.value })} inputMode="decimal" placeholder="ex: 30" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <span className="label" style={{ marginTop: 0 }}>Estoque mínimo</span>
+            <input value={campos.estoque_minimo} onChange={(e) => setCampos({ ...campos, estoque_minimo: e.target.value })} inputMode="decimal" placeholder="ex: 5" />
+          </div>
+        </div>
+      </div>
+
+      <div className="form-secao">
+        <span className="form-secao__titulo">Foto</span>
+        <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
+          <img className="product-thumb" src={campos.foto_url || PLACEHOLDER_FOTO} alt="" style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover', background: 'var(--panel-2)', flexShrink: 0 }} />
+          <input style={{ flex: 1 }} value={campos.foto_url} onChange={(e) => setCampos({ ...campos, foto_url: e.target.value })} placeholder="https://..." />
+        </div>
       </div>
     </>
   );
