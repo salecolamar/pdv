@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Ban, BarChart3, Download, Package, Printer, Search, Ticket, Users2, Wallet } from 'lucide-react';
+import { Ban, BarChart3, Download, Package, Percent, Printer, Search, Ticket, Users2, Wallet } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money, metodoLabel } from '../utils/format';
 import { inicioDoDia, inicioDoMes, subDias } from '../utils/datas';
@@ -58,8 +58,19 @@ export default function Relatorios() {
         <button type="button" className="tab" aria-pressed={abaPrincipal === 'cancelamentos'} onClick={() => setAbaPrincipal('cancelamentos')}>
           <Ban size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Cancelamentos
         </button>
+        <button type="button" className="tab" aria-pressed={abaPrincipal === 'recebiveis'} onClick={() => setAbaPrincipal('recebiveis')}>
+          <Percent size={14} style={{ marginRight: 6, verticalAlign: -2 }} /> Recebíveis
+        </button>
       </div>
-      {abaPrincipal === 'resumo' ? <ResumoVendas /> : abaPrincipal === 'detalhado' ? <RelatorioDetalhado /> : <RelatorioCancelamentos />}
+      {abaPrincipal === 'resumo' ? (
+        <ResumoVendas />
+      ) : abaPrincipal === 'detalhado' ? (
+        <RelatorioDetalhado />
+      ) : abaPrincipal === 'cancelamentos' ? (
+        <RelatorioCancelamentos />
+      ) : (
+        <RelatorioRecebiveis />
+      )}
     </div>
   );
 }
@@ -860,6 +871,201 @@ function RelatorioDetalhado() {
             </div>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+const CHAVE_TAXAS_RECEBIVEIS = 'pdv_taxas_recebiveis';
+
+function carregarTaxasSalvas() {
+  try {
+    const bruto = localStorage.getItem(CHAVE_TAXAS_RECEBIVEIS);
+    if (!bruto) return { debito: '', credito: '', pix: '' };
+    return { debito: '', credito: '', pix: '', ...JSON.parse(bruto) };
+  } catch {
+    return { debito: '', credito: '', pix: '' };
+  }
+}
+
+function RelatorioRecebiveis() {
+  const [filtro, setFiltro] = useState('hoje');
+  const [de, setDe] = useState('');
+  const [ate, setAte] = useState('');
+  const [dia, setDia] = useState(() => inicioDoDia().toISOString().slice(0, 10));
+  const [taxas, setTaxas] = useState(carregarTaxasSalvas);
+  const [resumo, setResumo] = useState(undefined);
+  const [erro, setErro] = useState('');
+
+  useEffect(() => {
+    carregar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtro, de, ate, dia]);
+
+  useEffect(() => {
+    localStorage.setItem(CHAVE_TAXAS_RECEBIVEIS, JSON.stringify(taxas));
+  }, [taxas]);
+
+  async function carregar() {
+    const [inicio, fim] = periodo(filtro, de, ate, dia);
+    if ((filtro === 'personalizado' || filtro === 'dia') && (!inicio || !fim)) {
+      setResumo(null);
+      return;
+    }
+
+    setResumo(undefined);
+    setErro('');
+
+    const { data, error } = await supabase
+      .from('pagamentos')
+      .select('forma, valor, vendas!inner(criado_em, cancelada)')
+      .eq('vendas.cancelada', false)
+      .gte('vendas.criado_em', inicio.toISOString())
+      .lte('vendas.criado_em', fim.toISOString());
+
+    if (error) {
+      setErro(error.message);
+      setResumo(null);
+      return;
+    }
+
+    const porForma = new Map();
+    for (const p of data || []) {
+      porForma.set(p.forma, (porForma.get(p.forma) || 0) + Number(p.valor));
+    }
+    setResumo({ porForma });
+  }
+
+  function taxaDaForma(forma) {
+    if (forma === 'debito') return Number(taxas.debito.replace(',', '.')) || 0;
+    if (forma === 'credito') return Number(taxas.credito.replace(',', '.')) || 0;
+    if (forma === 'pix') return Number(taxas.pix.replace(',', '.')) || 0;
+    return 0;
+  }
+
+  const linhas = resumo
+    ? FORMAS_PAGAMENTO.map((forma) => {
+        const bruto = resumo.porForma.get(forma) || 0;
+        const taxaPct = taxaDaForma(forma);
+        const liquido = bruto - bruto * (taxaPct / 100);
+        return { forma, bruto, taxaPct, liquido };
+      }).filter((l) => l.bruto > 0)
+    : [];
+  const totalBruto = linhas.reduce((s, l) => s + l.bruto, 0);
+  const totalLiquido = linhas.reduce((s, l) => s + l.liquido, 0);
+  const totalTaxas = totalBruto - totalLiquido;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="tab-row">
+        {FILTROS.map(([id, label]) => (
+          <button key={id} type="button" className="tab" aria-pressed={filtro === id} onClick={() => setFiltro(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {filtro === 'dia' && (
+        <div className="card">
+          <span className="label">Escolha o dia</span>
+          <input type="date" value={dia} onChange={(e) => setDia(e.target.value)} />
+        </div>
+      )}
+
+      {filtro === 'personalizado' && (
+        <div className="card" style={{ display: 'flex', gap: 8 }}>
+          <div style={{ flex: 1 }}>
+            <span className="label">De</span>
+            <input type="date" value={de} onChange={(e) => setDe(e.target.value)} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <span className="label">Até</span>
+            <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} />
+          </div>
+        </div>
+      )}
+
+      <div className="card">
+        <div className="dash-card-titulo"><Percent size={15} /> Taxas da máquina</div>
+        <p className="muted" style={{ fontSize: 12.5, margin: '0 0 8px' }}>
+          Percentual que a máquina cobra em cada forma de pagamento. Dinheiro não tem taxa.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10 }}>
+          <div>
+            <span className="label" style={{ marginTop: 0 }}>Débito (%)</span>
+            <input value={taxas.debito} onChange={(e) => setTaxas({ ...taxas, debito: e.target.value.replace(/[^\d,.-]/g, '') })} inputMode="decimal" placeholder="ex: 1,5" />
+          </div>
+          <div>
+            <span className="label" style={{ marginTop: 0 }}>Crédito (%)</span>
+            <input value={taxas.credito} onChange={(e) => setTaxas({ ...taxas, credito: e.target.value.replace(/[^\d,.-]/g, '') })} inputMode="decimal" placeholder="ex: 3,5" />
+          </div>
+          <div>
+            <span className="label" style={{ marginTop: 0 }}>Pix (%)</span>
+            <input value={taxas.pix} onChange={(e) => setTaxas({ ...taxas, pix: e.target.value.replace(/[^\d,.-]/g, '') })} inputMode="decimal" placeholder="ex: 0,99" />
+          </div>
+        </div>
+      </div>
+
+      {resumo === undefined ? (
+        <p className="muted">Carregando…</p>
+      ) : resumo === null ? (
+        erro ? (
+          <p className="danger-text">Falha ao carregar o relatório: {erro}</p>
+        ) : (
+          <p className="muted" style={{ fontSize: 13 }}>Escolha as datas de início e fim.</p>
+        )
+      ) : (
+        <div className="relatorio-print" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="no-print" style={{ display: 'flex', gap: 8 }}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => window.print()} disabled={linhas.length === 0}>
+              <Printer size={14} /> Exportar PDF
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+            <Cartao titulo="Faturado (total)" valor={money(totalBruto)} destaque />
+            <Cartao titulo="Receberá (com taxa)" valor={money(totalLiquido)} destaque />
+            <Cartao titulo="Descontado em taxas" valor={money(totalTaxas)} />
+          </div>
+
+          <div className="card">
+            <div className="dash-card-titulo"><Wallet size={15} /> Por forma de pagamento</div>
+            {linhas.length === 0 ? (
+              <p className="muted" style={{ fontSize: 13, margin: 0 }}>Nenhum pagamento no período.</p>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                      <th style={{ textAlign: 'left', padding: '7px 10px' }}>Forma</th>
+                      <th style={{ textAlign: 'right', padding: '7px 10px' }}>Faturado</th>
+                      <th style={{ textAlign: 'right', padding: '7px 10px' }}>Taxa</th>
+                      <th style={{ textAlign: 'right', padding: '7px 10px' }}>Receberá</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {linhas.map((l) => (
+                      <tr key={l.forma} style={{ borderBottom: '1px solid var(--border-soft)' }}>
+                        <td style={{ padding: '7px 10px' }}>{metodoLabel(l.forma)}</td>
+                        <td className="tabular" style={{ padding: '7px 10px', textAlign: 'right' }}>{money(l.bruto)}</td>
+                        <td className="tabular muted" style={{ padding: '7px 10px', textAlign: 'right' }}>{l.taxaPct > 0 ? `${l.taxaPct}%` : '—'}</td>
+                        <td className="tabular" style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700 }}>{money(l.liquido)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ borderTop: '2px solid var(--border)' }}>
+                      <td style={{ padding: '7px 10px', fontWeight: 800 }}>Total</td>
+                      <td className="tabular" style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800 }}>{money(totalBruto)}</td>
+                      <td></td>
+                      <td className="tabular" style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800 }}>{money(totalLiquido)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
