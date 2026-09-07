@@ -1030,10 +1030,23 @@ button:focus-visible {
   flex-direction: column;
   gap: 8px;
 }
+.secao-caixa--aberto { border-color: color-mix(in srgb, var(--success) 35%, var(--border-soft)); background: color-mix(in srgb, var(--success) 6%, var(--panel)); }
+.secao-caixa--fechado { border-color: color-mix(in srgb, var(--atencao) 35%, var(--border-soft)); background: color-mix(in srgb, var(--atencao) 6%, var(--panel)); }
 .secao-caixa__titulo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 10.5px;
   font-weight: 800;
   color: var(--text-dim);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+.secao-caixa__bolinha {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--atencao);
+  flex-shrink: 0;
+}
+.secao-caixa--aberto .secao-caixa__bolinha { background: var(--success); }

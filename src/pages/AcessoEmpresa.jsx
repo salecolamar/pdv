@@ -100,7 +100,10 @@ export function AcessoGarcom({ empresaId, onVoltar }) {
     // Sucesso: onAuthStateChange no App troca de tela sozinho.
   }
 
-  const listaOrdenada = [...(usuarios || [])].sort((a, b) => a.nome.localeCompare(b.nome));
+  const listaOrdenada = [...(usuarios || [])].sort((a, b) => {
+    if (a.role !== b.role) return a.role === 'gerente' ? -1 : 1;
+    return a.nome.localeCompare(b.nome);
+  });
 
   if (acaoCaixa) {
     return (
@@ -130,12 +133,14 @@ export function AcessoGarcom({ empresaId, onVoltar }) {
         />
 
         {!selecionado && resumoCaixa !== undefined && (
-          <div className="secao-caixa">
-            <span className="secao-caixa__titulo">Caixa do dia</span>
+          <div className={'secao-caixa ' + (resumoCaixa ? 'secao-caixa--aberto' : 'secao-caixa--fechado')}>
+            <span className="secao-caixa__titulo">
+              <span className="secao-caixa__bolinha" /> Caixa do dia
+            </span>
             {resumoCaixa ? (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
-                  <Wallet size={15} style={{ flexShrink: 0, color: 'var(--primary)' }} />
+                  <Wallet size={15} style={{ flexShrink: 0, color: 'var(--success)' }} />
                   <span>
                     Caixa aberto por <strong>{resumoCaixa.aberto_por_nome || '—'}</strong> às{' '}
                     {new Date(resumoCaixa.aberto_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
@@ -148,7 +153,7 @@ export function AcessoGarcom({ empresaId, onVoltar }) {
             ) : (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
-                  <Wallet size={15} style={{ flexShrink: 0, color: 'var(--text-dim)' }} />
+                  <Wallet size={15} style={{ flexShrink: 0, color: 'var(--atencao)' }} />
                   <span className="muted">Nenhum caixa aberto ainda hoje.</span>
                 </div>
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAcaoCaixa('abrir')}>
