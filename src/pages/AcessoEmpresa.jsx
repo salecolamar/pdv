@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, Lock, ShieldCheck, User, UserCog, UtensilsCrossed } from 'lucide-react';
+import { ChevronLeft, Lock, LogIn, LogOut, ShieldCheck, User, UserCog, UtensilsCrossed, Wallet } from 'lucide-react';
 import { supabase } from '../supabase';
+import { money } from '../utils/format';
 import { Centro, FormularioEntrar } from '../App';
 import EscolhaCard from '../components/EscolhaCard';
 
@@ -65,12 +66,23 @@ export function AcessoGarcom({ empresaId, onVoltar, tipoInicial = 'operador' }) 
   const [pin, setPin] = useState('');
   const [erro, setErro] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [acaoCaixa, setAcaoCaixa] = useState(null); // null | 'abrir' | 'fechar'
+  const [resumoCaixa, setResumoCaixa] = useState(undefined);
 
   useEffect(() => {
     supabase
       .rpc('listar_garcons', { p_empresa_id: empresaId })
       .then(({ data, error }) => setUsuarios(error ? null : data || []));
   }, [empresaId]);
+
+  useEffect(() => {
+    carregarResumoCaixa();
+  }, [empresaId]);
+
+  async function carregarResumoCaixa() {
+    const { data, error } = await supabase.rpc('resumo_caixa_aberto', { p_empresa_id: empresaId });
+    setResumoCaixa(error ? null : data?.[0] || null);
+  }
 
   async function entrar(e) {
     e.preventDefault();
@@ -92,6 +104,25 @@ export function AcessoGarcom({ empresaId, onVoltar, tipoInicial = 'operador' }) 
   const temGerentes = (usuarios || []).some((u) => u.role === 'gerente');
   const listaFiltrada = (usuarios || []).filter((u) => u.role === tipo);
 
+  if (acaoCaixa) {
+    return (
+      <Centro>
+        <div className="card" style={{ width: 340, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <AcaoCaixaModal
+            empresaId={empresaId}
+            acao={acaoCaixa}
+            resumo={resumoCaixa}
+            onVoltar={() => setAcaoCaixa(null)}
+            onConcluido={() => {
+              setAcaoCaixa(null);
+              carregarResumoCaixa();
+            }}
+          />
+        </div>
+      </Centro>
+    );
+  }
+
   return (
     <Centro>
       <div className="card" style={{ width: 340, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -99,6 +130,35 @@ export function AcessoGarcom({ empresaId, onVoltar, tipoInicial = 'operador' }) 
           onVoltar={selecionado ? () => { setSelecionado(null); setPin(''); setErro(''); } : onVoltar}
           titulo={selecionado ? (selecionado.role === 'gerente' ? 'Acesso do gerente' : 'Acesso do garçom') : tipo === 'gerente' ? 'Acesso do gerente' : 'Acesso do garçom'}
         />
+
+        {!selecionado && resumoCaixa !== undefined && (
+          <div className="card" style={{ background: 'var(--panel-2)', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {resumoCaixa ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
+                  <Wallet size={15} style={{ flexShrink: 0, color: 'var(--primary)' }} />
+                  <span>
+                    Caixa aberto por <strong>{resumoCaixa.aberto_por_nome || '—'}</strong> às{' '}
+                    {new Date(resumoCaixa.aberto_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAcaoCaixa('fechar')}>
+                  <LogOut size={14} /> Fechar caixa
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
+                  <Wallet size={15} style={{ flexShrink: 0, color: 'var(--text-dim)' }} />
+                  <span className="muted">Nenhum caixa aberto ainda hoje.</span>
+                </div>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAcaoCaixa('abrir')}>
+                  <LogIn size={14} /> Abrir caixa
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         {!selecionado && usuarios && usuarios.length > 0 && temGerentes && (
           <div className="tab-row">
@@ -152,5 +212,140 @@ export function AcessoGarcom({ empresaId, onVoltar, tipoInicial = 'operador' }) 
         )}
       </div>
     </Centro>
+  );
+}
+
+function AcaoCaixaModal({ empresaId, acao, resumo, onVoltar, onConcluido }) {
+  const [autorizadores, setAutorizadores] = useState(null);
+  const [usuarioId, setUsuarioId] = useState('');
+  const [senha, setSenha] = useState('');
+  const [valor, setValor] = useState(() => (acao === 'fechar' ? (resumo?.esperado || 0).toFixed(2) : '0'));
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState('');
+  const [resultado, setResultado] = useState(null);
+
+  useEffect(() => {
+    supabase.rpc('listar_autorizadores_caixa', { p_empresa_id: empresaId }).then(({ data }) => {
+      setAutorizadores(data || []);
+      if (data?.length > 0) setUsuarioId(data[0].id);
+    });
+  }, [empresaId]);
+
+  const mesasAbertas = resumo?.mesas_abertas || 0;
+
+  async function confirmar(e) {
+    e.preventDefault();
+    setErro('');
+    if (!usuarioId) {
+      setErro('Nenhum gerente ou admin cadastrado pra autorizar.');
+      return;
+    }
+    if (!senha) {
+      setErro('Digite a senha (ou PIN).');
+      return;
+    }
+    const v = Number(String(valor).replace(',', '.'));
+    if (!(v >= 0)) {
+      setErro('Informe um valor válido.');
+      return;
+    }
+    setEnviando(true);
+    const { data, error } =
+      acao === 'abrir'
+        ? await supabase.rpc('abrir_caixa_autorizado', { p_empresa_id: empresaId, p_usuario_id: usuarioId, p_senha: senha, p_valor_inicial: v })
+        : await supabase.rpc('fechar_caixa_autorizado', { p_empresa_id: empresaId, p_usuario_id: usuarioId, p_senha: senha, p_valor_informado: v });
+    setEnviando(false);
+    if (error) {
+      setErro(error.message.replace('P0001: ', ''));
+      return;
+    }
+    setResultado(acao === 'abrir' ? {} : data);
+  }
+
+  if (resultado) {
+    return (
+      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 0' }}>
+        <div
+          style={{
+            width: 48, height: 48, borderRadius: '50%', background: 'var(--primary)', color: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 6px',
+          }}
+        >
+          <Wallet size={22} />
+        </div>
+        <p style={{ fontWeight: 800, fontSize: 16 }}>{acao === 'abrir' ? 'Caixa aberto' : 'Caixa fechado'}</p>
+        {acao === 'fechar' && (
+          <>
+            <p className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>Diferença</p>
+            <p className="tabular" style={{ fontSize: 20, fontWeight: 800 }}>
+              {resultado.diferenca > 0 ? '+' : ''}{money(resultado.diferenca)}
+            </p>
+          </>
+        )}
+        <button type="button" className="btn btn-primary btn-block" style={{ marginTop: 10 }} onClick={onConcluido}>
+          Concluir
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={confirmar} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 12, background: 'var(--primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Lock size={18} />
+        </div>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 16.5 }}>{acao === 'abrir' ? 'Abrir caixa' : 'Fechar caixa'}</h2>
+          <p className="muted" style={{ fontSize: 12, margin: 0 }}>Precisa de um gerente ou admin pra confirmar.</p>
+        </div>
+      </div>
+
+      {acao === 'fechar' && mesasAbertas > 0 && (
+        <p className="danger-text" style={{ fontSize: 12.5, margin: 0 }}>
+          {mesasAbertas} mesa(s) ainda com comanda em aberto — feche todas antes de fechar o caixa.
+        </p>
+      )}
+
+      {autorizadores === null ? (
+        <p className="muted" style={{ fontSize: 13 }}>Carregando…</p>
+      ) : autorizadores.length === 0 ? (
+        <p className="danger-text" style={{ fontSize: 13 }}>Nenhum gerente ou admin cadastrado.</p>
+      ) : (
+        <>
+          <span className="label">Autorizado por</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto' }}>
+            {autorizadores.map((u) => (
+              <EscolhaCard
+                key={u.id}
+                selecionado={usuarioId === u.id}
+                onClick={() => setUsuarioId(u.id)}
+                icon={u.role === 'admin' ? ShieldCheck : UserCog}
+                titulo={u.nome}
+                descricao={u.role === 'admin' ? 'Admin' : 'Gerente'}
+              />
+            ))}
+          </div>
+          <span className="label">Senha (ou PIN)</span>
+          <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="••••••" autoFocus />
+          <span className="label">{acao === 'abrir' ? 'Valor inicial (R$)' : 'Valor contado no caixa (R$)'}</span>
+          <input value={valor} onChange={(e) => setValor(e.target.value)} inputMode="decimal" onFocus={(e) => e.target.select()} />
+          {acao === 'fechar' && resumo && (
+            <p className="muted" style={{ fontSize: 11.5, margin: 0 }}>Valor esperado: {money(resumo.esperado)}</p>
+          )}
+        </>
+      )}
+
+      {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
+
+      <div className="modal-box__actions">
+        <button type="button" className="btn btn-secondary" disabled={enviando} onClick={onVoltar}>
+          Voltar
+        </button>
+        <button type="submit" className="btn btn-primary" disabled={enviando || !autorizadores?.length}>
+          {enviando ? 'Confirmando…' : 'Confirmar'}
+        </button>
+      </div>
+    </form>
   );
 }

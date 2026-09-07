@@ -6,6 +6,7 @@ import {
   History,
   LayoutDashboard,
   LifeBuoy,
+  LogIn,
   LogOut,
   Menu,
   Package,
@@ -61,6 +62,8 @@ export default function Shell({ session }) {
   const [perfil, setPerfil] = useState(undefined); // undefined = carregando, null = sem linha em usuarios
   const [aba, setAba] = useState('dashboard');
   const [sidebarAberta, setSidebarAberta] = useState(false);
+  const [caixaInfo, setCaixaInfo] = useState(undefined); // undefined = carregando, null = nenhum aberto
+  const [caixaConfirmado, setCaixaConfirmado] = useState(() => sessionStorage.getItem('caixa_confirmado'));
   const [loginEm] = useState(() => {
     const bruto = session.user.last_sign_in_at ? new Date(session.user.last_sign_in_at) : new Date();
     return bruto.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -87,6 +90,23 @@ export default function Shell({ session }) {
     };
   }, [session.user.id]);
 
+  useEffect(() => {
+    if (perfil && (perfil.role === 'operador' || perfil.role === 'gerente')) {
+      carregarCaixa();
+    }
+  }, [perfil?.role]);
+
+  async function carregarCaixa() {
+    const { data } = await supabase
+      .from('caixas')
+      .select('*, usuarios!caixas_aberto_por_fkey(nome)')
+      .is('fechado_em', null)
+      .order('aberto_em', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    setCaixaInfo(data || null);
+  }
+
   if (perfil === undefined) return <Centro>Carregando…</Centro>;
   if (perfil === null) {
     return (
@@ -99,6 +119,55 @@ export default function Shell({ session }) {
         </div>
       </Centro>
     );
+  }
+
+  const precisaCaixaAberto = perfil.role === 'operador' || perfil.role === 'gerente';
+  const chaveConfirmacao = caixaInfo ? `${caixaInfo.id}_${perfil.id}` : null;
+
+  function entrarNoCaixa() {
+    sessionStorage.setItem('caixa_confirmado', chaveConfirmacao);
+    setCaixaConfirmado(chaveConfirmacao);
+  }
+
+  function sairDoCaixa() {
+    sessionStorage.removeItem('caixa_confirmado');
+    setCaixaConfirmado(null);
+    carregarCaixa();
+  }
+
+  if (precisaCaixaAberto) {
+    if (caixaInfo === undefined) return <Centro>Carregando…</Centro>;
+    if (caixaInfo === null) {
+      return (
+        <Centro>
+          <div className="card" style={{ width: 320, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <Wallet size={32} style={{ margin: '0 auto', color: 'var(--text-dim)' }} />
+            <p style={{ fontWeight: 700 }}>Nenhum caixa aberto</p>
+            <p className="muted" style={{ fontSize: 13 }}>Peça pra um gerente ou administrador abrir o caixa do dia antes de vender.</p>
+            <button type="button" className="btn btn-secondary btn-block" onClick={() => supabase.auth.signOut()}>
+              <LogOut size={16} /> Sair
+            </button>
+          </div>
+        </Centro>
+      );
+    }
+    if (caixaConfirmado !== chaveConfirmacao) {
+      return (
+        <Centro>
+          <div className="card" style={{ width: 320, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <Wallet size={32} style={{ margin: '0 auto', color: 'var(--primary)' }} />
+            <p style={{ fontWeight: 700 }}>Caixa aberto</p>
+            <p className="muted" style={{ fontSize: 13 }}>
+              Aberto por {caixaInfo.usuarios?.nome || '—'} às{' '}
+              {new Date(caixaInfo.aberto_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </p>
+            <button type="button" className="btn btn-primary btn-block" onClick={entrarNoCaixa}>
+              <LogIn size={16} /> Entrar
+            </button>
+          </div>
+        </Centro>
+      );
+    }
   }
 
   const modulosVisiveis = MODULOS.filter((m) => m.papeis.includes(perfil.role));
@@ -145,6 +214,11 @@ export default function Shell({ session }) {
           {perfil.role === 'admin' && (
             <button type="button" className="sidebar__sair" onClick={acessarComoGarcom}>
               <UtensilsCrossed size={16} /> Acessar como garçom
+            </button>
+          )}
+          {precisaCaixaAberto && (
+            <button type="button" className="sidebar__sair" onClick={sairDoCaixa}>
+              <Wallet size={16} /> Sair do caixa
             </button>
           )}
           <button type="button" className="sidebar__sair" onClick={() => supabase.auth.signOut()}>
