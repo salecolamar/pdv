@@ -1,8 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Eye, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { supabase } from '../supabase';
+import { money } from '../utils/format';
 import IconeMesa from '../components/IconeMesa';
 import { conectarMaquininha, dispositivoSalvo, estornarUltimaTransacao, listarAparelhosPareados, pagarNaMaquininha, suportaPagamentoPagBank } from '../utils/pagbank';
+
+// preco_unitario de um item já vem com os complementos somados (pra fechar
+// a conta certo) — aqui a gente quer mostrar o produto pelo preço dele
+// sozinho, com cada complemento discriminado embaixo com o preço próprio.
+function precoBaseSemComplementos(precoUnitario, complementos) {
+  const totalComplementos = (complementos || []).reduce((s, c) => s + Number(c.preco), 0);
+  return Number(precoUnitario) - totalComplementos;
+}
 
 const STATUS_LABEL = { livre: 'Livre', ocupada: 'Ocupada', reservada: 'Reservada' };
 const STATUS_CHIP = { livre: 'chip-success', ocupada: 'chip-danger', reservada: 'chip-primary' };
@@ -16,6 +25,7 @@ export default function PosPago() {
   const [nomeEditado, setNomeEditado] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
+  const [mesaVendo, setMesaVendo] = useState(null);
 
   useEffect(() => {
     carregar();
@@ -135,7 +145,13 @@ export default function PosPago() {
                 <button type="button" className="btn btn-primary btn-sm" disabled={enviando} onClick={() => salvarNome(m.id)}>Salvar</button>
               </div>
             ) : (
-              <div key={m.id} className="card row" style={{ alignItems: 'center', gap: 10 }}>
+              <div
+                key={m.id}
+                className="card row"
+                style={{ alignItems: 'center', gap: 10, cursor: 'pointer' }}
+                onClick={() => setMesaVendo(m)}
+                title="Ver consumo da mesa"
+              >
                 <div
                   style={{
                     width: 34, height: 34, borderRadius: 10, background: STATUS_COR[m.status] || 'var(--text-dim)', color: '#fff',
@@ -146,16 +162,21 @@ export default function PosPago() {
                 </div>
                 <span style={{ flex: 1, fontWeight: 700, fontSize: 14.5 }}>{m.nome}</span>
                 <span className={'chip ' + (STATUS_CHIP[m.status] || 'chip-danger')}>{STATUS_LABEL[m.status] || m.status}</span>
+                {m.status !== 'livre' && (
+                  <span style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center' }}>
+                    <Eye size={15} />
+                  </span>
+                )}
                 <button
                   type="button"
-                  onClick={() => comecarEdicao(m)}
+                  onClick={(e) => { e.stopPropagation(); comecarEdicao(m); }}
                   style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: 4, marginLeft: 8 }}
                 >
                   <Pencil size={14} />
                 </button>
                 <button
                   type="button"
-                  onClick={() => remover(m.id)}
+                  onClick={(e) => { e.stopPropagation(); remover(m.id); }}
                   disabled={m.status !== 'livre'}
                   style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: m.status === 'livre' ? 'pointer' : 'not-allowed', opacity: m.status === 'livre' ? 1 : 0.35, padding: 4 }}
                 >
@@ -168,6 +189,105 @@ export default function PosPago() {
       )}
 
       <TesteMaquininha />
+
+      {mesaVendo && <ConsumoMesaModal mesa={mesaVendo} onFechar={() => setMesaVendo(null)} />}
+    </div>
+  );
+}
+
+function ConsumoMesaModal({ mesa, onFechar }) {
+  const [pedido, setPedido] = useState(undefined); // undefined = carregando, null = sem comanda aberta
+
+  useEffect(() => {
+    carregar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mesa.id]);
+
+  async function carregar() {
+    const { data } = await supabase
+      .from('pedidos')
+      .select('*, clientes(nome), pedido_rodadas(*, pedido_itens(*), usuarios(nome))')
+      .eq('mesa_id', mesa.id)
+      .in('status', ['aberto', 'fechado'])
+      .order('aberto_em', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    setPedido(data || null);
+  }
+
+  const rodadas = pedido?.pedido_rodadas || [];
+  const total = rodadas.reduce(
+    (s, r) => s + r.pedido_itens.filter((i) => !i.cancelado).reduce((s2, i) => s2 + i.quantidade * i.preco_unitario, 0),
+    0
+  );
+
+  return (
+    <div className="modal-overlay" onClick={onFechar}>
+      <div className="modal-box" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+        <div className="row" style={{ marginBottom: 4 }}>
+          <span style={{ fontWeight: 700 }}>Consumo — {mesa.nome}</span>
+          <button type="button" onClick={onFechar} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>
+            <X size={16} />
+          </button>
+        </div>
+
+        {pedido === undefined ? (
+          <p className="muted" style={{ fontSize: 13 }}>Carregando…</p>
+        ) : pedido === null ? (
+          <p className="muted" style={{ fontSize: 13 }}>Nenhuma comanda aberta nessa mesa.</p>
+        ) : (
+          <>
+            {pedido.clientes?.nome && <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>Cliente: {pedido.clientes.nome}</p>}
+            <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+              Aberta às {new Date(pedido.aberto_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </p>
+
+            <div className="list" style={{ maxHeight: 340, overflowY: 'auto', marginTop: 8 }}>
+              {rodadas.length === 0 ? (
+                <p className="muted" style={{ fontSize: 13 }}>Nenhum item lançado ainda.</p>
+              ) : (
+                rodadas.map((r) => (
+                  <div key={r.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span className="muted" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                      {new Date(r.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · {r.usuarios?.nome || 'Operador'}
+                    </span>
+                    {r.pedido_itens.map((i) => (
+                      <div key={i.id} style={{ padding: '2px 0', opacity: i.cancelado ? 0.5 : 1 }}>
+                        <div className="row" style={{ fontSize: 13 }}>
+                          <span style={{ textDecoration: i.cancelado ? 'line-through' : 'none' }}>
+                            {i.quantidade}x {i.nome_produto}{i.cancelado ? ' (cancelado)' : ''}
+                          </span>
+                          <span className="tabular">{money(i.quantidade * precoBaseSemComplementos(i.preco_unitario, i.complementos))}</span>
+                        </div>
+                        {(i.complementos || []).map((c, idx) => (
+                          <div key={idx} className="row" style={{ fontSize: 11, color: 'var(--text-dim)', paddingLeft: 14 }}>
+                            <span>+ {c.nome}</span>
+                            <span className="tabular">{money(Number(c.preco) * i.quantidade)}</span>
+                          </div>
+                        ))}
+                        {(i.observacoes || []).map((g, idx) => (
+                          <div key={idx} className="muted" style={{ fontSize: 11, paddingLeft: 14 }}>
+                            {g.titulo}: {g.opcoes.join(', ')}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="row" style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 8, marginTop: 8 }}>
+              <span style={{ fontWeight: 700 }}>Total consumido</span>
+              <span className="tabular" style={{ fontWeight: 800, fontSize: 17 }}>{money(total)}</span>
+            </div>
+          </>
+        )}
+
+        <button type="button" className="btn btn-secondary btn-block" style={{ marginTop: 12 }} onClick={onFechar}>
+          Fechar
+        </button>
+      </div>
     </div>
   );
 }
