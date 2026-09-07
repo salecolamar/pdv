@@ -147,16 +147,32 @@ function escaparXml(texto) {
     .replace(/>/g, '&gt;');
 }
 
+// Tamanho de cada linha, em "vezes o normal" (width/height do ePOS-Print
+// e multiplicador do GS ! do ESC/POS) — produto sempre destaca mais que o
+// resto (é a linha que não pode ser lida errado), categoria fica menor.
+function tamanhoLinha(linha, tamanhoFonteGlobal) {
+  const dobradoGlobal = tamanhoFonteGlobal === 'grande';
+  if (linha.estilo === 'produto') return dobradoGlobal ? 2 : { largura: 1, altura: 2 };
+  if (linha.estilo === 'categoria') return 1;
+  return dobradoGlobal ? 2 : 1;
+}
+
 function montarXmlEpos(linhas) {
-  const dobrado = obterConfigImpressao().tamanhoFonte === 'grande';
+  const tamanhoFonte = obterConfigImpressao().tamanhoFonte;
   const comandos = linhas
     .map((linha) => {
       const align = linha.centralizado ? 'center' : 'left';
-      const atributos = `align="${align}"` + (linha.negrito ? ' lang="en"' : '');
-      const peso = linha.negrito ? '<text em="true"/>' : '';
-      const fimPeso = linha.negrito ? '<text em="false"/>' : '';
-      const tamanho = dobrado ? '<text width="2" height="2"/>' : '<text width="1" height="1"/>';
-      return `<text ${atributos}/>${peso}${tamanho}<text>${escaparXml(semAcento(linha.texto ?? ''))}&#10;</text>${fimPeso}`;
+      const negrito = linha.negrito || linha.estilo === 'produto';
+      const atributos = `align="${align}"` + (negrito ? ' lang="en"' : '');
+      const peso = negrito ? '<text em="true"/>' : '';
+      const fimPeso = negrito ? '<text em="false"/>' : '';
+      const tam = tamanhoLinha(linha, tamanhoFonte);
+      const { largura, altura } = typeof tam === 'number' ? { largura: tam, altura: tam } : tam;
+      const tamanho = `<text width="${largura}" height="${altura}"/>`;
+      // "espaco" antes de cada produto (exceto se for a primeira linha do
+      // ticket) — separa visualmente um item do outro.
+      const espaco = linha.estilo === 'produto' ? '<feed unit="20"/>' : '';
+      return `${espaco}<text ${atributos}/>${peso}${tamanho}<text>${escaparXml(semAcento(linha.texto ?? ''))}&#10;</text>${fimPeso}`;
     })
     .join('');
 
@@ -216,18 +232,32 @@ function semAcento(texto) {
 const ESC = 0x1b;
 const GS = 0x1d;
 
+// GS ! n: bits 4-6 = largura-1, bits 0-2 = altura-1 (0x11 = dobro nos
+// dois). Produto sempre imprime maior que o resto (pelo menos altura
+// dobrada) — categoria nunca aumenta, fica sempre no tamanho normal.
+function escalaEscPosLinha(linha, tamanhoFonte) {
+  if (linha.estilo === 'categoria') return 0x00;
+  if (linha.estilo === 'produto') return tamanhoFonte === 'grande' ? 0x11 : 0x01;
+  return escalaEscPos(tamanhoFonte);
+}
+
 function montarComandosEscPos(linhas) {
-  const escala = escalaEscPos(obterConfigImpressao().tamanhoFonte);
-  const bytes = [ESC, 0x40, GS, 0x21, escala]; // inicializa a impressora + tamanho da fonte
+  const tamanhoFonte = obterConfigImpressao().tamanhoFonte;
+  const bytes = [ESC, 0x40]; // inicializa a impressora
 
   for (const linha of linhas) {
     bytes.push(ESC, 0x61, linha.centralizado ? 1 : 0);
-    if (linha.negrito) bytes.push(ESC, 0x45, 1);
+    bytes.push(GS, 0x21, escalaEscPosLinha(linha, tamanhoFonte));
+    if (linha.negrito || linha.estilo === 'produto') bytes.push(ESC, 0x45, 1);
+
+    // Espaço extra antes de cada produto — separa um item do outro pra
+    // não confundir na hora de montar o pedido.
+    if (linha.estilo === 'produto') bytes.push('\n'.charCodeAt(0));
 
     const texto = semAcento(linha.texto ?? '') + '\n';
     for (let i = 0; i < texto.length; i++) bytes.push(texto.charCodeAt(i) & 0xff);
 
-    if (linha.negrito) bytes.push(ESC, 0x45, 0);
+    if (linha.negrito || linha.estilo === 'produto') bytes.push(ESC, 0x45, 0);
   }
 
   bytes.push('\n'.charCodeAt(0), '\n'.charCodeAt(0));
@@ -266,19 +296,23 @@ export function ticketRodada({ tituloMesa, cliente, operador, horario, grupos })
   if (config.mostrarCliente && cliente) linhas.push({ texto: 'Cliente: ' + cliente, centralizado: true });
   linhas.push({ texto: '--------------------------------', centralizado: true });
 
+  // "produto" imprime bem maior e em negrito — é a linha que o pessoal da
+  // cozinha realmente precisa ler rápido e sem errar; "categoria" é só uma
+  // referência, então fica pequena; espaçamento extra entre itens ajuda a
+  // não confundir onde um item termina e o outro começa.
   const itensFn = (i) => {
-    linhas.push({ texto: `${i.quantidade}x ${i.nome_produto}` });
+    linhas.push({ texto: `${i.quantidade}x ${i.nome_produto}`, estilo: 'produto' });
     for (const c of i.complementos || []) {
-      linhas.push({ texto: `   + ${c.nome}` });
+      linhas.push({ texto: `+ ${c.nome}`, estilo: 'detalhe' });
     }
     for (const g of i.observacoes || []) {
-      linhas.push({ texto: `   ${g.titulo}: ${g.opcoes.join(', ')}`, negrito: true });
+      linhas.push({ texto: `${g.titulo}: ${g.opcoes.join(', ')}`, estilo: 'detalhe', negrito: true });
     }
   };
 
   if (config.agruparCategoria) {
     for (const [categoria, itens] of grupos) {
-      linhas.push({ texto: categoria.toUpperCase(), negrito: true });
+      linhas.push({ texto: categoria.toUpperCase(), estilo: 'categoria' });
       for (const i of itens) itensFn(i);
     }
   } else {
