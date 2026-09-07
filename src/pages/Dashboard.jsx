@@ -279,6 +279,8 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <SecaoCaixa />
+
       <div className="dash-grid-stats">
         <CartaoIcone icon={Wallet} cor="#6C3CE0" titulo="Faturamento do mês" valor={money(resumo.faturamentoMes)} />
         <CartaoIcone icon={ShoppingBag} cor="var(--primary)" titulo={resumo.ehHoje ? 'Vendas hoje' : resumo.ehPeriodoUnico ? 'Vendas no dia' : 'Vendas no período'} valor={resumo.numeroVendas} />
@@ -396,6 +398,121 @@ export default function Dashboard() {
       <button type="button" className="btn btn-secondary btn-sm" onClick={carregar}>
         Atualizar
       </button>
+    </div>
+  );
+}
+
+function rotuloCaixa(c) {
+  const abertoEm = new Date(c.aberto_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  return c.fechado_em ? `Fechado — ${abertoEm}` : `Aberto agora — ${abertoEm}`;
+}
+
+function SecaoCaixa() {
+  const [caixas, setCaixas] = useState(undefined);
+  const [caixaId, setCaixaId] = useState('');
+  const [detalhe, setDetalhe] = useState(undefined);
+
+  useEffect(() => {
+    carregarCaixas();
+  }, []);
+
+  useEffect(() => {
+    if (caixaId) carregarDetalhe(caixaId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caixaId]);
+
+  async function carregarCaixas() {
+    const { data } = await supabase
+      .from('caixas')
+      .select('id, aberto_em, fechado_em, valor_inicial, valor_informado, diferenca, aberto_por_usuario:usuarios!caixas_aberto_por_fkey(nome), fechado_por_usuario:usuarios!caixas_fechado_por_fkey(nome)')
+      .order('aberto_em', { ascending: false })
+      .limit(30);
+    setCaixas(data || []);
+    if (data?.length > 0) setCaixaId(data[0].id);
+  }
+
+  async function carregarDetalhe(id) {
+    setDetalhe(undefined);
+    const [pagamentosResp, movimentosResp, vendasResp] = await Promise.all([
+      supabase.from('pagamentos').select('forma, valor, vendas!inner(caixa_id, cancelada)').eq('vendas.caixa_id', id).eq('vendas.cancelada', false),
+      supabase.from('caixa_movimentos').select('tipo, valor').eq('caixa_id', id),
+      supabase.from('vendas').select('id, total').eq('caixa_id', id).eq('cancelada', false),
+    ]);
+    const porForma = {};
+    for (const p of pagamentosResp.data || []) {
+      porForma[p.forma] = (porForma[p.forma] || 0) + Number(p.valor);
+    }
+    const movimentos = (movimentosResp.data || []).reduce((s, m) => s + (m.tipo === 'entrada' ? Number(m.valor) : -Number(m.valor)), 0);
+    const totalVendas = (vendasResp.data || []).reduce((s, v) => s + Number(v.total), 0);
+    setDetalhe({ porForma, movimentos, totalVendas, numeroVendas: (vendasResp.data || []).length });
+  }
+
+  if (caixas === undefined) return null;
+  if (caixas.length === 0) {
+    return (
+      <div className="card">
+        <div className="dash-card-titulo"><Wallet size={15} /> Caixa</div>
+        <p className="muted" style={{ fontSize: 13, margin: 0 }}>Nenhum caixa aberto ainda.</p>
+      </div>
+    );
+  }
+
+  const caixa = caixas.find((c) => c.id === caixaId);
+  const aberto = caixa && !caixa.fechado_em;
+  const vendasDinheiro = detalhe?.porForma.dinheiro || 0;
+  const esperado = caixa ? Number(caixa.valor_inicial) + vendasDinheiro + (detalhe?.movimentos || 0) : 0;
+
+  return (
+    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+        <div className="dash-card-titulo" style={{ marginBottom: 0 }}><Wallet size={15} /> Caixa</div>
+        <select value={caixaId} onChange={(e) => setCaixaId(e.target.value)} style={{ width: 'auto', maxWidth: 260 }}>
+          {caixas.map((c) => (
+            <option key={c.id} value={c.id}>{rotuloCaixa(c)}</option>
+          ))}
+        </select>
+      </div>
+
+      {caixa && (
+        <>
+          <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+            <span className={'chip ' + (aberto ? 'chip-success' : 'chip-primary')}>{aberto ? 'Aberto' : 'Fechado'}</span>
+            <span className="muted" style={{ fontSize: 12 }}>
+              Aberto por {caixa.aberto_por_usuario?.nome || '—'} às{' '}
+              {new Date(caixa.aberto_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              {caixa.fechado_em && (
+                <>
+                  {' · Fechado por '}{caixa.fechado_por_usuario?.nome || '—'}{' às '}
+                  {new Date(caixa.fechado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </>
+              )}
+            </span>
+          </div>
+
+          {detalhe === undefined ? (
+            <p className="muted" style={{ fontSize: 13, margin: 0 }}>Carregando…</p>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
+              <Cartao titulo="Valor inicial" valor={money(caixa.valor_inicial)} />
+              <Cartao titulo="Vendas no caixa" valor={detalhe.numeroVendas} />
+              <Cartao titulo="Faturamento" valor={money(detalhe.totalVendas)} />
+              <Cartao titulo="Vendas em dinheiro" valor={money(vendasDinheiro)} />
+              <Cartao titulo="Entradas/sangrias" valor={money(detalhe.movimentos)} />
+              <Cartao titulo="Esperado em dinheiro" valor={money(esperado)} destaque />
+              {caixa.fechado_em && (
+                <>
+                  <Cartao titulo="Informado" valor={money(caixa.valor_informado)} />
+                  <Cartao
+                    titulo="Diferença"
+                    valor={(Number(caixa.diferenca) > 0 ? '+' : '') + money(caixa.diferenca)}
+                    destaque
+                  />
+                </>
+              )}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
