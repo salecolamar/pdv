@@ -129,10 +129,11 @@ export default function Shell({ session }) {
     setCaixaConfirmado(chaveConfirmacao);
   }
 
-  function sairDoCaixa() {
+  async function sairDoCaixa() {
     sessionStorage.removeItem('caixa_confirmado');
-    setCaixaConfirmado(null);
-    carregarCaixa();
+    const empresaId = perfil.empresas.id;
+    await supabase.auth.signOut();
+    window.location.href = `/garcom/${empresaId}`;
   }
 
   if (precisaCaixaAberto) {
