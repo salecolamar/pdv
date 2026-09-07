@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChefHat, Printer, PrinterCheck, Settings, X } from 'lucide-react';
+import { ChefHat, Eye, Printer, PrinterCheck, Settings, X } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import {
@@ -16,6 +16,8 @@ import {
   usarImpressoraPagBank,
 } from '../utils/impressora';
 import { dispositivoSalvo, suportaPagamentoPagBank } from '../utils/pagbank';
+import { larguraEmPixels, obterConfigImpressao, salvarConfigImpressao } from '../utils/impressaoConfig';
+import { ticketComoPngBase64 } from '../utils/ticketImagem';
 
 const COLUNAS = [
   { status: 'novo', titulo: 'Novos', acao: 'Iniciar preparo', proximo: 'fazendo' },
@@ -50,6 +52,7 @@ export default function Cozinha() {
   const [agora, setAgora] = useState(() => Date.now());
   const [impressoraPronta, setImpressoraPronta] = useState(() => impressoraConfigurada());
   const [configAberta, setConfigAberta] = useState(false);
+  const [layoutAberto, setLayoutAberto] = useState(false);
   const [configProdutosAberta, setConfigProdutosAberta] = useState(false);
   const [erroImpressora, setErroImpressora] = useState('');
   const impressoraProntaRef = useRef(impressoraPronta);
@@ -140,6 +143,9 @@ export default function Cozinha() {
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfigProdutosAberta(true)}>
             <Settings size={14} /> Produtos no painel
           </button>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setLayoutAberto(true)}>
+            <Eye size={14} /> Layout do ticket
+          </button>
           {impressoraPronta ? (
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfigAberta(true)}>
               <PrinterCheck size={14} /> Impressora configurada
@@ -170,6 +176,8 @@ export default function Cozinha() {
       {configProdutosAberta && (
         <ConfigProdutosKds onFechar={() => setConfigProdutosAberta(false)} onMudou={carregar} />
       )}
+
+      {layoutAberto && <ConfigLayoutTicket onFechar={() => setLayoutAberto(false)} />}
 
       {rodadas === null ? (
         <p className="muted" style={{ fontSize: 18 }}>Carregando…</p>
@@ -341,6 +349,101 @@ function ConfigImpressora({ impressoraPronta, onPronta, onEsquecer, onErro, onFe
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+const AMOSTRA_GRUPOS = [
+  [
+    'Bebidas',
+    [
+      { quantidade: 2, nome_produto: 'Coca Cola Lata', complementos: [], observacoes: [] },
+      {
+        quantidade: 1,
+        nome_produto: 'Batata Frita',
+        complementos: [{ nome: 'Bacon extra' }],
+        observacoes: [{ titulo: 'Escolha seu molho', opcoes: ['Ketchup', 'Maionese'] }],
+      },
+    ],
+  ],
+  ['Petiscos', [{ quantidade: 1, nome_produto: 'Asinha de Frango', complementos: [], observacoes: [] }]],
+];
+
+function ConfigLayoutTicket({ onFechar }) {
+  const [config, setConfig] = useState(() => obterConfigImpressao());
+  const [preview, setPreview] = useState('');
+
+  useEffect(() => {
+    const linhas = ticketRodada({
+      tituloMesa: 'MESA 4',
+      cliente: config.mostrarCliente ? 'Maria' : '',
+      operador: 'Saleco',
+      horario: '23:51',
+      grupos: AMOSTRA_GRUPOS,
+    });
+    setPreview(ticketComoPngBase64(linhas, larguraEmPixels(config.larguraPapel), config.tamanhoFonte));
+    salvarConfigImpressao(config);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config]);
+
+  function atualizar(campo, valor) {
+    setConfig((atual) => ({ ...atual, [campo]: valor }));
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onFechar}>
+      <div className="modal-box" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+        <div className="row" style={{ marginBottom: 4 }}>
+          <span style={{ fontWeight: 700 }}>Layout do ticket</span>
+          <button type="button" onClick={onFechar} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}>
+            <X size={16} />
+          </button>
+        </div>
+        <p className="muted" style={{ fontSize: 12.5, marginTop: 0 }}>
+          Vale pros dois jeitos de imprimir (impressora térmica e maquininha) — os dois mandam o mesmo conteúdo.
+        </p>
+
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <label className="row" style={{ cursor: 'pointer' }}>
+              <span style={{ fontSize: 13.5 }}>Mostrar cliente</span>
+              <input type="checkbox" checked={config.mostrarCliente} onChange={(e) => atualizar('mostrarCliente', e.target.checked)} />
+            </label>
+            <label className="row" style={{ cursor: 'pointer' }}>
+              <span style={{ fontSize: 13.5 }}>Mostrar garçom/operador</span>
+              <input type="checkbox" checked={config.mostrarOperador} onChange={(e) => atualizar('mostrarOperador', e.target.checked)} />
+            </label>
+            <label className="row" style={{ cursor: 'pointer' }}>
+              <span style={{ fontSize: 13.5 }}>Agrupar por categoria</span>
+              <input type="checkbox" checked={config.agruparCategoria} onChange={(e) => atualizar('agruparCategoria', e.target.checked)} />
+            </label>
+
+            <span className="label" style={{ marginTop: 4 }}>Tamanho da fonte</span>
+            <select value={config.tamanhoFonte} onChange={(e) => atualizar('tamanhoFonte', e.target.value)}>
+              <option value="pequena">Pequena</option>
+              <option value="media">Média</option>
+              <option value="grande">Grande</option>
+            </select>
+
+            <span className="label">Largura do papel</span>
+            <select value={config.larguraPapel} onChange={(e) => atualizar('larguraPapel', Number(e.target.value))}>
+              <option value={58}>58mm</option>
+              <option value={80}>80mm</option>
+            </select>
+          </div>
+
+          <div style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <span className="label" style={{ margin: 0, alignSelf: 'flex-start' }}>Pré-visualização</span>
+            <div style={{ background: '#f2f4fd', padding: 10, borderRadius: 10, maxHeight: 400, overflowY: 'auto' }}>
+              {preview && <img src={'data:image/png;base64,' + preview} alt="Pré-visualização do ticket" style={{ maxWidth: '100%', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }} />}
+            </div>
+          </div>
+        </div>
+
+        <button type="button" className="btn btn-primary btn-block" style={{ marginTop: 12 }} onClick={onFechar}>
+          Concluir
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,11 +1,11 @@
 // Desenha o mesmo "layout de linhas" já usado pela impressora térmica
 // (ver ticketRodada em impressora.js) como uma imagem PNG — é o formato
 // que a impressora da maquininha PagBank aceita (printImageBluetooth só
-// imprime imagem, não manda texto formatado direto).
+// imprime imagem, não manda texto formatado direto), e também serve pra
+// mostrar uma pré-visualização de como o ticket vai sair impresso.
+import { tamanhoFontePx } from './impressaoConfig.js';
+
 const LARGURA_PADRAO = 384; // pixels — impressora térmica de 58mm típica
-const FONTE = '22px monospace';
-const FONTE_NEGRITO = 'bold 22px monospace';
-const ALTURA_LINHA = 30;
 const MARGEM = 12;
 
 // Quebra uma linha longa em várias, palavra por palavra, pra nunca
@@ -27,7 +27,12 @@ function quebrarLinha(ctx, texto, larguraMaxima) {
   return linhasQuebradas;
 }
 
-export function ticketComoPngBase64(linhas, largura = LARGURA_PADRAO) {
+export function ticketComoPngBase64(linhas, largura = LARGURA_PADRAO, tamanhoFonte = 'media') {
+  const tamanhoPx = tamanhoFontePx(tamanhoFonte);
+  const fonte = `${tamanhoPx}px monospace`;
+  const fonteNegrito = `bold ${tamanhoPx}px monospace`;
+  const alturaLinha = Math.round(tamanhoPx * 1.35);
+
   const larguraUtil = largura - MARGEM * 2;
   const canvasMedidor = document.createElement('canvas');
   const ctxMedidor = canvasMedidor.getContext('2d');
@@ -37,7 +42,7 @@ export function ticketComoPngBase64(linhas, largura = LARGURA_PADRAO) {
   // disso, e canvas não redimensiona depois de já ter desenhado).
   const linhasParaDesenhar = [];
   for (const linha of linhas) {
-    ctxMedidor.font = linha.negrito ? FONTE_NEGRITO : FONTE;
+    ctxMedidor.font = linha.negrito ? fonteNegrito : fonte;
     const texto = String(linha.texto ?? '');
     const partes = ctxMedidor.measureText(texto).width > larguraUtil ? quebrarLinha(ctxMedidor, texto, larguraUtil) : [texto];
     for (const parte of partes) {
@@ -46,7 +51,7 @@ export function ticketComoPngBase64(linhas, largura = LARGURA_PADRAO) {
   }
 
   const canvas = document.createElement('canvas');
-  const alturaTotal = linhasParaDesenhar.length * ALTURA_LINHA + MARGEM * 2;
+  const alturaTotal = linhasParaDesenhar.length * alturaLinha + MARGEM * 2;
   canvas.width = largura;
   canvas.height = alturaTotal;
   const ctx = canvas.getContext('2d');
@@ -58,12 +63,12 @@ export function ticketComoPngBase64(linhas, largura = LARGURA_PADRAO) {
 
   let y = MARGEM;
   for (const linha of linhasParaDesenhar) {
-    ctx.font = linha.negrito ? FONTE_NEGRITO : FONTE;
+    ctx.font = linha.negrito ? fonteNegrito : fonte;
     const larguraTexto = ctx.measureText(linha.texto).width;
     let x = MARGEM;
     if (linha.centralizado) x = Math.max(MARGEM, (largura - larguraTexto) / 2);
     ctx.fillText(linha.texto, x, y);
-    y += ALTURA_LINHA;
+    y += alturaLinha;
   }
 
   return canvas.toDataURL('image/png').split(',')[1];

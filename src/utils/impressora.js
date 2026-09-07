@@ -21,6 +21,7 @@
 //   pra pagamento — imprime como imagem, já que o SDK não aceita texto.
 import { ticketComoPngBase64 } from './ticketImagem.js';
 import { imprimirImagemNaMaquininha } from './pagbank.js';
+import { escalaEscPos, larguraEmPixels, obterConfigImpressao } from './impressaoConfig.js';
 
 const CANDIDATOS_BLUETOOTH = [
   { servico: '000018f0-0000-1000-8000-00805f9b34fb', caracteristica: '00002af1-0000-1000-8000-00805f9b34fb' },
@@ -147,13 +148,15 @@ function escaparXml(texto) {
 }
 
 function montarXmlEpos(linhas) {
+  const dobrado = obterConfigImpressao().tamanhoFonte === 'grande';
   const comandos = linhas
     .map((linha) => {
       const align = linha.centralizado ? 'center' : 'left';
       const atributos = `align="${align}"` + (linha.negrito ? ' lang="en"' : '');
       const peso = linha.negrito ? '<text em="true"/>' : '';
       const fimPeso = linha.negrito ? '<text em="false"/>' : '';
-      return `<text ${atributos}/>${peso}<text>${escaparXml(semAcento(linha.texto ?? ''))}&#10;</text>${fimPeso}`;
+      const tamanho = dobrado ? '<text width="2" height="2"/>' : '<text width="1" height="1"/>';
+      return `<text ${atributos}/>${peso}${tamanho}<text>${escaparXml(semAcento(linha.texto ?? ''))}&#10;</text>${fimPeso}`;
     })
     .join('');
 
@@ -214,7 +217,8 @@ const ESC = 0x1b;
 const GS = 0x1d;
 
 function montarComandosEscPos(linhas) {
-  const bytes = [ESC, 0x40]; // inicializa a impressora
+  const escala = escalaEscPos(obterConfigImpressao().tamanhoFonte);
+  const bytes = [ESC, 0x40, GS, 0x21, escala]; // inicializa a impressora + tamanho da fonte
 
   for (const linha of linhas) {
     bytes.push(ESC, 0x61, linha.centralizado ? 1 : 0);
@@ -227,12 +231,14 @@ function montarComandosEscPos(linhas) {
   }
 
   bytes.push('\n'.charCodeAt(0), '\n'.charCodeAt(0));
+  bytes.push(GS, 0x21, 0x00); // volta o tamanho ao normal
   bytes.push(GS, 0x56, 0x42, 0x00); // corta o papel (ignorado silenciosamente por quem não tem guilhotina)
   return new Uint8Array(bytes);
 }
 
 async function imprimirViaPagBank(linhas) {
-  const imagem = ticketComoPngBase64(linhas);
+  const config = obterConfigImpressao();
+  const imagem = ticketComoPngBase64(linhas, larguraEmPixels(config.larguraPapel), config.tamanhoFonte);
   const resultado = await imprimirImagemNaMaquininha(imagem);
   if (!resultado.sucesso) throw new Error(resultado.mensagem || 'A maquininha não conseguiu imprimir.');
 }
@@ -251,23 +257,33 @@ export async function imprimirTexto(linhas) {
 }
 
 export function ticketRodada({ tituloMesa, cliente, operador, horario, grupos }) {
-  const linhas = [
-    { texto: tituloMesa, centralizado: true, negrito: true },
-    { texto: horario + (operador ? ' - ' + operador : ''), centralizado: true },
-  ];
-  if (cliente) linhas.push({ texto: 'Cliente: ' + cliente, centralizado: true });
+  const config = obterConfigImpressao();
+  const linhas = [{ texto: tituloMesa, centralizado: true, negrito: true }];
+
+  const mostrarOperador = config.mostrarOperador && operador;
+  linhas.push({ texto: horario + (mostrarOperador ? ' - ' + operador : ''), centralizado: true });
+
+  if (config.mostrarCliente && cliente) linhas.push({ texto: 'Cliente: ' + cliente, centralizado: true });
   linhas.push({ texto: '--------------------------------', centralizado: true });
 
-  for (const [categoria, itens] of grupos) {
-    linhas.push({ texto: categoria.toUpperCase(), negrito: true });
-    for (const i of itens) {
-      linhas.push({ texto: `${i.quantidade}x ${i.nome_produto}` });
-      for (const c of i.complementos || []) {
-        linhas.push({ texto: `   + ${c.nome}` });
-      }
-      for (const g of i.observacoes || []) {
-        linhas.push({ texto: `   ${g.titulo}: ${g.opcoes.join(', ')}`, negrito: true });
-      }
+  const itensFn = (i) => {
+    linhas.push({ texto: `${i.quantidade}x ${i.nome_produto}` });
+    for (const c of i.complementos || []) {
+      linhas.push({ texto: `   + ${c.nome}` });
+    }
+    for (const g of i.observacoes || []) {
+      linhas.push({ texto: `   ${g.titulo}: ${g.opcoes.join(', ')}`, negrito: true });
+    }
+  };
+
+  if (config.agruparCategoria) {
+    for (const [categoria, itens] of grupos) {
+      linhas.push({ texto: categoria.toUpperCase(), negrito: true });
+      for (const i of itens) itensFn(i);
+    }
+  } else {
+    for (const [, itens] of grupos) {
+      for (const i of itens) itensFn(i);
     }
   }
 
