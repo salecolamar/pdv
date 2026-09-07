@@ -2,9 +2,11 @@ package br.com.appvia.pdv;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.util.Base64;
 import br.com.uol.pagseguro.plugpag.PlugPag;
 import br.com.uol.pagseguro.plugpag.PlugPagDevice;
 import br.com.uol.pagseguro.plugpag.PlugPagPaymentData;
+import br.com.uol.pagseguro.plugpag.PlugPagPrinterBluetoothResult;
 import br.com.uol.pagseguro.plugpag.PlugPagTransactionResult;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -14,6 +16,8 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.Set;
 
 /**
@@ -186,6 +190,43 @@ public class PagBankPlugin extends Plugin {
         call.resolve(resposta);
       } catch (Exception e) {
         call.reject("Falha ao processar o pagamento: " + e.getMessage(), e);
+      }
+    }).start();
+  }
+
+  // Imprime uma imagem (PNG em base64) na impressora térmica da própria
+  // maquininha — é a única forma de impressão de conteúdo livre que o SDK
+  // do modo Bluetooth/smartphone oferece (não existe um "imprimir texto"
+  // direto, só imagem ou o recibo automático do pagamento). O app manda o
+  // ticket já desenhado como imagem (ver utils/ticketImagem.js) e aqui só
+  // salvamos num arquivo temporário pra passar o caminho pro SDK.
+  @PluginMethod
+  public void printImage(PluginCall call) {
+    String imagemBase64 = call.getString("imagemBase64");
+    if (imagemBase64 == null || imagemBase64.isEmpty()) {
+      call.reject("Informe \"imagemBase64\" (PNG em base64, sem o prefixo data:).");
+      return;
+    }
+
+    new Thread(() -> {
+      File arquivoTemp = new File(getContext().getCacheDir(), "ticket-" + System.currentTimeMillis() + ".png");
+      try {
+        byte[] bytes = Base64.decode(imagemBase64, Base64.DEFAULT);
+        try (FileOutputStream saida = new FileOutputStream(arquivoTemp)) {
+          saida.write(bytes);
+        }
+
+        PlugPagPrinterBluetoothResult resultado = obterInstancia().printImageBluetooth(arquivoTemp.getAbsolutePath());
+
+        JSObject resposta = new JSObject();
+        resposta.put("sucesso", resultado.getResult() == PlugPag.RET_OK);
+        resposta.put("codigo", resultado.getResult());
+        resposta.put("mensagem", resultado.getErrorMessage());
+        call.resolve(resposta);
+      } catch (Exception e) {
+        call.reject("Falha ao imprimir na maquininha: " + e.getMessage(), e);
+      } finally {
+        arquivoTemp.delete();
       }
     }).start();
   }

@@ -16,15 +16,22 @@
 //
 // Nenhum dos dois modos funciona no Safari/iOS (não implementa Web
 // Bluetooth nem permite esse tipo de exceção de rede).
+//
+// - Maquininha (PagBank/PlugPag): reaproveita a conexão Bluetooth já feita
+//   pra pagamento — imprime como imagem, já que o SDK não aceita texto.
+import { ticketComoPngBase64 } from './ticketImagem.js';
+import { imprimirImagemNaMaquininha } from './pagbank.js';
+
 const CANDIDATOS_BLUETOOTH = [
   { servico: '000018f0-0000-1000-8000-00805f9b34fb', caracteristica: '00002af1-0000-1000-8000-00805f9b34fb' },
   { servico: '0000ffe0-0000-1000-8000-00805f9b34fb', caracteristica: '0000ffe1-0000-1000-8000-00805f9b34fb' },
   { servico: '49535343-fe7d-4ae5-8fa9-9fafd205e455', caracteristica: '49535343-1e4d-4bd9-ba61-23c647249616' },
 ];
 
-const CHAVE_MODO = 'pdv_impressora_modo'; // 'bluetooth' | 'wifi'
+const CHAVE_MODO = 'pdv_impressora_modo'; // 'bluetooth' | 'wifi' | 'pagbank'
 const CHAVE_BLUETOOTH_ID = 'pdv_impressora_bluetooth_id';
 const CHAVE_WIFI_IP = 'pdv_impressora_wifi_ip';
+const CHAVE_PAGBANK_DISPOSITIVO = 'pdv_pagbank_dispositivo'; // mesma chave de utils/pagbank.js
 
 let caracteristicaCache = null;
 
@@ -38,7 +45,20 @@ export function obterModo() {
 
 export function impressoraConfigurada() {
   if (typeof localStorage === 'undefined') return false;
-  return obterModo() === 'wifi' ? !!localStorage.getItem(CHAVE_WIFI_IP) : !!localStorage.getItem(CHAVE_BLUETOOTH_ID);
+  const modo = obterModo();
+  if (modo === 'wifi') return !!localStorage.getItem(CHAVE_WIFI_IP);
+  if (modo === 'pagbank') return !!localStorage.getItem(CHAVE_PAGBANK_DISPOSITIVO);
+  return !!localStorage.getItem(CHAVE_BLUETOOTH_ID);
+}
+
+// Usa a maquininha PagBank já conectada (configurada em Mapa de Mesas →
+// Testar maquininha) como impressora — não precisa parear de novo, o
+// SDK já está autenticado com o terminal.
+export function usarImpressoraPagBank() {
+  if (!localStorage.getItem(CHAVE_PAGBANK_DISPOSITIVO)) {
+    throw new Error('Conecte a maquininha primeiro em Mapa de Mesas → Testar maquininha PagBank.');
+  }
+  localStorage.setItem(CHAVE_MODO, 'pagbank');
 }
 
 export function esquecerImpressora() {
@@ -211,9 +231,20 @@ function montarComandosEscPos(linhas) {
   return new Uint8Array(bytes);
 }
 
+async function imprimirViaPagBank(linhas) {
+  const imagem = ticketComoPngBase64(linhas);
+  const resultado = await imprimirImagemNaMaquininha(imagem);
+  if (!resultado.sucesso) throw new Error(resultado.mensagem || 'A maquininha não conseguiu imprimir.');
+}
+
 export async function imprimirTexto(linhas) {
-  if (obterModo() === 'wifi') {
+  const modo = obterModo();
+  if (modo === 'wifi') {
     await imprimirViaWifi(linhas);
+    return;
+  }
+  if (modo === 'pagbank') {
+    await imprimirViaPagBank(linhas);
     return;
   }
   await imprimirViaBluetooth(montarComandosEscPos(linhas));

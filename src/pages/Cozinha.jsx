@@ -13,7 +13,9 @@ import {
   suportaImpressaoBluetooth,
   testarImpressoraWifi,
   ticketRodada,
+  usarImpressoraPagBank,
 } from '../utils/impressora';
+import { dispositivoSalvo, suportaPagamentoPagBank } from '../utils/pagbank';
 
 const COLUNAS = [
   { status: 'novo', titulo: 'Novos', acao: 'Iniciar preparo', proximo: 'fazendo' },
@@ -252,6 +254,18 @@ function ConfigImpressora({ impressoraPronta, onPronta, onEsquecer, onErro, onFe
     }
   }
 
+  function salvarPagBank() {
+    try {
+      usarImpressoraPagBank();
+      onPronta();
+      onFechar();
+    } catch (e) {
+      onErro(e.message);
+    }
+  }
+
+  const maquininhaDisponivel = suportaPagamentoPagBank() && !!dispositivoSalvo();
+
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 4 }}>
       <div className="row">
@@ -274,9 +288,24 @@ function ConfigImpressora({ impressoraPronta, onPronta, onEsquecer, onErro, onFe
         <button type="button" className="tab" aria-pressed={modo === 'wifi'} onClick={() => setModo('wifi')}>
           Wi-Fi
         </button>
+        {maquininhaDisponivel && (
+          <button type="button" className="tab" aria-pressed={modo === 'pagbank'} onClick={() => setModo('pagbank')}>
+            Maquininha
+          </button>
+        )}
       </div>
 
-      {modo === 'bluetooth' ? (
+      {modo === 'pagbank' ? (
+        <>
+          <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+            Usa a impressora da maquininha PagBank já conectada (configurada em Mapa de Mesas → Testar maquininha).
+            Não precisa parear de novo — o pedido sai como uma imagem impressa na própria maquininha.
+          </p>
+          <button type="button" className="btn btn-primary btn-block" onClick={salvarPagBank}>
+            Usar a maquininha como impressora
+          </button>
+        </>
+      ) : modo === 'bluetooth' ? (
         suportaImpressaoBluetooth() ? (
           <>
             <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>

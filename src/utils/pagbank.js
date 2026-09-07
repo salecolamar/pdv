@@ -38,6 +38,13 @@ export async function estornarUltimaTransacao() {
   return PagBank.cancel();
 }
 
+// imagemBase64: PNG em base64 (sem o prefixo "data:image/png;base64,"),
+// gerado por utils/ticketImagem.js — a maquininha, no modo Bluetooth em
+// que o app roda no celular, só imprime imagem (não tem "imprimir texto").
+export async function imprimirImagemNaMaquininha(imagemBase64) {
+  return PagBank.printImage({ imagemBase64 });
+}
+
 // Lista os aparelhos Bluetooth já pareados no celular ({ nome, mac }[]) —
 // evita ter que descobrir o MAC manualmente nas configurações do Android.
 export async function listarAparelhosPareados() {
