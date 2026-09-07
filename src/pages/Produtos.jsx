@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { Copy, FileSpreadsheet, Pencil, Plus, PlusCircle, Trash2, UtensilsCrossed } from 'lucide-react';
+import { Camera, Copy, FileSpreadsheet, Pencil, Plus, PlusCircle, Trash2, UtensilsCrossed } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import Promocoes from './Promocoes';
@@ -349,6 +349,7 @@ function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
   const [produtos, setProdutos] = useState(null);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [importando, setImportando] = useState(false);
+  const [importandoFoto, setImportandoFoto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [campos, setCampos] = useState(campoVazio(null));
   const [complementos, setComplementos] = useState([]);
@@ -483,6 +484,20 @@ function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
     );
   }
 
+  if (importandoFoto) {
+    return (
+      <ImportarProdutosPorFoto
+        categorias={categorias}
+        onVoltar={() => setImportandoFoto(false)}
+        onImportado={() => {
+          setImportandoFoto(false);
+          onCategoriasAtualizadas();
+          carregar();
+        }}
+      />
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {!mostrarForm ? (
@@ -492,6 +507,9 @@ function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
           </button>
           <button type="button" className="btn btn-secondary" onClick={() => setImportando(true)}>
             <FileSpreadsheet size={15} /> Importar
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={() => setImportandoFoto(true)}>
+            <Camera size={15} /> Importar por foto
           </button>
         </div>
       ) : null}
@@ -709,6 +727,33 @@ function analisarLinha(linhaBruta) {
   return { nome, preco, categoria, valido: true, motivo: '' };
 }
 
+// Cria as categorias que ainda não existem e insere os produtos válidos —
+// compartilhado entre a importação por planilha e por foto do cardápio.
+async function salvarProdutosImportados(categorias, validas) {
+  const nomesCategorias = [...new Set(validas.map((l) => l.categoria).filter(Boolean))];
+  const mapaCategorias = new Map(categorias.map((c) => [normalizarCabecalho(c.nome), c.id]));
+  const categoriasFaltando = nomesCategorias.filter((nome) => !mapaCategorias.has(normalizarCabecalho(nome)));
+
+  if (categoriasFaltando.length > 0) {
+    const { data: novasCategorias, error: erroCategorias } = await supabase
+      .from('categorias')
+      .insert(categoriasFaltando.map((nome) => ({ nome })))
+      .select();
+    if (erroCategorias) return 'Falha ao criar categorias: ' + erroCategorias.message;
+    for (const c of novasCategorias) mapaCategorias.set(normalizarCabecalho(c.nome), c.id);
+  }
+
+  const payload = validas.map((l) => ({
+    nome: l.nome,
+    preco: l.preco,
+    categoria_id: l.categoria ? mapaCategorias.get(normalizarCabecalho(l.categoria)) || null : null,
+  }));
+
+  const { error: erroProdutos } = await supabase.from('produtos').insert(payload);
+  if (erroProdutos) return 'Falha ao importar produtos: ' + erroProdutos.message;
+  return null;
+}
+
 function ImportarProdutos({ categorias, onVoltar, onImportado }) {
   const [nomeArquivo, setNomeArquivo] = useState('');
   const [linhas, setLinhas] = useState(null);
@@ -749,34 +794,10 @@ function ImportarProdutos({ categorias, onVoltar, onImportado }) {
     if (validas.length === 0) return;
     setImportando(true);
     setErro('');
-
-    const nomesCategorias = [...new Set(validas.map((l) => l.categoria).filter(Boolean))];
-    const mapaCategorias = new Map(categorias.map((c) => [normalizarCabecalho(c.nome), c.id]));
-    const categoriasFaltando = nomesCategorias.filter((nome) => !mapaCategorias.has(normalizarCabecalho(nome)));
-
-    if (categoriasFaltando.length > 0) {
-      const { data: novasCategorias, error: erroCategorias } = await supabase
-        .from('categorias')
-        .insert(categoriasFaltando.map((nome) => ({ nome })))
-        .select();
-      if (erroCategorias) {
-        setErro('Falha ao criar categorias: ' + erroCategorias.message);
-        setImportando(false);
-        return;
-      }
-      for (const c of novasCategorias) mapaCategorias.set(normalizarCabecalho(c.nome), c.id);
-    }
-
-    const payload = validas.map((l) => ({
-      nome: l.nome,
-      preco: l.preco,
-      categoria_id: l.categoria ? mapaCategorias.get(normalizarCabecalho(l.categoria)) || null : null,
-    }));
-
-    const { error: erroProdutos } = await supabase.from('produtos').insert(payload);
+    const erroImportacao = await salvarProdutosImportados(categorias, validas);
     setImportando(false);
-    if (erroProdutos) {
-      setErro('Falha ao importar produtos: ' + erroProdutos.message);
+    if (erroImportacao) {
+      setErro(erroImportacao);
       return;
     }
     onImportado();
@@ -827,6 +848,162 @@ function ImportarProdutos({ categorias, onVoltar, onImportado }) {
           <button type="button" className="btn btn-primary btn-block" disabled={validas === 0 || importando} onClick={confirmarImportacao}>
             {importando ? 'Importando…' : `Importar ${validas} produto${validas === 1 ? '' : 's'}`}
           </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function fotoParaBase64(arquivo) {
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader();
+    leitor.onload = () => resolve(String(leitor.result).split(',')[1]);
+    leitor.onerror = reject;
+    leitor.readAsDataURL(arquivo);
+  });
+}
+
+function ImportarProdutosPorFoto({ categorias, onVoltar, onImportado }) {
+  const [nomeArquivo, setNomeArquivo] = useState('');
+  const [itens, setItens] = useState(null);
+  const [lendo, setLendo] = useState(false);
+  const [importando, setImportando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  async function selecionarArquivo(e) {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    setErro('');
+    setItens(null);
+    setNomeArquivo(arquivo.name);
+    setLendo(true);
+    try {
+      const base64 = await fotoParaBase64(arquivo);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const resp = await fetch('/api/importar-cardapio-foto', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ imagemBase64: base64, mimeType: arquivo.type || 'image/jpeg' }),
+      });
+      const dados = await resp.json();
+      if (!resp.ok) {
+        setErro(dados.error || 'Não consegui ler essa foto.');
+        return;
+      }
+      setItens(
+        (dados.itens || []).map((i) => ({
+          nome: String(i.nome || '').trim(),
+          preco: i.preco == null ? NaN : Number(i.preco),
+          categoria: String(i.categoria || '').trim(),
+        }))
+      );
+    } catch {
+      setErro('Falha ao processar a foto. Tente de novo.');
+    } finally {
+      setLendo(false);
+    }
+  }
+
+  function atualizarItem(idx, campo, valor) {
+    setItens((atual) => atual.map((it, i) => (i === idx ? { ...it, [campo]: valor } : it)));
+  }
+
+  function removerItem(idx) {
+    setItens((atual) => atual.filter((_, i) => i !== idx));
+  }
+
+  async function confirmarImportacao() {
+    const validas = itens.filter((i) => i.nome && i.preco > 0).map((i) => ({ ...i, valido: true }));
+    if (validas.length === 0) return;
+    setImportando(true);
+    setErro('');
+    const erroImportacao = await salvarProdutosImportados(categorias, validas);
+    setImportando(false);
+    if (erroImportacao) {
+      setErro(erroImportacao);
+      return;
+    }
+    onImportado();
+  }
+
+  const validos = itens?.filter((i) => i.nome && i.preco > 0).length ?? 0;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onVoltar}>
+        Voltar
+      </button>
+
+      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ fontWeight: 700 }}>Importar por foto do cardápio</div>
+        <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+          Envie uma foto nítida do cardápio. A IA lê os itens automaticamente — confira e corrija antes de importar, já
+          que letra apertada ou foto tremida pode confundir a leitura.
+        </p>
+        <input type="file" accept="image/*" capture="environment" onChange={selecionarArquivo} />
+        {nomeArquivo && <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>Arquivo: {nomeArquivo}</p>}
+      </div>
+
+      {lendo && <p className="muted">Lendo a foto com a IA… pode levar alguns segundos.</p>}
+      {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
+
+      {itens && !lendo && (
+        <>
+          {itens.length === 0 ? (
+            <p className="muted" style={{ fontSize: 13 }}>Não encontrei nenhum item nessa foto.</p>
+          ) : (
+            <>
+              <div className="card row">
+                <span className="success-text" style={{ fontSize: 13 }}>{validos} válido{validos === 1 ? '' : 's'}</span>
+                {itens.length - validos > 0 && (
+                  <span className="danger-text" style={{ fontSize: 13 }}>{itens.length - validos} com erro</span>
+                )}
+              </div>
+
+              <div className="list" style={{ maxHeight: 360, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {itens.map((it, idx) => {
+                  const valido = it.nome && it.preco > 0;
+                  return (
+                    <div key={idx} className="card" style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6, opacity: valido ? 1 : 0.75 }}>
+                      <div className="row" style={{ gap: 6 }}>
+                        <input
+                          style={{ flex: 1 }}
+                          value={it.nome}
+                          placeholder="Nome"
+                          onChange={(e) => atualizarItem(idx, 'nome', e.target.value)}
+                        />
+                        <button type="button" onClick={() => removerItem(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', flexShrink: 0 }} title="Remover">
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                      <div className="row" style={{ gap: 6 }}>
+                        <input
+                          style={{ width: 90 }}
+                          inputMode="decimal"
+                          value={Number.isNaN(it.preco) ? '' : it.preco}
+                          placeholder="Preço"
+                          onChange={(e) => atualizarItem(idx, 'preco', Number(e.target.value.replace(',', '.')))}
+                        />
+                        <input
+                          style={{ flex: 1 }}
+                          value={it.categoria}
+                          placeholder="Categoria"
+                          onChange={(e) => atualizarItem(idx, 'categoria', e.target.value)}
+                        />
+                      </div>
+                      {!valido && <span className="danger-text" style={{ fontSize: 11.5 }}>Falta nome ou preço válido</span>}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <button type="button" className="btn btn-primary btn-block" disabled={validos === 0 || importando} onClick={confirmarImportacao}>
+                {importando ? 'Importando…' : `Importar ${validos} produto${validos === 1 ? '' : 's'}`}
+              </button>
+            </>
+          )}
         </>
       )}
     </div>
