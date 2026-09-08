@@ -138,7 +138,7 @@ export default function Cozinha() {
     <div className="cozinha">
       <header className="cozinha__header">
         <h1 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><ChefHat size={22} /> Painel de Pedidos</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="cozinha__header-acoes">
           {rodadas && pendentes > 0 && <span className="chip chip-primary">{pendentes} em preparo</span>}
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfigProdutosAberta(true)}>
             <Settings size={14} /> Produtos no painel

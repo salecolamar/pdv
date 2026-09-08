@@ -601,14 +601,14 @@ function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {!mostrarForm ? (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={() => { setCampos(campoVazio(null)); setMostrarForm(true); }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" className="btn btn-primary" style={{ flex: '1 1 160px' }} onClick={() => { setCampos(campoVazio(null)); setMostrarForm(true); }}>
             <Plus size={15} /> Novo produto
           </button>
-          <button type="button" className="btn btn-secondary" onClick={() => setImportando(true)}>
+          <button type="button" className="btn btn-secondary" style={{ flex: '1 1 auto' }} onClick={() => setImportando(true)}>
             <FileSpreadsheet size={15} /> Importar
           </button>
-          <button type="button" className="btn btn-secondary" onClick={() => setImportandoFoto(true)}>
+          <button type="button" className="btn btn-secondary" style={{ flex: '1 1 auto' }} onClick={() => setImportandoFoto(true)}>
             <Camera size={15} /> Importar por foto
           </button>
         </div>
@@ -743,31 +743,30 @@ function ProdutosPorCategoria({
               const semControle = p.estoque === null;
               const baixo = !semControle && p.estoque_minimo != null && Number(p.estoque) <= Number(p.estoque_minimo);
               return (
-                <div key={p.id} className="card row" style={{ opacity: p.ativo ? 1 : 0.5, alignItems: 'center' }}>
+                <div key={p.id} className="card row" style={{ opacity: p.ativo ? 1 : 0.5, alignItems: 'center', flexWrap: 'wrap' }}>
                   <input
                     type="checkbox"
                     checked={selecionados.has(p.id)}
                     onChange={() => onAlternarSelecionado(p.id)}
                     style={{ marginRight: 2, flexShrink: 0 }}
                   />
-                  <img className="product-thumb" src={p.foto_url || PLACEHOLDER_FOTO} alt="" style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover', background: 'var(--panel-2)' }} />
-                  <div style={{ flex: 1, paddingRight: 8 }}>
+                  <img className="product-thumb" src={p.foto_url || PLACEHOLDER_FOTO} alt="" style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover', background: 'var(--panel-2)', flexShrink: 0 }} />
+                  <div style={{ flex: '1 1 160px', paddingRight: 8, minWidth: 0 }}>
                     <div>{p.nome}</div>
                     <div style={{ fontSize: 12, marginTop: 2, color: baixo ? 'var(--danger)' : 'var(--text-dim)' }}>
                       {semControle ? 'Sem controle de estoque' : `Estoque: ${p.estoque}${baixo ? ' — repor logo' : ''}`}
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div className="tabular" style={{ fontWeight: 600 }}>
-                      {p.preco_promocional ? (
-                        <>
-                          <span className="muted" style={{ textDecoration: 'line-through', fontSize: 12 }}>{money(p.preco)}</span> {money(p.preco_promocional)}
-                        </>
-                      ) : (
-                        money(p.preco)
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 6, justifyContent: 'flex-end' }}>
+                  <div className="tabular" style={{ fontWeight: 600, flex: '0 0 auto' }}>
+                    {p.preco_promocional ? (
+                      <>
+                        <span className="muted" style={{ textDecoration: 'line-through', fontSize: 12 }}>{money(p.preco)}</span> {money(p.preco_promocional)}
+                      </>
+                    ) : (
+                      money(p.preco)
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', flex: '1 0 auto', width: '100%' }}>
                       <button type="button" className="btn btn-secondary btn-sm" title="Duplicar" onClick={() => onDuplicar(p)}>
                         <Copy size={13} />
                       </button>
@@ -777,7 +776,6 @@ function ProdutosPorCategoria({
                       <button type="button" className="btn btn-secondary btn-sm" onClick={() => onEditar(p)}>
                         <Pencil size={13} /> Editar
                       </button>
-                    </div>
                   </div>
                 </div>
               );

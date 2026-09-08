@@ -653,11 +653,19 @@ button:focus-visible {
 .cozinha { padding: 4px 0 24px; }
 .cozinha__header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
   margin-bottom: 16px;
 }
-.cozinha__header h1 { font-size: 22px; }
+.cozinha__header h1 { font-size: 22px; flex: 0 0 auto; white-space: nowrap; }
+.cozinha__header-acoes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
 .cozinha__colunas {
   display: grid;
   grid-template-columns: repeat(3, minmax(280px, 1fr));
