@@ -876,16 +876,16 @@ function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
       )}
 
       <div className="tab-row">
-        <button type="button" className="btn btn-primary btn-sm" onClick={() => setVendoConta(true)}>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setVendoConta(true)}>
           <Receipt size={14} /> Imprimir conta
         </button>
         {pedido.status === 'aberto' && (
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => setTransferindoMesa(true)} disabled={rodadas.length === 0}>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setTransferindoMesa(true)} disabled={rodadas.length === 0}>
             <ArrowRightLeft size={14} /> Transferir mesa
           </button>
         )}
         {pedido.status === 'aberto' && (
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => setJuntandoMesas(true)} disabled={mesasDestinoJuntar.length === 0}>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setJuntandoMesas(true)} disabled={mesasDestinoJuntar.length === 0}>
             <Users2 size={14} /> Juntar mesa
           </button>
         )}
