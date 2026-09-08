@@ -310,30 +310,20 @@ function FormularioCriarEmpresa() {
       return;
     }
 
-    // Gera o id no navegador em vez de pedir pro banco devolver a linha
-    // criada (.select()): nesse instante o usuário ainda não tem uma linha
-    // em `usuarios`, então a política de leitura de `empresas` (que depende
-    // de já pertencer a uma empresa) ainda não consegue confirmar que essa
-    // linha é dele — e o Postgres rejeita o INSERT inteiro por causa disso.
+    // empresas + usuarios numa transação só (função criar_empresa_admin) —
+    // antes eram dois inserts separados e, se o segundo falhasse, a empresa
+    // ficava criada pela metade (sem usuário, e o e-mail já "gasto" no
+    // signUp, travando qualquer nova tentativa).
     const empresaId = crypto.randomUUID();
-    const { error: erroEmpresa } = await supabase
-      .from('empresas')
-      .insert({ id: empresaId, nome: nomeEmpresa.trim() || 'Minha Empresa', categoria: categoria.trim() || 'Bar' });
-    if (erroEmpresa) {
-      setErro('Falha ao criar a empresa: ' + erroEmpresa.message);
-      setEnviando(false);
-      return;
-    }
-
-    const { error: erroUsuario } = await supabase.from('usuarios').insert({
-      id: signUpData.session.user.id,
-      empresa_id: empresaId,
-      nome: nome.trim() || 'Administrador',
-      email: email.trim(),
-      role: 'admin',
+    const { error: erroCriacao } = await supabase.rpc('criar_empresa_admin', {
+      p_empresa_id: empresaId,
+      p_nome_empresa: nomeEmpresa.trim(),
+      p_categoria: categoria.trim(),
+      p_nome_admin: nome.trim(),
+      p_email: email.trim(),
     });
-    if (erroUsuario) {
-      setErro('Falha ao criar o usuário: ' + erroUsuario.message);
+    if (erroCriacao) {
+      setErro('Falha ao criar a empresa: ' + erroCriacao.message);
       setEnviando(false);
       return;
     }
