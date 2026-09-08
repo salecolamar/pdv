@@ -30,7 +30,7 @@ const PERMISSOES = [
 ];
 
 const ROLE_INFO = {
-  admin: { label: 'Admin', icon: ShieldCheck, cor: '#6C3CE0' },
+  admin: { label: 'Admin', icon: ShieldCheck, cor: 'var(--primary-violet)' },
   gerente: { label: 'Gerente', icon: UserCog, cor: 'var(--primary)' },
   operador: { label: 'Garçom', icon: UtensilsCrossed, cor: 'var(--success, #2f9e5f)' },
 };
@@ -188,7 +188,7 @@ function LinkAcesso({ empresaId }) {
   }
 
   return (
-    <div className="card" style={{ background: 'linear-gradient(135deg, var(--primary), #6C3CE0)', color: '#fff' }}>
+    <div className="card" style={{ background: 'var(--gradient-primary)', color: '#fff' }}>
       <div style={{ fontWeight: 700, marginBottom: 4 }}>Link de acesso do estabelecimento</div>
       <p style={{ fontSize: 12.5, margin: '0 0 10px', opacity: 0.9 }}>
         Deixe esse link salvo no celular/tablet do balcão — quem abrir escolhe entre entrar como admin (e-mail e senha) ou como garçom (escolhe o nome na lista e digita o PIN).

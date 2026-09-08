@@ -115,7 +115,7 @@ export default function Clientes() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {!mostrarForm ? (
         <>
-          <div className="card row" style={{ padding: '14px 16px', background: 'linear-gradient(135deg, var(--primary), #6C3CE0)', color: '#fff' }}>
+          <div className="card row" style={{ padding: '14px 16px', background: 'var(--gradient-primary)', color: '#fff' }}>
             <p style={{ fontSize: 12.5, margin: 0, opacity: 0.92 }}>
               <strong>★ Programa de fidelidade:</strong> cada cliente ganha pontos por R$ gasto em vendas vinculadas a ele. Resgate os pontos no cartão do cliente quando ele trocar por desconto/brinde no balcão.
             </p>

@@ -167,7 +167,7 @@ function VendasDoGarcom() {
   if (!resumo) return null;
 
   return (
-    <div className="card" style={{ padding: '10px 14px', background: 'linear-gradient(135deg, var(--primary), #6C3CE0)', color: '#fff' }}>
+    <div className="card" style={{ padding: '10px 14px', background: 'var(--gradient-primary)', color: '#fff' }}>
       <div className="row">
         <span style={{ fontSize: 13, fontWeight: 600 }}>Suas vendas hoje ({resumo.quantidade})</span>
         <span className="tabular" style={{ fontSize: 18, fontWeight: 800 }}>{money(resumo.total)}</span>

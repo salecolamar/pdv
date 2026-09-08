@@ -42,7 +42,7 @@ export default function Relatorios() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div className="card row" style={{ padding: '14px 16px', background: 'linear-gradient(135deg, var(--primary), #6C3CE0)', color: '#fff' }}>
+      <div className="card row" style={{ padding: '14px 16px', background: 'var(--gradient-primary)', color: '#fff' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5 }}>
           <BarChart3 size={18} />
           Acompanhe faturamento, formas de pagamento, operadores e cancelamentos por período.

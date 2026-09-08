@@ -29,7 +29,7 @@ export default function AcessoEmpresa({ empresaId }) {
         <div style={{ textAlign: 'center' }}>
           <div
             style={{
-              width: 48, height: 48, borderRadius: 14, margin: '0 auto 10px', background: 'linear-gradient(135deg, var(--primary), #6C3CE0)',
+              width: 48, height: 48, borderRadius: 14, margin: '0 auto 10px', background: 'var(--gradient-primary)',
               color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >

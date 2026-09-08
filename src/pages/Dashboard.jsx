@@ -20,7 +20,7 @@ import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import { inicioDoDia, inicioDoMes, subDias } from '../utils/datas';
 
-const MEDALHA = ['#FFD54A', '#C9CBD1', '#E0A458'];
+const MEDALHA = ['var(--accent-gold)', 'var(--accent-silver)', 'var(--accent-bronze)'];
 
 const FORMAS_PAGAMENTO = [
   { forma: 'dinheiro', label: 'Dinheiro', icon: Banknote },
@@ -282,13 +282,13 @@ export default function Dashboard() {
       <SecaoCaixa />
 
       <div className="dash-grid-stats">
-        <CartaoIcone icon={Wallet} cor="#6C3CE0" titulo="Faturamento do mês" valor={money(resumo.faturamentoMes)} />
+        <CartaoIcone icon={Wallet} cor="var(--primary-violet)" titulo="Faturamento do mês" valor={money(resumo.faturamentoMes)} />
         <CartaoIcone icon={ShoppingBag} cor="var(--primary)" titulo={resumo.ehHoje ? 'Vendas hoje' : resumo.ehPeriodoUnico ? 'Vendas no dia' : 'Vendas no período'} valor={resumo.numeroVendas} />
         <CartaoIcone icon={Receipt} cor="var(--success, #2f9e5f)" titulo="Ticket médio" valor={money(resumo.ticketMedio)} />
         <CartaoIcone icon={Percent} cor="var(--atencao)" titulo="Taxa de serviço" valor={money(resumo.taxaServicoTotal)} />
         <CartaoIcone icon={Ticket} cor="var(--danger)" titulo="Descontos concedidos" valor={money(resumo.descontoTotal)} />
         {melhorHorario && melhorHorario.total > 0 && (
-          <CartaoIcone icon={Flame} cor="#ff6b6b" titulo="Horário mais forte" valor={rotuloBucket(melhorHorario.idx)} />
+          <CartaoIcone icon={Flame} cor="var(--accent-coral)" titulo="Horário mais forte" valor={rotuloBucket(melhorHorario.idx)} />
         )}
       </div>
 

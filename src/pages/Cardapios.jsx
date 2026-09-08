@@ -63,7 +63,7 @@ export default function Cardapios() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div className="card row" style={{ padding: '14px 16px', background: 'linear-gradient(135deg, var(--primary), #6C3CE0)', color: '#fff' }}>
+      <div className="card row" style={{ padding: '14px 16px', background: 'var(--gradient-primary)', color: '#fff' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5 }}>
           <BookOpen size={18} />
           Monte subconjuntos do cardápio (ex: "Cardápio de eventos", "Happy hour") pra usar na hora de lançar itens.

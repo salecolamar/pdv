@@ -219,7 +219,7 @@ function CaixaAberto({ caixa, onFechado }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div className="card" style={{ background: 'linear-gradient(135deg, var(--primary), #6C3CE0)', color: '#fff', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div className="card" style={{ background: 'var(--gradient-primary)', color: '#fff', display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <Wallet size={20} />
         </div>

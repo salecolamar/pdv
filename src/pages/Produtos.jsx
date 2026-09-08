@@ -185,7 +185,7 @@ function Complementos() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div className="card row" style={{ padding: '14px 16px', background: 'linear-gradient(135deg, var(--primary), #6C3CE0)', color: '#fff' }}>
+      <div className="card row" style={{ padding: '14px 16px', background: 'var(--gradient-primary)', color: '#fff' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5 }}>
           <PlusCircle size={18} />
           Cadastre aqui os adicionais (ex: bacon extra, queijo extra) — na edição de cada produto você escolhe quais desses valem pra ele.
