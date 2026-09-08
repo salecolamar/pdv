@@ -1,5 +1,9 @@
 {
   "appId": "br.com.appvia.pdv",
   "appName": "AppVia PDV",
-  "webDir": "dist"
+  "webDir": "dist",
+  "server": {
+    "url": "https://threepdv.vercel.app",
+    "androidScheme": "https"
+  }
 }
