@@ -155,16 +155,18 @@ export default function Usuarios() {
                     editandoId === u.id ? (
                       <EditarUsuario key={u.id} usuario={u} onCancelar={() => setEditandoId(null)} onSalvo={() => { setEditandoId(null); carregar(); }} />
                     ) : (
-                      <div key={u.id} className="card row" style={{ opacity: u.ativo ? 1 : 0.55 }}>
+                      <div key={u.id} className="card row" style={{ opacity: u.ativo ? 1 : 0.55, flexWrap: 'wrap' }}>
                         <Avatar nome={u.nome} role={u.role} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 700, fontSize: 14.5 }}>{u.nome}</div>
+                        <div style={{ flex: '1 1 140px', minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14.5, whiteSpace: 'nowrap' }}>{u.nome}</div>
                           <div className="muted" style={{ fontSize: 12 }}>{u.login_tipo === 'pin' ? 'Acesso por PIN' : u.email}</div>
                         </div>
-                        {!u.ativo && <span className="chip chip-danger" style={{ marginRight: 4 }}>Inativo</span>}
-                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditandoId(u.id)}>
-                          <Pencil size={13} /> Editar
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          {!u.ativo && <span className="chip chip-danger">Inativo</span>}
+                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditandoId(u.id)}>
+                            <Pencil size={13} /> Editar
+                          </button>
+                        </div>
                       </div>
                     )
                   )}

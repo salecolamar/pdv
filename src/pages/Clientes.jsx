@@ -235,13 +235,13 @@ function ClienteCard({ cliente, expandido, onExpandir, onEditar, onExcluir, onMu
 
   return (
     <div className="card">
-      <div className="row" style={{ cursor: 'pointer', gap: 10 }} onClick={onExpandir}>
+      <div className="row" style={{ cursor: 'pointer', gap: 10, flexWrap: 'wrap' }} onClick={onExpandir}>
         <AvatarCliente nome={cliente.nome} />
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: '1 1 120px', minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 14.5 }}>{cliente.nome}</div>
-          <div className="muted" style={{ fontSize: 12 }}>{cliente.telefone || 'sem telefone'}</div>
+          <div className="muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{cliente.telefone || 'sem telefone'}</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <span className="chip chip-primary" title="Pontos de fidelidade">★ {pontos}</span>
           <button type="button" className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); onEditar(); }}>
             Editar
