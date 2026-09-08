@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ShieldCheck, UserCog, UtensilsCrossed } from 'lucide-react';
+import { LogOut, ShieldCheck, UserCog, UtensilsCrossed } from 'lucide-react';
 import { supabase } from './supabase';
 import Shell from './Shell';
 import AcessoEmpresa, { AcessoGarcom } from './pages/AcessoEmpresa';
@@ -132,6 +132,14 @@ function PosLogin({ session }) {
             }}
           />
         </div>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          style={{ alignSelf: 'center', display: 'flex', alignItems: 'center', gap: 6 }}
+          onClick={() => supabase.auth.signOut()}
+        >
+          <LogOut size={14} /> Sair
+        </button>
       </div>
     </Centro>
   );
