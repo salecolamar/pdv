@@ -292,13 +292,24 @@ function ConsumoMesaModal({ mesa, onFechar }) {
   );
 }
 
+// tipos de transação suportados pelo terminal, na ordem que aparecem no
+// seletor do painel de teste — é aqui que a homologação PagBank (que pede
+// os logs de cada tipo pra validar a integração) faz os testes de verdade.
+const TIPOS_TESTE = [
+  { valor: 'credito', label: 'Crédito' },
+  { valor: 'debito', label: 'Débito' },
+  { valor: 'pix', label: 'Pix' },
+];
+
 function TesteMaquininha() {
   const [dispositivo, setDispositivo] = useState(() => dispositivoSalvo());
   const [valor, setValor] = useState('1.00');
+  const [tipo, setTipo] = useState('credito');
   const [status, setStatus] = useState('');
   const [erro, setErro] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [pareados, setPareados] = useState(null);
+  const [log, setLog] = useState(null);
 
   const suportado = suportaPagamentoPagBank();
 
@@ -337,10 +348,12 @@ function TesteMaquininha() {
     if (!(valorNum > 0)) return;
     setOcupado(true);
     setErro('');
-    setStatus('Aguardando o cartão na maquininha...');
+    setLog(null);
+    setStatus(tipo === 'pix' ? 'Aguardando o Pix na maquininha...' : 'Aguardando o cartão na maquininha...');
     try {
-      const resultado = await pagarNaMaquininha(valorNum, 'credito', 'TESTE');
+      const resultado = await pagarNaMaquininha(valorNum, tipo, 'TESTE');
       setStatus(resultado.sucesso ? `Pagamento aprovado! ID ${resultado.transacaoId}` : `Recusado: ${resultado.mensagem}`);
+      setLog({ tipo, valor: valorNum, dataHora: new Date().toISOString(), ...resultado });
     } catch (e) {
       setErro(e.message || String(e));
     } finally {
@@ -397,9 +410,26 @@ function TesteMaquininha() {
 
       <span className="label">Valor de teste (R$)</span>
       <input value={valor} onChange={(e) => setValor(e.target.value)} inputMode="decimal" disabled={!suportado} />
+
+      <span className="label">Tipo de transação</span>
+      <div style={{ display: 'flex', gap: 8 }}>
+        {TIPOS_TESTE.map((t) => (
+          <button
+            key={t.valor}
+            type="button"
+            className={`btn btn-sm ${tipo === t.valor ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ flex: 1 }}
+            onClick={() => setTipo(t.valor)}
+            disabled={!suportado}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       <div style={{ display: 'flex', gap: 8 }}>
         <button type="button" className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={pagar} disabled={!suportado || ocupado}>
-          Cobrar no crédito
+          Cobrar no {TIPOS_TESTE.find((t) => t.valor === tipo)?.label.toLowerCase()}
         </button>
         <button type="button" className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={estornar} disabled={!suportado || ocupado}>
           Estornar última
@@ -408,6 +438,19 @@ function TesteMaquininha() {
 
       {status && <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>{status}</p>}
       {erro && <p className="danger-text" style={{ fontSize: 12.5, margin: 0 }}>{erro}</p>}
+
+      {log && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span className="label">Log da transação (envie esse texto pra PagBank)</span>
+          <textarea
+            readOnly
+            rows={7}
+            style={{ fontFamily: 'monospace', fontSize: 12 }}
+            value={JSON.stringify(log, null, 2)}
+            onClick={(e) => e.target.select()}
+          />
+        </div>
+      )}
     </div>
   );
 }

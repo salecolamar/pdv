@@ -27,7 +27,7 @@ export async function conectarMaquininha(dispositivo) {
   return resultado;
 }
 
-// valor em reais (ex: 45.90); tipo: 'credito' | 'debito' | 'voucher'
+// valor em reais (ex: 45.90); tipo: 'credito' | 'debito' | 'voucher' | 'pix'
 export async function pagarNaMaquininha(valor, tipo = 'credito', referencia = 'VENDA') {
   const valorCentavos = Math.round(Number(valor) * 100);
   return PagBank.pay({ valorCentavos, tipo, referencia });

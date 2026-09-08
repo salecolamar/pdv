@@ -144,7 +144,7 @@ public class PagBankPlugin extends Plugin {
   }
 
   // valorCentavos: valor em centavos (ex: 4590 = R$45,90).
-  // tipo: 'credito' | 'debito' | 'voucher'.
+  // tipo: 'credito' | 'debito' | 'voucher' | 'pix'.
   // parcelas / parcelamentoLoja (true = parcelado pelo vendedor) são opcionais.
   @PluginMethod
   public void pay(PluginCall call) {
@@ -164,6 +164,7 @@ public class PagBankPlugin extends Plugin {
         int tipoTransacao =
           "debito".equals(tipo) ? PlugPag.TYPE_DEBITO
             : "voucher".equals(tipo) ? PlugPag.TYPE_VOUCHER
+            : "pix".equals(tipo) ? PlugPag.TYPE_PIX
             : PlugPag.TYPE_CREDITO;
         int tipoParcelamento = (parcelas != null && parcelas > 1 && Boolean.TRUE.equals(parceladoLoja))
           ? PlugPag.INSTALLMENT_TYPE_PARC_VENDEDOR
