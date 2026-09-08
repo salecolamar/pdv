@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Carregando } from '../components/EstadoVazio';
 import {
   Ban,
   Copy,
@@ -133,7 +134,7 @@ export default function Usuarios() {
       {empresaId && <LinkAcesso empresaId={empresaId} />}
 
       {usuarios === null ? (
-        <p className="muted">Carregando…</p>
+        <Carregando />
       ) : usuarios.length === 0 ? (
         <p className="muted" style={{ fontSize: 13 }}>Nenhum usuário cadastrado ainda.</p>
       ) : (

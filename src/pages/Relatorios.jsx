@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Carregando } from '../components/EstadoVazio';
 import { Ban, BarChart3, Download, Package, Percent, Printer, Search, Ticket, Users2, Wallet } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money, metodoLabel } from '../utils/format';
@@ -194,7 +195,7 @@ function RelatorioCancelamentos() {
       )}
 
       {linhas === undefined ? (
-        <p className="muted">Carregando…</p>
+        <Carregando />
       ) : linhas === null ? (
         erro ? (
           <p className="danger-text">Falha ao carregar o relatório: {erro}</p>
@@ -405,7 +406,7 @@ function ResumoVendas() {
       )}
 
       {resumo === undefined ? (
-        <p className="muted">Carregando…</p>
+        <Carregando />
       ) : resumo === null ? (
         erro ? (
           <p className="danger-text">Falha ao carregar o relatório: {erro}</p>
@@ -815,7 +816,7 @@ function RelatorioDetalhado() {
       </div>
 
       {linhas === undefined ? (
-        <p className="muted">Carregando…</p>
+        <Carregando />
       ) : linhas === null ? (
         erro ? (
           <p className="danger-text">Falha ao carregar o relatório: {erro}</p>
@@ -1007,7 +1008,7 @@ function RelatorioRecebiveis() {
       </div>
 
       {resumo === undefined ? (
-        <p className="muted">Carregando…</p>
+        <Carregando />
       ) : resumo === null ? (
         erro ? (
           <p className="danger-text">Falha ao carregar o relatório: {erro}</p>

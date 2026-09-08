@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Carregando } from '../components/EstadoVazio';
 import { Percent, Sparkles, Trash2 } from 'lucide-react';
 import { supabase } from '../supabase';
 
@@ -69,7 +70,7 @@ export default function Promocoes() {
       </button>
 
       {promocoes === null ? (
-        <p className="muted">Carregando…</p>
+        <Carregando />
       ) : promocoes.length === 0 ? (
         <p className="muted" style={{ fontSize: 13 }}>Nenhuma promoção cadastrada ainda.</p>
       ) : (

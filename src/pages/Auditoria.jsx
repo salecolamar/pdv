@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Carregando } from '../components/EstadoVazio';
 import { Ban, DoorClosed, DoorOpen, History, Percent, Star, Tag, Wallet } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
@@ -67,7 +68,7 @@ export default function Auditoria() {
       </div>
 
       {logs === null ? (
-        <p className="muted">Carregando…</p>
+        <Carregando />
       ) : logs.length === 0 ? (
         <p className="muted" style={{ fontSize: 13 }}>Nenhuma ação registrada ainda.</p>
       ) : (

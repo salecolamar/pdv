@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Carregando } from '../components/EstadoVazio';
 import { BookOpen, Pencil, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '../supabase';
 
@@ -78,7 +79,7 @@ export default function Cardapios() {
       </form>
 
       {cardapios === null ? (
-        <p className="muted">Carregando…</p>
+        <Carregando />
       ) : cardapios.length === 0 ? (
         <p className="muted" style={{ fontSize: 13 }}>Nenhum cardápio criado ainda.</p>
       ) : (

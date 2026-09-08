@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Carregando } from '../components/EstadoVazio';
 import { AlertTriangle, ArrowRightLeft, Calendar, ChevronDown, CreditCard, Lock, Mail, Minus, Package, Phone, Plus, Printer, Receipt, RefreshCw, Search, ShieldCheck, ShoppingCart, Trash2, User, Users2, Wallet, X } from 'lucide-react';
 import IconeMesaGenerico from '../components/IconeMesa';
 import { supabase } from '../supabase';
@@ -230,7 +231,7 @@ export function HistoricoPDV() {
     carregar();
   }
 
-  if (vendas === null) return <p className="muted">Carregando…</p>;
+  if (vendas === null) return <Carregando />;
   if (vendas.length === 0) return <p className="muted" style={{ fontSize: 13 }}>Nenhuma movimentação de pagamento hoje ainda.</p>;
 
   return (
@@ -341,7 +342,7 @@ function IconeMesa() {
 }
 
 function MapaMesas({ mesas, ultimoPedidoPorMesa, grupoPorMesa, prontoPorMesa, agora, onAbrirMesa }) {
-  if (mesas === null) return <p className="muted">Carregando…</p>;
+  if (mesas === null) return <Carregando />;
   if (mesas.length === 0) {
     return <p className="muted" style={{ fontSize: 13 }}>Nenhuma mesa cadastrada ainda. Peça pro admin cadastrar em Mapa de Mesas.</p>;
   }
@@ -671,7 +672,7 @@ function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
     return <FormAbrirMesa mesa={mesa} onAbrir={abrirComCliente} onVoltar={onVoltar} />;
   }
 
-  if (pedido === undefined) return <p className="muted">Carregando…</p>;
+  if (pedido === undefined) return <Carregando />;
   if (pedido === null) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1800,7 +1801,7 @@ function LancarItens({ pedido, tituloComanda, onVoltar, onLancado }) {
       </div>
 
       {produtos === null ? (
-        <p className="muted">Carregando…</p>
+        <Carregando />
       ) : produtosFiltrados.length === 0 ? (
         <p className="muted" style={{ fontSize: 13 }}>Nenhum produto encontrado.</p>
       ) : (

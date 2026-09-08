@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Carregando } from '../components/EstadoVazio';
 import { ArrowDownCircle, ArrowUpCircle, Banknote, Receipt, Wallet } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money, metodoLabel } from '../utils/format';
@@ -44,7 +45,7 @@ export default function Caixa() {
       {aba === 'historico' ? (
         <HistoricoCaixas />
       ) : caixa === undefined ? (
-        <p className="muted">Carregando…</p>
+        <Carregando />
       ) : caixa === null ? (
         <AbrirCaixa onAberto={carregar} />
       ) : (
@@ -67,7 +68,7 @@ function HistoricoCaixas() {
       .then(({ data }) => setHistorico(data || []));
   }, []);
 
-  if (historico === null) return <p className="muted">Carregando…</p>;
+  if (historico === null) return <Carregando />;
   if (historico.length === 0) return <p className="muted" style={{ fontSize: 13 }}>Nenhum caixa fechado ainda.</p>;
 
   return (

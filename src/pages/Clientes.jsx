@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Carregando } from '../components/EstadoVazio';
 import { Search, Star } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money, mascararTelefone, mascararCpf } from '../utils/format';
@@ -168,7 +169,7 @@ export default function Clientes() {
       )}
 
       {clientes === null ? (
-        <p className="muted">Carregando…</p>
+        <Carregando />
       ) : filtrados.length === 0 ? (
         <p className="muted" style={{ fontSize: 13 }}>{clientes.length === 0 ? 'Nenhum cliente cadastrado ainda.' : 'Nenhum cliente encontrado.'}</p>
       ) : (

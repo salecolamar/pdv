@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Carregando } from '../components/EstadoVazio';
 import * as XLSX from 'xlsx';
 import { Camera, Copy, FileSpreadsheet, Pencil, Plus, PlusCircle, Trash2, UtensilsCrossed, X } from 'lucide-react';
 import { supabase } from '../supabase';
@@ -90,7 +91,7 @@ function Categorias({ categorias, onMudou }) {
         </button>
       </form>
       {categorias === null ? (
-        <p className="muted">Carregando…</p>
+        <Carregando />
       ) : categorias.length === 0 ? (
         <p className="muted" style={{ fontSize: 13 }}>Nenhuma categoria cadastrada ainda.</p>
       ) : (
@@ -204,7 +205,7 @@ function Complementos() {
       </form>
 
       {complementos === null ? (
-        <p className="muted">Carregando…</p>
+        <Carregando />
       ) : complementos.length === 0 ? (
         <p className="muted" style={{ fontSize: 13 }}>Nenhum complemento cadastrado ainda.</p>
       ) : (
@@ -644,7 +645,7 @@ function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
       )}
 
       {produtos === null ? (
-        <p className="muted">Carregando…</p>
+        <Carregando />
       ) : produtos.length === 0 ? (
         <p className="muted" style={{ fontSize: 13 }}>Nenhum produto cadastrado ainda.</p>
       ) : (

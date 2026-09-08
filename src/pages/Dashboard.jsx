@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Carregando } from '../components/EstadoVazio';
 import {
   Banknote,
   CreditCard,
@@ -220,7 +221,7 @@ export default function Dashboard() {
     });
   }
 
-  if (resumo === undefined) return <p className="muted">Carregando…</p>;
+  if (resumo === undefined) return <Carregando />;
   if (resumo === null) return <p className="danger-text">Falha ao carregar o dashboard: {erro}</p>;
 
   const formatarCurta = (dataStr) => new Date(dataStr + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });

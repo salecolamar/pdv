@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Carregando } from '../components/EstadoVazio';
 import { Percent, Settings, ShieldCheck, UserCog, Users2 } from 'lucide-react';
 import { supabase } from '../supabase';
 import Switch from '../components/Switch';
@@ -10,7 +11,7 @@ export default function Configuracoes() {
     supabase.from('usuarios').select('empresa_id').limit(1).maybeSingle().then(({ data }) => setEmpresaId(data?.empresa_id || null));
   }, []);
 
-  if (!empresaId) return <p className="muted">Carregando…</p>;
+  if (!empresaId) return <Carregando />;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

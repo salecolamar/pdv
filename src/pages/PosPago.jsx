@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Carregando } from '../components/EstadoVazio';
 import { Eye, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
@@ -132,7 +133,7 @@ export default function PosPago() {
       {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
 
       {mesas === null ? (
-        <p className="muted">Carregando…</p>
+        <Carregando />
       ) : mesas.length === 0 ? (
         <p className="muted" style={{ fontSize: 13 }}>Nenhuma mesa cadastrada ainda.</p>
       ) : (

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Carregando } from '../components/EstadoVazio';
 import { CalendarClock, CalendarPlus, Check, Phone, Trash2 } from 'lucide-react';
 import { supabase } from '../supabase';
 
@@ -67,7 +68,7 @@ export default function Reservas() {
       </div>
 
       {reservas === null ? (
-        <p className="muted">Carregando…</p>
+        <Carregando />
       ) : listaFiltrada.length === 0 ? (
         <p className="muted" style={{ fontSize: 13 }}>
           {aba === 'proximas' ? 'Nenhuma reserva pendente.' : 'Nenhuma reserva no histórico.'}
