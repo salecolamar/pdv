@@ -19,7 +19,14 @@ export default function Reservas() {
       supabase.from('mesas').select('id, nome, status').order('nome'),
     ]);
     setReservas(reservasResp.data || []);
-    setMesas(mesasResp.data || []);
+    setMesas(
+      (mesasResp.data || []).sort((a, b) => {
+        const na = Number(a.nome.match(/\d+/)?.[0]);
+        const nb = Number(b.nome.match(/\d+/)?.[0]);
+        if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+        return a.nome.localeCompare(b.nome);
+      })
+    );
   }
 
   function nomesMesas(mesaIds) {
