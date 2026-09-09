@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Carregando } from '../components/EstadoVazio';
+import EstadoVazio, { Carregando } from '../components/EstadoVazio';
 import { History } from 'lucide-react';
 import { supabase } from '../supabase';
 
@@ -74,7 +74,11 @@ export default function Estoque() {
         {historico === null ? (
           <Carregando />
         ) : historico.length === 0 ? (
-          <p className="muted" style={{ fontSize: 13 }}>Nenhuma movimentação registrada ainda.</p>
+          <EstadoVazio
+            icon={History}
+            titulo="Nenhuma movimentação registrada ainda"
+            texto="Entradas, saídas e ajustes de estoque aparecem aqui conforme forem lançados."
+          />
         ) : (
           <div className="list">
             {historico.map((m) => (

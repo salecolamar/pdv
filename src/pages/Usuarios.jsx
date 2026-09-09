@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Carregando } from '../components/EstadoVazio';
+import EstadoVazio, { Carregando } from '../components/EstadoVazio';
 import {
   Ban,
   Copy,
@@ -136,7 +136,11 @@ export default function Usuarios() {
       {usuarios === null ? (
         <Carregando />
       ) : usuarios.length === 0 ? (
-        <p className="muted" style={{ fontSize: 13 }}>Nenhum usuário cadastrado ainda.</p>
+        <EstadoVazio
+          icon={UserPlus}
+          titulo="Nenhum usuário cadastrado ainda"
+          texto="Convide um gerente ou garçom pelo botão acima pra ele acessar o PDV."
+        />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {grupos.map((grupo) => {
