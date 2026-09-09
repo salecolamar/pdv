@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import EstadoVazio, { Carregando } from '../components/EstadoVazio';
-import { Percent, Sparkles, Trash2 } from 'lucide-react';
+import { Ban, Percent, Play, Sparkles, Trash2 } from 'lucide-react';
 import { supabase } from '../supabase';
 
 const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -97,15 +97,16 @@ export default function Promocoes() {
               </div>
               <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{vigencia(promo)}</p>
               <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => alternarAtiva(promo)}>
-                  {promo.ativo ? 'Desativar' : 'Ativar'}
-                </button>
                 <button
                   type="button"
-                  onClick={() => remover(promo.id)}
-                  style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: 4 }}
+                  className={'btn btn-icon ' + (promo.ativo ? 'btn-icon--atencao' : 'btn-icon--success')}
+                  title={promo.ativo ? 'Desativar' : 'Ativar'}
+                  onClick={() => alternarAtiva(promo)}
                 >
-                  <Trash2 size={14} />
+                  {promo.ativo ? <Ban size={15} /> : <Play size={15} />}
+                </button>
+                <button type="button" className="btn btn-icon btn-icon--danger" title="Excluir" onClick={() => remover(promo.id)}>
+                  <Trash2 size={15} />
                 </button>
               </div>
             </div>

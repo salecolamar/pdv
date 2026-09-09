@@ -114,10 +114,12 @@ export default function Reservas() {
                     </button>
                     <button
                       type="button"
+                      className="btn btn-icon btn-icon--danger"
+                      title="Cancelar reserva"
                       onClick={() => mudarStatus(r, 'cancelada')}
-                      style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: 4, marginLeft: 'auto' }}
+                      style={{ marginLeft: 'auto' }}
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={15} />
                     </button>
                   </div>
                 )}
