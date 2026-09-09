@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import EstadoVazio, { Carregando } from '../components/EstadoVazio';
-import { Search, Star, Users } from 'lucide-react';
+import { Pencil, Search, Star, Trash2, Users } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money, mascararTelefone, mascararCpf } from '../utils/format';
 
@@ -247,11 +247,11 @@ function ClienteCard({ cliente, expandido, onExpandir, onEditar, onExcluir, onMu
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <span className="chip chip-primary" title="Pontos de fidelidade">★ {pontos}</span>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); onEditar(); }}>
-            Editar
+          <button type="button" className="btn btn-icon btn-icon--primary" title="Editar" onClick={(e) => { e.stopPropagation(); onEditar(); }}>
+            <Pencil size={15} />
           </button>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); onExcluir(); }}>
-            Excluir
+          <button type="button" className="btn btn-icon btn-icon--danger" title="Excluir" onClick={(e) => { e.stopPropagation(); onExcluir(); }}>
+            <Trash2 size={15} />
           </button>
         </div>
       </div>

@@ -167,8 +167,8 @@ export default function Usuarios() {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                           {!u.ativo && <span className="chip chip-danger">Inativo</span>}
-                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditandoId(u.id)}>
-                            <Pencil size={13} /> Editar
+                          <button type="button" className="btn btn-icon btn-icon--primary" title="Editar" onClick={() => setEditandoId(u.id)}>
+                            <Pencil size={15} />
                           </button>
                         </div>
                       </div>

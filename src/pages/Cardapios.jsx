@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import EstadoVazio, { Carregando } from '../components/EstadoVazio';
-import { BookOpen, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Ban, BookOpen, Pencil, Play, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '../supabase';
 
 export default function Cardapios() {
@@ -133,14 +133,19 @@ export default function Cardapios() {
                   <div className="muted" style={{ fontSize: 12 }}>{(c.cardapio_produtos || []).length} produto(s) {c.ativo ? '' : '· inativo'}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => alternarAtivo(c)}>
-                    {c.ativo ? 'Desativar' : 'Ativar'}
+                  <button
+                    type="button"
+                    className={'btn btn-icon ' + (c.ativo ? 'btn-icon--atencao' : 'btn-icon--success')}
+                    title={c.ativo ? 'Desativar' : 'Ativar'}
+                    onClick={() => alternarAtivo(c)}
+                  >
+                    {c.ativo ? <Ban size={15} /> : <Play size={15} />}
                   </button>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => editar(c)}>
-                    <Pencil size={13} /> Editar
+                  <button type="button" className="btn btn-icon btn-icon--primary" title="Editar" onClick={() => editar(c)}>
+                    <Pencil size={15} />
                   </button>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => excluir(c.id)}>
-                    <Trash2 size={13} />
+                  <button type="button" className="btn btn-icon btn-icon--danger" title="Excluir" onClick={() => excluir(c.id)}>
+                    <Trash2 size={15} />
                   </button>
                 </div>
               </div>

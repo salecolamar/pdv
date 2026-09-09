@@ -170,18 +170,21 @@ export default function PosPago() {
                 )}
                 <button
                   type="button"
+                  className="btn btn-icon btn-icon--primary"
+                  title="Editar"
                   onClick={(e) => { e.stopPropagation(); comecarEdicao(m); }}
-                  style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: 4, marginLeft: 8 }}
+                  style={{ marginLeft: 8 }}
                 >
-                  <Pencil size={14} />
+                  <Pencil size={15} />
                 </button>
                 <button
                   type="button"
+                  className="btn btn-icon btn-icon--danger"
+                  title="Excluir"
                   onClick={(e) => { e.stopPropagation(); remover(m.id); }}
                   disabled={m.status !== 'livre'}
-                  style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: m.status === 'livre' ? 'pointer' : 'not-allowed', opacity: m.status === 'livre' ? 1 : 0.35, padding: 4 }}
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={15} />
                 </button>
               </div>
             )
