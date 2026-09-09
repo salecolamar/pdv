@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import EstadoVazio, { Carregando } from '../components/EstadoVazio';
-import { History } from 'lucide-react';
+import { History, Package, Plus } from 'lucide-react';
 import { supabase } from '../supabase';
 
 export default function Estoque() {
@@ -13,6 +13,8 @@ export default function Estoque() {
   const [erro, setErro] = useState('');
   const [mostrarHistorico, setMostrarHistorico] = useState(false);
   const [historico, setHistorico] = useState(null);
+  const [ativandoId, setAtivandoId] = useState(null);
+  const [valorInicial, setValorInicial] = useState('');
 
   useEffect(() => {
     carregar();
@@ -20,7 +22,34 @@ export default function Estoque() {
 
   async function carregar() {
     const { data } = await supabase.from('produtos').select('*').order('nome');
-    setProdutos((data || []).filter((p) => p.estoque !== null));
+    setProdutos(data || []);
+  }
+
+  function abrirAtivacao(p) {
+    setAtivandoId(p.id);
+    setValorInicial('0');
+    setErro('');
+  }
+
+  async function confirmarAtivacao(p) {
+    setErro('');
+    const qtd = Number(valorInicial.replace(',', '.'));
+    if (!(qtd >= 0)) {
+      setErro('Informe uma quantidade válida.');
+      return;
+    }
+    setEnviando(true);
+    const { error } = await supabase.from('produtos').update({ estoque: qtd }).eq('id', p.id);
+    if (!error && qtd > 0) {
+      await supabase.from('estoque_movimentos').insert({ produto_id: p.id, tipo: 'entrada', quantidade: qtd, motivo: 'Ativação de controle de estoque' });
+    }
+    setEnviando(false);
+    if (error) {
+      setErro(error.message);
+      return;
+    }
+    setAtivandoId(null);
+    carregar();
   }
 
   function abrirMovimento(p, tipoInicial) {
@@ -110,12 +139,41 @@ export default function Estoque() {
       {produtos === null ? (
         <Carregando />
       ) : produtos.length === 0 ? (
-        <p className="muted" style={{ fontSize: 13 }}>
-          Nenhum produto com controle de estoque. Cadastre um estoque em Produtos pra ele aparecer aqui.
-        </p>
+        <EstadoVazio
+          icon={Package}
+          titulo="Nenhum produto cadastrado ainda"
+          texto="Cadastre produtos na aba Cardápio pra eles aparecerem aqui."
+        />
       ) : (
         <div className="list">
-          {produtos.map((p) => {
+          {produtos.filter((p) => p.estoque === null).map((p) => (
+            <div key={p.id} className="card">
+              <div className="row">
+                <div style={{ fontWeight: 700, fontSize: 14.5 }}>{p.nome}</div>
+                <span className="chip" style={{ background: 'var(--panel-2)', color: 'var(--text-dim)' }}>Sem controle</span>
+              </div>
+              {ativandoId === p.id ? (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <span className="label">Quantidade inicial em estoque</span>
+                  <input value={valorInicial} onChange={(e) => setValorInicial(e.target.value)} inputMode="decimal" autoFocus />
+                  {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setAtivandoId(null)}>
+                      Cancelar
+                    </button>
+                    <button type="button" className="btn btn-primary" style={{ flex: 1 }} disabled={enviando} onClick={() => confirmarAtivacao(p)}>
+                      {enviando ? 'Salvando…' : 'Ativar controle'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 8 }} onClick={() => abrirAtivacao(p)}>
+                  <Plus size={14} /> Ativar controle de estoque
+                </button>
+              )}
+            </div>
+          ))}
+          {produtos.filter((p) => p.estoque !== null).map((p) => {
             const semEstoque = Number(p.estoque) <= 0;
             const baixo = !semEstoque && p.estoque_minimo != null && Number(p.estoque) <= Number(p.estoque_minimo);
             return (

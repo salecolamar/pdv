@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import EstadoVazio, { Carregando } from '../components/EstadoVazio';
 import * as XLSX from 'xlsx';
-import { Ban, Camera, Copy, FileSpreadsheet, Pencil, Play, Plus, PlusCircle, Trash2, UtensilsCrossed, X } from 'lucide-react';
+import { Ban, Camera, Copy, FileSpreadsheet, Pencil, Play, Plus, PlusCircle, Search, Trash2, UtensilsCrossed, X } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import Promocoes from './Promocoes';
@@ -66,6 +66,8 @@ export default function Produtos() {
 function Categorias({ categorias, onMudou }) {
   const [nome, setNome] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const [editandoId, setEditandoId] = useState(null);
+  const [nomeEditado, setNomeEditado] = useState('');
 
   async function adicionar(e) {
     e.preventDefault();
@@ -74,6 +76,20 @@ function Categorias({ categorias, onMudou }) {
     await supabase.from('categorias').insert({ nome: nome.trim(), ordem: categorias?.length || 0 });
     setNome('');
     setSalvando(false);
+    onMudou();
+  }
+
+  function comecarEdicao(c) {
+    setEditandoId(c.id);
+    setNomeEditado(c.nome);
+  }
+
+  async function salvarEdicao(id) {
+    if (!nomeEditado.trim()) return;
+    setSalvando(true);
+    await supabase.from('categorias').update({ nome: nomeEditado.trim() }).eq('id', id);
+    setSalvando(false);
+    setEditandoId(null);
     onMudou();
   }
 
@@ -100,14 +116,27 @@ function Categorias({ categorias, onMudou }) {
         />
       ) : (
         <div className="list">
-          {categorias.map((c) => (
-            <div key={c.id} className="item">
-              <span>{c.nome}</span>
-              <button type="button" className="btn btn-icon btn-icon--danger" title="Excluir" onClick={() => excluir(c.id)}>
-                <Trash2 size={15} />
-              </button>
-            </div>
-          ))}
+          {categorias.map((c) =>
+            editandoId === c.id ? (
+              <div key={c.id} className="item" style={{ gap: 8 }}>
+                <input value={nomeEditado} onChange={(e) => setNomeEditado(e.target.value)} style={{ flex: 1 }} autoFocus />
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditandoId(null)}>Cancelar</button>
+                <button type="button" className="btn btn-primary btn-sm" disabled={salvando} onClick={() => salvarEdicao(c.id)}>Salvar</button>
+              </div>
+            ) : (
+              <div key={c.id} className="item">
+                <span>{c.nome}</span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button type="button" className="btn btn-icon btn-icon--primary" title="Editar" onClick={() => comecarEdicao(c)}>
+                    <Pencil size={15} />
+                  </button>
+                  <button type="button" className="btn btn-icon btn-icon--danger" title="Excluir" onClick={() => excluir(c.id)}>
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            )
+          )}
         </div>
       )}
     </div>
@@ -308,6 +337,47 @@ function validar(campos, avisar) {
       .map((g) => ({ titulo: g.titulo.trim(), opcoes: g.opcoes.map((o) => o.trim()).filter(Boolean) }))
       .filter((g) => g.titulo && g.opcoes.length > 0),
   };
+}
+
+// Seletor de complementos com busca — reaproveitado tanto no formulário
+// de "Novo produto" quanto na edição de um produto existente (antes só
+// existia na edição, então um produto recém-criado nunca tinha como
+// receber complementos até ser editado de novo).
+function SeletorComplementos({ complementosDisponiveis, selecionados, onAlternar }) {
+  const [busca, setBusca] = useState('');
+  const filtrados = complementosDisponiveis.filter((op) => op.nome.toLowerCase().includes(busca.toLowerCase()));
+
+  if (complementosDisponiveis.length === 0) {
+    return (
+      <>
+        <span className="label" style={{ marginTop: 6 }}>Complementos (cadastrados na aba Complementos)</span>
+        <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>Nenhum complemento cadastrado ainda — crie na aba "Complementos".</p>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <span className="label" style={{ marginTop: 6 }}>Complementos (cadastrados na aba Complementos)</span>
+      <div className="search-input-wrap">
+        <Search size={14} />
+        <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar complemento…" />
+      </div>
+      <div className="list" style={{ maxHeight: 200, overflowY: 'auto' }}>
+        {filtrados.length === 0 ? (
+          <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>Nenhum complemento encontrado.</p>
+        ) : (
+          filtrados.map((op) => (
+            <label key={op.id} className="item" style={{ cursor: 'pointer', alignItems: 'center' }}>
+              <span style={{ flex: 1 }}>{op.nome}</span>
+              <span className="tabular muted" style={{ fontSize: 12 }}>+ {money(op.preco)}</span>
+              <input type="checkbox" checked={selecionados.includes(op.id)} onChange={() => onAlternar(op.id)} style={{ marginLeft: 10 }} />
+            </label>
+          ))
+        )}
+      </div>
+    </>
+  );
 }
 
 function CamposProduto({ campos, setCampos, categorias }) {
@@ -515,13 +585,18 @@ function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
     const dados = validar(campos, setErro);
     if (!dados) return;
     setSalvando(true);
-    const { error } = await supabase.from('produtos').insert(dados);
-    setSalvando(false);
+    const { data: novoProduto, error } = await supabase.from('produtos').insert(dados).select().single();
     if (error) {
+      setSalvando(false);
       setErro(error.message);
       return;
     }
+    if (complementos.length > 0) {
+      await supabase.from('produto_complementos').insert(complementos.map((complemento_id) => ({ produto_id: novoProduto.id, complemento_id })));
+    }
+    setSalvando(false);
     setCampos(campoVazio(null));
+    setComplementos([]);
     setMostrarForm(false);
     carregar();
   }
@@ -619,7 +694,7 @@ function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {!mostrarForm ? (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button type="button" className="btn btn-primary" style={{ flex: '1 1 160px' }} onClick={() => { setCampos(campoVazio(null)); setMostrarForm(true); }}>
+          <button type="button" className="btn btn-primary" style={{ flex: '1 1 160px' }} onClick={() => { setCampos(campoVazio(null)); setComplementos([]); setMostrarForm(true); }}>
             <Plus size={15} /> Novo produto
           </button>
           <button type="button" className="btn btn-secondary" style={{ flex: '1 1 auto' }} onClick={() => setImportando(true)}>
@@ -649,6 +724,7 @@ function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
         <form onSubmit={adicionar} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>Novo produto</div>
           <CamposProduto campos={campos} setCampos={setCampos} categorias={categorias} />
+          <SeletorComplementos complementosDisponiveis={complementosDisponiveis} selecionados={complementos} onAlternar={alternarComplemento} />
           {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
             <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setMostrarForm(false)}>
@@ -730,25 +806,7 @@ function ProdutosPorCategoria({
                 return (
                   <div key={p.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <CamposProduto campos={campos} setCampos={setCampos} categorias={categorias} />
-                    <span className="label" style={{ marginTop: 6 }}>Complementos (cadastrados na aba Complementos)</span>
-                    {complementosDisponiveis.length === 0 ? (
-                      <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>Nenhum complemento cadastrado ainda — crie na aba "Complementos".</p>
-                    ) : (
-                      <div className="list" style={{ maxHeight: 200, overflowY: 'auto' }}>
-                        {complementosDisponiveis.map((op) => (
-                          <label key={op.id} className="item" style={{ cursor: 'pointer', alignItems: 'center' }}>
-                            <span style={{ flex: 1 }}>{op.nome}</span>
-                            <span className="tabular muted" style={{ fontSize: 12 }}>+ {money(op.preco)}</span>
-                            <input
-                              type="checkbox"
-                              checked={complementos.includes(op.id)}
-                              onChange={() => onAlternarComplemento(op.id)}
-                              style={{ marginLeft: 10 }}
-                            />
-                          </label>
-                        ))}
-                      </div>
-                    )}
+                    <SeletorComplementos complementosDisponiveis={complementosDisponiveis} selecionados={complementos} onAlternar={onAlternarComplemento} />
                     {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
                     <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                       <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={onCancelarEdicao}>
@@ -1091,34 +1149,40 @@ function ImportarProdutosPorFoto({ categorias, onVoltar, onImportado }) {
                   const valido = it.nome && it.preco > 0;
                   return (
                     <div key={idx} className="card" style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6, opacity: valido ? 1 : 0.75 }}>
-                      <div className="row" style={{ gap: 6 }}>
-                        <input
-                          style={{ flex: 1 }}
-                          value={it.nome}
-                          placeholder="Nome"
-                          aria-label="Nome do produto importado"
-                          onChange={(e) => atualizarItem(idx, 'nome', e.target.value)}
-                        />
+                      <div className="row" style={{ gap: 6, alignItems: 'flex-end' }}>
+                        <div style={{ flex: 1 }}>
+                          <span className="label" style={{ margin: '0 0 3px' }}>Produto</span>
+                          <input
+                            value={it.nome}
+                            placeholder="Nome"
+                            aria-label="Nome do produto importado"
+                            onChange={(e) => atualizarItem(idx, 'nome', e.target.value)}
+                          />
+                        </div>
                         <button type="button" className="btn btn-icon btn-icon--danger" onClick={() => removerItem(idx)} title="Remover" aria-label="Remover item" style={{ flexShrink: 0 }}>
                           <Trash2 size={15} />
                         </button>
                       </div>
-                      <div className="row" style={{ gap: 6 }}>
-                        <input
-                          style={{ width: 90 }}
-                          inputMode="decimal"
-                          value={Number.isNaN(it.preco) ? '' : it.preco}
-                          placeholder="Preço"
-                          aria-label="Preço do produto importado"
-                          onChange={(e) => atualizarItem(idx, 'preco', Number(e.target.value.replace(',', '.')))}
-                        />
-                        <input
-                          style={{ flex: 1 }}
-                          value={it.categoria}
-                          placeholder="Categoria"
-                          aria-label="Categoria do produto importado"
-                          onChange={(e) => atualizarItem(idx, 'categoria', e.target.value)}
-                        />
+                      <div className="row" style={{ gap: 6, alignItems: 'flex-end' }}>
+                        <div style={{ width: 90 }}>
+                          <span className="label" style={{ margin: '0 0 3px' }}>Preço</span>
+                          <input
+                            inputMode="decimal"
+                            value={Number.isNaN(it.preco) ? '' : it.preco}
+                            placeholder="Preço"
+                            aria-label="Preço do produto importado"
+                            onChange={(e) => atualizarItem(idx, 'preco', Number(e.target.value.replace(',', '.')))}
+                          />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <span className="label" style={{ margin: '0 0 3px' }}>Categoria</span>
+                          <input
+                            value={it.categoria}
+                            placeholder="Categoria"
+                            aria-label="Categoria do produto importado"
+                            onChange={(e) => atualizarItem(idx, 'categoria', e.target.value)}
+                          />
+                        </div>
                       </div>
                       {!valido && <span className="danger-text" style={{ fontSize: 11.5 }}>Falta nome ou preço válido</span>}
                     </div>
