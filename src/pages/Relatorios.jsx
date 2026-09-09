@@ -220,7 +220,7 @@ function RelatorioCancelamentos() {
                 <thead>
                   <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border)' }}>
                     {['Data', 'Produto', 'Observação', 'Pagamento', 'Garçom', 'Valor'].map((h) => (
-                      <th key={h} className="muted" style={{ padding: '8px 10px', fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
+                      <th key={h} className="muted" style={{ padding: '8px 10px', fontWeight: 700, whiteSpace: 'nowrap', position: 'sticky', top: 0, background: 'var(--panel)', zIndex: 1 }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -842,7 +842,7 @@ function RelatorioDetalhado() {
                 <thead>
                   <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border)' }}>
                     {['Data', 'Operador', 'Tipo', 'Mesa', 'Produto', 'Categoria', 'Qtd', 'Unit.', 'Total', 'Pagamento'].map((h) => (
-                      <th key={h} className="muted" style={{ padding: '8px 10px', fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
+                      <th key={h} className="muted" style={{ padding: '8px 10px', fontWeight: 700, whiteSpace: 'nowrap', position: 'sticky', top: 0, background: 'var(--panel)', zIndex: 1 }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
