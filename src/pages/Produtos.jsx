@@ -200,8 +200,8 @@ function Complementos() {
       <form onSubmit={adicionar} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {erro && <p className="danger-text" style={{ fontSize: 13, margin: 0 }}>{erro}</p>}
         <div className="row" style={{ gap: 8 }}>
-          <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Bacon extra" style={{ flex: 1 }} />
-          <input value={preco} onChange={(e) => setPreco(e.target.value)} inputMode="decimal" placeholder="Preço" style={{ width: 100 }} />
+          <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Bacon extra" aria-label="Nome do complemento" style={{ flex: 1 }} />
+          <input value={preco} onChange={(e) => setPreco(e.target.value)} inputMode="decimal" placeholder="Preço" aria-label="Preço do complemento" style={{ width: 100 }} />
           <button type="submit" className="btn btn-primary btn-sm" disabled={salvando}>
             <Plus size={14} /> Adicionar
           </button>
@@ -421,8 +421,9 @@ function CamposProduto({ campos, setCampos, categorias }) {
                 value={g.titulo}
                 onChange={(e) => atualizarTituloGrupo(idxGrupo, e.target.value)}
                 placeholder="Título, ex: Escolha seu molho"
+                aria-label="Título do grupo de observação"
               />
-              <button type="button" onClick={() => removerGrupo(idxGrupo)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', flexShrink: 0 }} title="Remover grupo">
+              <button type="button" className="btn btn-icon btn-icon--danger" onClick={() => removerGrupo(idxGrupo)} title="Remover grupo" aria-label="Remover grupo" style={{ flexShrink: 0 }}>
                 <Trash2 size={15} />
               </button>
             </div>
@@ -433,8 +434,9 @@ function CamposProduto({ campos, setCampos, categorias }) {
                   value={op}
                   onChange={(e) => atualizarOpcao(idxGrupo, idxOpcao, e.target.value)}
                   placeholder="Opção, ex: Ketchup"
+                  aria-label="Opção do grupo de observação"
                 />
-                <button type="button" onClick={() => removerOpcao(idxGrupo, idxOpcao)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', flexShrink: 0 }} title="Remover opção">
+                <button type="button" className="btn btn-icon btn-icon--neutral" onClick={() => removerOpcao(idxGrupo, idxOpcao)} title="Remover opção" aria-label="Remover opção" style={{ flexShrink: 0 }}>
                   <X size={15} />
                 </button>
               </div>
@@ -1094,9 +1096,10 @@ function ImportarProdutosPorFoto({ categorias, onVoltar, onImportado }) {
                           style={{ flex: 1 }}
                           value={it.nome}
                           placeholder="Nome"
+                          aria-label="Nome do produto importado"
                           onChange={(e) => atualizarItem(idx, 'nome', e.target.value)}
                         />
-                        <button type="button" onClick={() => removerItem(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', flexShrink: 0 }} title="Remover">
+                        <button type="button" className="btn btn-icon btn-icon--danger" onClick={() => removerItem(idx)} title="Remover" aria-label="Remover item" style={{ flexShrink: 0 }}>
                           <Trash2 size={15} />
                         </button>
                       </div>
@@ -1106,12 +1109,14 @@ function ImportarProdutosPorFoto({ categorias, onVoltar, onImportado }) {
                           inputMode="decimal"
                           value={Number.isNaN(it.preco) ? '' : it.preco}
                           placeholder="Preço"
+                          aria-label="Preço do produto importado"
                           onChange={(e) => atualizarItem(idx, 'preco', Number(e.target.value.replace(',', '.')))}
                         />
                         <input
                           style={{ flex: 1 }}
                           value={it.categoria}
                           placeholder="Categoria"
+                          aria-label="Categoria do produto importado"
                           onChange={(e) => atualizarItem(idx, 'categoria', e.target.value)}
                         />
                       </div>
