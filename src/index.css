@@ -217,6 +217,28 @@ button:focus-visible {
   box-shadow: none;
 }
 
+/* Botão só com ícone, cor indica a ação (editar/excluir/duplicar...) —
+   usado nas linhas de lista pra não repetir "Editar"/"Excluir" ao lado
+   de um ícone que já diz a mesma coisa. */
+.btn.btn-icon {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 10px;
+  border: none;
+  box-shadow: none;
+  flex: 0 0 auto;
+}
+.btn.btn-icon:hover { box-shadow: none; filter: brightness(0.96); transform: none; }
+.btn.btn-icon:active:not(:disabled) { transform: scale(0.94); }
+
+.btn-icon--primary { background: color-mix(in srgb, var(--primary) 12%, white); color: var(--primary); }
+.btn-icon--danger { background: color-mix(in srgb, var(--danger) 12%, white); color: var(--danger); }
+.btn-icon--success { background: color-mix(in srgb, var(--success) 12%, white); color: var(--success); }
+.btn-icon--atencao { background: color-mix(in srgb, var(--atencao) 12%, white); color: var(--atencao); }
+.btn-icon--neutral { background: var(--panel-2); color: var(--text-dim); }
+
 .card {
   background: var(--panel);
   border: 1px solid var(--border-soft);

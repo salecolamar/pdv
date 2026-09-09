@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import EstadoVazio, { Carregando } from '../components/EstadoVazio';
 import * as XLSX from 'xlsx';
-import { Camera, Copy, FileSpreadsheet, Pencil, Plus, PlusCircle, Trash2, UtensilsCrossed, X } from 'lucide-react';
+import { Ban, Camera, Copy, FileSpreadsheet, Pencil, Play, Plus, PlusCircle, Trash2, UtensilsCrossed, X } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import Promocoes from './Promocoes';
@@ -771,14 +771,19 @@ function ProdutosPorCategoria({
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', flex: '1 0 auto', width: '100%' }}>
-                      <button type="button" className="btn btn-secondary btn-sm" title="Duplicar" onClick={() => onDuplicar(p)}>
-                        <Copy size={13} />
+                      <button type="button" className="btn btn-icon btn-icon--neutral" title="Duplicar" onClick={() => onDuplicar(p)}>
+                        <Copy size={15} />
                       </button>
-                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => onAlternarAtivo(p)}>
-                        {p.ativo ? 'Desativar' : 'Ativar'}
+                      <button
+                        type="button"
+                        className={'btn btn-icon ' + (p.ativo ? 'btn-icon--atencao' : 'btn-icon--success')}
+                        title={p.ativo ? 'Desativar' : 'Ativar'}
+                        onClick={() => onAlternarAtivo(p)}
+                      >
+                        {p.ativo ? <Ban size={15} /> : <Play size={15} />}
                       </button>
-                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => onEditar(p)}>
-                        <Pencil size={13} /> Editar
+                      <button type="button" className="btn btn-icon btn-icon--primary" title="Editar" onClick={() => onEditar(p)}>
+                        <Pencil size={15} />
                       </button>
                   </div>
                 </div>
