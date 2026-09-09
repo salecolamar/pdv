@@ -93,14 +93,18 @@ function Categorias({ categorias, onMudou }) {
       {categorias === null ? (
         <Carregando />
       ) : categorias.length === 0 ? (
-        <p className="muted" style={{ fontSize: 13 }}>Nenhuma categoria cadastrada ainda.</p>
+        <EstadoVazio
+          icon={UtensilsCrossed}
+          titulo="Nenhuma categoria cadastrada ainda"
+          texto="Categorias organizam o cardápio (ex: Bebidas, Petiscos) — crie a primeira acima."
+        />
       ) : (
         <div className="list">
           {categorias.map((c) => (
             <div key={c.id} className="item">
               <span>{c.nome}</span>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => excluir(c.id)}>
-                Excluir
+              <button type="button" className="btn btn-icon btn-icon--danger" title="Excluir" onClick={() => excluir(c.id)}>
+                <Trash2 size={15} />
               </button>
             </div>
           ))}
@@ -207,7 +211,11 @@ function Complementos() {
       {complementos === null ? (
         <Carregando />
       ) : complementos.length === 0 ? (
-        <p className="muted" style={{ fontSize: 13 }}>Nenhum complemento cadastrado ainda.</p>
+        <EstadoVazio
+          icon={PlusCircle}
+          titulo="Nenhum complemento cadastrado ainda"
+          texto="Cadastre adicionais como bacon extra ou queijo extra pra oferecer na edição de cada produto."
+        />
       ) : (
         <div className="list">
           {complementos.map((c) =>
@@ -222,7 +230,9 @@ function Complementos() {
               <div key={c.id} className="card row" style={{ alignItems: 'center', gap: 10, opacity: c.ativo ? 1 : 0.55 }}>
                 <div
                   style={{
-                    width: 34, height: 34, borderRadius: 10, background: c.ativo ? 'var(--primary)' : 'var(--text-dim)', color: '#fff',
+                    width: 34, height: 34, borderRadius: 10,
+                    background: c.ativo ? 'color-mix(in srgb, var(--primary) 14%, white)' : 'var(--panel-2)',
+                    color: c.ativo ? 'var(--primary)' : 'var(--text-dim)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                   }}
                 >
@@ -230,14 +240,19 @@ function Complementos() {
                 </div>
                 <span style={{ flex: 1, fontWeight: 700, fontSize: 14.5 }}>{c.nome}</span>
                 <span className="tabular" style={{ fontWeight: 600 }}>+ {money(c.preco)}</span>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => alternarAtivo(c)}>
-                  {c.ativo ? 'Desativar' : 'Ativar'}
+                <button
+                  type="button"
+                  className={'btn btn-icon ' + (c.ativo ? 'btn-icon--atencao' : 'btn-icon--success')}
+                  title={c.ativo ? 'Desativar' : 'Ativar'}
+                  onClick={() => alternarAtivo(c)}
+                >
+                  {c.ativo ? <Ban size={15} /> : <Play size={15} />}
                 </button>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => editar(c)}>
-                  <Pencil size={13} />
+                <button type="button" className="btn btn-icon btn-icon--primary" title="Editar" onClick={() => editar(c)}>
+                  <Pencil size={15} />
                 </button>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => excluir(c.id)}>
-                  <Trash2 size={13} />
+                <button type="button" className="btn btn-icon btn-icon--danger" title="Excluir" onClick={() => excluir(c.id)}>
+                  <Trash2 size={15} />
                 </button>
               </div>
             )
