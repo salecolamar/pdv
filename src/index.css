@@ -155,11 +155,11 @@ button:focus-visible {
   font-weight: 700;
   font-size: 15px;
   cursor: pointer;
-  transition: opacity 0.15s ease, transform 0.1s ease, background 0.15s ease, box-shadow 0.15s ease;
+  transition: opacity 0.15s ease, transform 0.1s ease, background 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease, border-color 0.15s ease;
 }
 
-.btn:active {
-  transform: scale(0.98);
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .btn-primary {
@@ -168,7 +168,14 @@ button:focus-visible {
   box-shadow: 0 3px 10px rgba(74, 95, 232, 0.28);
 }
 
-.btn-primary:hover { filter: brightness(0.94); }
+.btn-primary:hover {
+  box-shadow: 0 6px 16px rgba(74, 95, 232, 0.38);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active:not(:disabled) {
+  box-shadow: 0 2px 6px rgba(74, 95, 232, 0.28);
+}
 
 .btn-secondary {
   background: var(--panel);
@@ -176,7 +183,11 @@ button:focus-visible {
   border: 1px solid var(--border);
 }
 
-.btn-secondary:hover { background: var(--panel-2); border-color: #cfc2ec; }
+.btn-secondary:hover {
+  background: var(--panel-2);
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  box-shadow: var(--shadow-sm);
+}
 
 .btn-danger {
   background: rgba(220, 38, 38, 0.08);
@@ -184,12 +195,13 @@ button:focus-visible {
   border: 1px solid rgba(220, 38, 38, 0.3);
 }
 
-.btn-danger:hover { background: rgba(220, 38, 38, 0.14); }
+.btn-danger:hover { background: rgba(220, 38, 38, 0.14); border-color: rgba(220, 38, 38, 0.5); }
 
 .btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
   box-shadow: none;
+  transform: none;
 }
 
 .btn-block {
@@ -197,7 +209,8 @@ button:focus-visible {
 }
 
 .btn-sm {
-  padding: 9px 16px;
+  padding: 10px 16px;
+  min-height: 36px;
   font-size: 13px;
   border-radius: 10px;
   width: auto;
