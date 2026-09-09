@@ -1383,13 +1383,19 @@ function PagamentoParcialForm({ restante, itensSelecionados, taxaPercentual = 0,
   const subtotalSelecionado = itensSelecionados
     ? itensSelecionados.reduce((s, i) => s + i.quantidade * i.preco_unitario, 0)
     : restante;
-  const taxaSelecionada = itensSelecionados && taxaPercentual > 0 ? Math.round(subtotalSelecionado * (taxaPercentual / 100) * 100) / 100 : 0;
+  const [taxaAtiva, setTaxaAtiva] = useState(true);
+  const taxaSelecionada = itensSelecionados && taxaPercentual > 0 && taxaAtiva ? Math.round(subtotalSelecionado * (taxaPercentual / 100) * 100) / 100 : 0;
   const valorSugerido = Math.min(subtotalSelecionado + taxaSelecionada, restante);
   const [forma, setForma] = useState('dinheiro');
   const [valor, setValor] = useState(valorSugerido.toFixed(2));
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
   const travado = !!itensSelecionados;
+
+  useEffect(() => {
+    if (travado) setValor(valorSugerido.toFixed(2));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taxaAtiva]);
 
   async function confirmar() {
     setErro('');
@@ -1447,10 +1453,10 @@ function PagamentoParcialForm({ restante, itensSelecionados, taxaPercentual = 0,
               ))}
             </div>
           ))}
-          {taxaSelecionada > 0 && (
+          {taxaPercentual > 0 && (
             <div className="row" style={{ fontSize: 13, borderTop: '1px dashed var(--border)', paddingTop: 6 }}>
-              <span className="muted">Taxa de serviço ({taxaPercentual}%)</span>
-              <span className="tabular">{money(taxaSelecionada)}</span>
+              <span className="muted">Taxa de serviço ({taxaPercentual}%) {taxaAtiva ? money(Math.round(subtotalSelecionado * (taxaPercentual / 100) * 100) / 100) : money(0)}</span>
+              <Switch checked={taxaAtiva} onChange={setTaxaAtiva} />
             </div>
           )}
         </div>
