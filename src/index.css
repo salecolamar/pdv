@@ -74,6 +74,26 @@ body {
   background: var(--bg);
 }
 
+/* Tela de login/cadastro — a única tela que todo mundo vê antes de
+   entrar, merece mais investimento visual que as telas internas do
+   dia a dia (que ficam de propósito neutras). Fundo com glow suave
+   nas cores da marca, atrás do card. */
+.tela-login {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 15% 15%, color-mix(in srgb, var(--primary-blue) 16%, transparent), transparent 55%),
+    radial-gradient(circle at 85% 85%, color-mix(in srgb, var(--primary-violet) 18%, transparent), transparent 55%),
+    var(--bg);
+  padding: 20px;
+}
+.tela-login__card {
+  position: relative;
+  z-index: 1;
+  box-shadow: var(--shadow-md), 0 24px 60px -20px color-mix(in srgb, var(--primary-violet) 35%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 12%, var(--border-soft));
+}
+
 /* Sem max-width fixo no #root: ao contrário do Balcão (só celular do
    garçom), este app também roda como painel de dono/caixa em tablet e
    desktop — cada tela decide sua própria largura confortável. */

@@ -36,9 +36,9 @@ export default function App() {
   return <PosLogin session={session} />;
 }
 
-export function Centro({ children }) {
+export function Centro({ children, className = '' }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100dvh', color: 'var(--text-dim)' }}>
+    <div className={className} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100dvh', color: 'var(--text-dim)' }}>
       {children}
     </div>
   );
@@ -200,8 +200,8 @@ function Auth() {
 
   if (cadastrando) {
     return (
-      <Centro>
-        <div className="card" style={{ width: 340, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Centro className="tela-login">
+        <div className="card tela-login__card" style={{ width: 340, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ textAlign: 'center' }}>
             <h1 style={{ fontSize: 18 }}>Cadastrar estabelecimento</h1>
           </div>
@@ -215,8 +215,8 @@ function Auth() {
   }
 
   return (
-    <Centro>
-      <div className="card" style={{ width: 340, display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <Centro className="tela-login">
+      <div className="card tela-login__card" style={{ width: 340, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ textAlign: 'center' }}>
           <LogoAppVia onCliques={registrarClique} />
           <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>Sistema de vendas para bares, restaurantes e eventos.</p>
