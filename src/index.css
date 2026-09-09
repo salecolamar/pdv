@@ -465,6 +465,16 @@ button:focus-visible {
   border-color: color-mix(in srgb, var(--primary) 45%, var(--border)) !important;
   background: color-mix(in srgb, var(--primary) 4%, var(--panel)) !important;
 }
+
+/* Linha clicável dentro de um .card (cliente, mesa cadastrada...) —
+   mesmo motivo do EscolhaCard: sem isso não reagia ao passar o mouse. */
+.linha-clicavel {
+  transition: background 0.14s ease;
+  border-radius: var(--radius-sm);
+}
+.linha-clicavel:hover {
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+}
 .tab[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 700; }
 
 .stepper { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }

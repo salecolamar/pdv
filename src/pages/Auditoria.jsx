@@ -79,7 +79,7 @@ export default function Auditoria() {
               <div key={log.id} className="card row" style={{ alignItems: 'flex-start', gap: 10 }}>
                 <div
                   style={{
-                    width: 32, height: 32, borderRadius: 10, background: cor, color: '#fff', flexShrink: 0,
+                    width: 32, height: 32, borderRadius: 10, background: `color-mix(in srgb, ${cor} 14%, white)`, color: cor, flexShrink: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1,
                   }}
                 >

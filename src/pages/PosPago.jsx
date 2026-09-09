@@ -148,7 +148,7 @@ export default function PosPago() {
             ) : (
               <div
                 key={m.id}
-                className="card row"
+                className="card row linha-clicavel"
                 style={{ alignItems: 'center', gap: 10, cursor: 'pointer' }}
                 onClick={() => setMesaVendo(m)}
                 title="Ver consumo da mesa"
