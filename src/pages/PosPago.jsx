@@ -152,6 +152,9 @@ export default function PosPago() {
                 style={{ alignItems: 'center', gap: 10, cursor: 'pointer' }}
                 onClick={() => setMesaVendo(m)}
                 title="Ver consumo da mesa"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMesaVendo(m); } }}
               >
                 <div
                   style={{

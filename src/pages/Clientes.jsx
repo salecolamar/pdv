@@ -239,7 +239,14 @@ function ClienteCard({ cliente, expandido, onExpandir, onEditar, onExcluir, onMu
 
   return (
     <div className="card">
-      <div className="row linha-clicavel" style={{ cursor: 'pointer', gap: 10, flexWrap: 'wrap', padding: 4, margin: -4 }} onClick={onExpandir}>
+      <div
+        className="row linha-clicavel"
+        style={{ cursor: 'pointer', gap: 10, flexWrap: 'wrap', padding: 4, margin: -4 }}
+        onClick={onExpandir}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onExpandir(); } }}
+      >
         <AvatarCliente nome={cliente.nome} />
         <div style={{ flex: '1 1 120px', minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 14.5 }}>{cliente.nome}</div>
