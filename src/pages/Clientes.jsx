@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Carregando } from '../components/EstadoVazio';
-import { Search, Star } from 'lucide-react';
+import EstadoVazio, { Carregando } from '../components/EstadoVazio';
+import { Search, Star, Users } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money, mascararTelefone, mascararCpf } from '../utils/format';
 
@@ -171,7 +171,11 @@ export default function Clientes() {
       {clientes === null ? (
         <Carregando />
       ) : filtrados.length === 0 ? (
-        <p className="muted" style={{ fontSize: 13 }}>{clientes.length === 0 ? 'Nenhum cliente cadastrado ainda.' : 'Nenhum cliente encontrado.'}</p>
+        <EstadoVazio
+          icon={clientes.length === 0 ? Users : Search}
+          titulo={clientes.length === 0 ? 'Nenhum cliente cadastrado ainda' : 'Nenhum cliente encontrado'}
+          texto={clientes.length === 0 ? 'Cadastre o primeiro cliente pra começar a acumular pontos de fidelidade nas vendas.' : 'Tente buscar por outro nome ou telefone.'}
+        />
       ) : (
         <div className="list">
           {filtrados.map((c) => (

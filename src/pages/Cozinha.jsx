@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChefHat, Eye, Printer, PrinterCheck, Settings, X } from 'lucide-react';
 import { supabase } from '../supabase';
+import EstadoVazio, { Carregando } from '../components/EstadoVazio';
 import { money } from '../utils/format';
 import {
   configurarImpressoraWifi,
@@ -180,9 +181,13 @@ export default function Cozinha() {
       {layoutAberto && <ConfigLayoutTicket onFechar={() => setLayoutAberto(false)} />}
 
       {rodadas === null ? (
-        <p className="muted" style={{ fontSize: 18 }}>Carregando…</p>
+        <Carregando />
       ) : rodadas.length === 0 ? (
-        <p className="muted" style={{ fontSize: 18 }}>Nenhum pedido hoje ainda.</p>
+        <EstadoVazio
+          icon={ChefHat}
+          titulo="Nenhum pedido hoje ainda"
+          texto="Assim que um garçom lançar uma rodada numa mesa, o ticket aparece aqui pra cozinha preparar."
+        />
       ) : (
         <div className="cozinha__colunas">
           {COLUNAS.map((col) => {

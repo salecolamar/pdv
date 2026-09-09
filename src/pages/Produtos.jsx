@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Carregando } from '../components/EstadoVazio';
+import EstadoVazio, { Carregando } from '../components/EstadoVazio';
 import * as XLSX from 'xlsx';
 import { Camera, Copy, FileSpreadsheet, Pencil, Plus, PlusCircle, Trash2, UtensilsCrossed, X } from 'lucide-react';
 import { supabase } from '../supabase';
@@ -647,7 +647,11 @@ function ProdutosLista({ categorias, onCategoriasAtualizadas }) {
       {produtos === null ? (
         <Carregando />
       ) : produtos.length === 0 ? (
-        <p className="muted" style={{ fontSize: 13 }}>Nenhum produto cadastrado ainda.</p>
+        <EstadoVazio
+          icon={UtensilsCrossed}
+          titulo="Nenhum produto cadastrado ainda"
+          texto="Adicione manualmente em “Novo produto” ou importe o cardápio de uma vez (planilha ou foto) usando os botões acima."
+        />
       ) : (
         <ProdutosPorCategoria
           produtos={produtos}

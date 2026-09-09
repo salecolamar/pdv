@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Carregando } from '../components/EstadoVazio';
+import EstadoVazio, { Carregando } from '../components/EstadoVazio';
 import { BookOpen, Pencil, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '../supabase';
 
@@ -81,7 +81,11 @@ export default function Cardapios() {
       {cardapios === null ? (
         <Carregando />
       ) : cardapios.length === 0 ? (
-        <p className="muted" style={{ fontSize: 13 }}>Nenhum cardápio criado ainda.</p>
+        <EstadoVazio
+          icon={BookOpen}
+          titulo="Nenhum cardápio criado ainda"
+          texto="Um cardápio agrupa os produtos que aparecem no QR Code da mesa — crie um pra ativar o cardápio digital."
+        />
       ) : (
         <div className="list">
           {cardapios.map((c) =>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Carregando } from '../components/EstadoVazio';
+import EstadoVazio, { Carregando } from '../components/EstadoVazio';
 import { Percent, Sparkles, Trash2 } from 'lucide-react';
 import { supabase } from '../supabase';
 
@@ -72,7 +72,11 @@ export default function Promocoes() {
       {promocoes === null ? (
         <Carregando />
       ) : promocoes.length === 0 ? (
-        <p className="muted" style={{ fontSize: 13 }}>Nenhuma promoção cadastrada ainda.</p>
+        <EstadoVazio
+          icon={Sparkles}
+          titulo="Nenhuma promoção cadastrada ainda"
+          texto="Crie uma promoção pra aplicar desconto automático em produtos ou combos por tempo limitado."
+        />
       ) : (
         <div className="list">
           {promocoes.map((promo) => (

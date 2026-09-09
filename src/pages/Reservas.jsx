@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Carregando } from '../components/EstadoVazio';
+import EstadoVazio, { Carregando } from '../components/EstadoVazio';
 import { CalendarClock, CalendarPlus, Check, Phone, Trash2 } from 'lucide-react';
 import { supabase } from '../supabase';
 
@@ -77,9 +77,11 @@ export default function Reservas() {
       {reservas === null ? (
         <Carregando />
       ) : listaFiltrada.length === 0 ? (
-        <p className="muted" style={{ fontSize: 13 }}>
-          {aba === 'proximas' ? 'Nenhuma reserva pendente.' : 'Nenhuma reserva no histórico.'}
-        </p>
+        <EstadoVazio
+          icon={CalendarClock}
+          titulo={aba === 'proximas' ? 'Nenhuma reserva pendente' : 'Nenhuma reserva no histórico'}
+          texto={aba === 'proximas' ? 'Toque em "Nova reserva" pra anotar a próxima mesa reservada.' : 'Reservas já concluídas ou canceladas aparecem aqui.'}
+        />
       ) : (
         <div className="list">
           {listaFiltrada.map((r) => {
