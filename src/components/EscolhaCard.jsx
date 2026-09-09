@@ -4,6 +4,7 @@ export default function EscolhaCard({ selecionado, onClick, icon: Icon, titulo, 
       type="button"
       onClick={onClick}
       disabled={disabled}
+      className="escolha-card"
       style={{
         flex: 1,
         textAlign: 'left',

@@ -24,10 +24,10 @@ import { inicioDoDia, inicioDoMes, subDias } from '../utils/datas';
 const MEDALHA = ['var(--accent-gold)', 'var(--accent-silver)', 'var(--accent-bronze)'];
 
 const FORMAS_PAGAMENTO = [
-  { forma: 'dinheiro', label: 'Dinheiro', icon: Banknote },
-  { forma: 'pix', label: 'Pix', icon: QrCode },
-  { forma: 'debito', label: 'Débito', icon: Landmark },
-  { forma: 'credito', label: 'Crédito', icon: CreditCard },
+  { forma: 'dinheiro', label: 'Dinheiro', icon: Banknote, cor: 'var(--success, #2f9e5f)' },
+  { forma: 'pix', label: 'Pix', icon: QrCode, cor: 'var(--primary-blue)' },
+  { forma: 'debito', label: 'Débito', icon: Landmark, cor: 'var(--primary-violet)' },
+  { forma: 'credito', label: 'Crédito', icon: CreditCard, cor: 'var(--primary)' },
 ];
 
 function bucketsMeiaHora(vendas) {
@@ -310,7 +310,7 @@ export default function Dashboard() {
             const pct = Math.round((valor / totalFormas) * 100);
             return (
               <div key={f.forma} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div className="dash-forma-icone">
+                <div className="dash-forma-icone" style={{ background: `color-mix(in srgb, ${f.cor} 14%, white)`, color: f.cor }}>
                   <f.icon size={16} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -584,7 +584,7 @@ function Ranking({ titulo, icon: Icon, itens, vazio, renderLinha, semMedalha }) 
 function CartaoIcone({ icon: Icon, cor, titulo, valor }) {
   return (
     <div className="card dash-stat-card">
-      <div className="dash-stat-card__icone" style={{ background: cor }}>
+      <div className="dash-stat-card__icone" style={{ background: `color-mix(in srgb, ${cor} 14%, white)`, color: cor }}>
         <Icon size={17} />
       </div>
       <div style={{ minWidth: 0 }}>

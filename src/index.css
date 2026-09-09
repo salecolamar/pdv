@@ -458,6 +458,13 @@ button:focus-visible {
   transition: background 0.14s ease, color 0.14s ease;
 }
 .tab:hover { color: var(--text); }
+
+/* EscolhaCard (cartão clicável de seleção — mesa, papel, tipo de caixa...):
+   sem isso ele não reagia a hover, parecia estático/morto ao passar o mouse. */
+.escolha-card:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border)) !important;
+  background: color-mix(in srgb, var(--primary) 4%, var(--panel)) !important;
+}
 .tab[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 700; }
 
 .stepper { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
@@ -903,7 +910,6 @@ button:focus-visible {
   width: 38px;
   height: 38px;
   border-radius: 11px;
-  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
