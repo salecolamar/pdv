@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Carregando } from '../components/EstadoVazio';
-import { Minus, Plus, Search, ShoppingCart, Trash2, X } from 'lucide-react';
+import { CheckCircle2, Minus, Plus, Search, ShoppingCart, Trash2, X } from 'lucide-react';
 import { supabase } from '../supabase';
 import { money } from '../utils/format';
 import { precoEfetivo } from '../utils/promocoes';
@@ -461,7 +461,7 @@ function FinalizarVenda({ itens, subtotal, desconto, total, onVoltar, onConcluid
       {erro && <p className="danger-text" style={{ fontSize: 13 }}>{erro}</p>}
 
       <button type="button" className="btn btn-primary btn-block" disabled={enviando} onClick={confirmar}>
-        {enviando ? 'Finalizando…' : 'Confirmar pagamento'}
+        {enviando ? 'Finalizando…' : (<><CheckCircle2 size={17} /> Confirmar pagamento</>)}
       </button>
     </div>
   );

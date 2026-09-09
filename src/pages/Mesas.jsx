@@ -893,7 +893,7 @@ function Comanda({ mesa, mesas, onVoltar, onDadosAlterados }) {
 
       {pedido.status === 'aberto' && (
         <button type="button" className="btn btn-primary btn-block" onClick={() => setLancando(true)}>
-          Lançar itens
+          <Plus size={17} /> Lançar itens
         </button>
       )}
 
